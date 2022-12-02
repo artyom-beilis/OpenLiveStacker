@@ -61,6 +61,8 @@ Stacked result meta data per file
     
 ## API:
 
+Basic API layout
+
     /api - base URL to API access
     /api/video/live - live video stream non-processed MJPEG to show directly in browser
     /api/video/stacked - video of stacked stream MJPEG to show directly in browser
@@ -69,40 +71,10 @@ Stacked result meta data per file
     /api/camera - camera controls
     /api/stacker - stacker controls
 
-## Updates:
-
-All updates are sent via ServerSentEvents 
-
-Historgrams: 
-
-    /api/updates/live/histogram - histogram for raw video
-    /api/updates/stacked/histogram - histogram for stacked image BEFORE auto-stretch
-
-        histogram format 
-        {
-            "type": "rgb"/"mono"
-            // for RGB
-            "R" : [ 256 floating point numbers ] 
-            "G" : [ 256 floating point numbers ]
-            "B" : [ 256 floating point numbers ]
-            // for mono
-            "Y" : [ 256 floating point numbers ]
-        }
-   
-Stacking updates   
     
-    /api/updates/stacking_status - progress updates, meta info etc.
-        {
-            "status" : "stacking" / "failed" / "paused" / "finished" // stacking status
-            "frames" : INTEGER, // number of frames received
-            "processed" : INTERGER, // number of frames processing
-            "stacked": INTEGER // number of rames actually stacked (may be failure due to registration errors
-            "dropped": INTEGER // number of frames dropped due to overload
-            "error_message": // message in case of failed status
-        }
+### Camera API `/api/camera`
 
-    
-Camera API `/api/camera`
+Camera controls
 
 
     GET /api/camera
@@ -159,7 +131,9 @@ Camera API `/api/camera`
         [ { "option_id" : string, "value" : value }, ... ]
         return { "status" : "ok"/"fail: reason" }
 
-Stacker API
+### Stacker API
+
+Stacking controls
 
 
     POST /api/stacker/start - start stacking
@@ -207,4 +181,37 @@ Stacker API
         }
         return { "status" : "ok"/"fail: reason" }
             
+### Live Updates
+
+All updates are sent via ServerSentEvents 
+
+Image Historgrams: 
+
+    /api/updates/live/histogram - histogram for raw video
+    /api/updates/stacked/histogram - histogram for stacked image BEFORE auto-stretch
+
+        histogram format 
+        {
+            "type": "rgb"/"mono"
+            // for RGB
+            "R" : [ 256 floating point numbers ] 
+            "G" : [ 256 floating point numbers ]
+            "B" : [ 256 floating point numbers ]
+            // for mono
+            "Y" : [ 256 floating point numbers ]
+        }
+   
+Stacking updates   
+    
+    /api/updates/stacking_status - progress updates, meta info etc.
+
+    {
+        "status" : "stacking" / "failed" / "paused" / "finished" // stacking status
+        "frames" : INTEGER, // number of frames received
+        "processed" : INTERGER, // number of frames processing
+        "stacked": INTEGER // number of rames actually stacked (may be failure due to registration errors
+        "dropped": INTEGER // number of frames dropped due to overload
+        "error_message": // message in case of failed status
+    }
+
 
