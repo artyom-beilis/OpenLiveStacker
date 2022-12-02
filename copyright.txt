@@ -1,0 +1,5 @@
+OpenLiveStacker - open source live stacker with web interface for Linux based OS:
+Linux, Raspberry PI, ANdroid
+
+Copyright (C) 2022 Artyom Beilis
+
