@@ -2,6 +2,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <queue>
+#include <memory>
 
 namespace ols {
     template<typename T>
@@ -11,7 +12,7 @@ namespace ols {
         void push(T const &v)
         {
             std::unique_lock<std::mutex> guard(lock_);
-            data_.push_back(v);
+            data_.push(v);
             cond_.notify_one();
         }
 
@@ -21,8 +22,8 @@ namespace ols {
             while(data_.empty()) {
                 cond_.wait(guard);
             }
-            T res = queue_.front();
-            queue_.pop_front();
+            T res = data_.front();
+            data_.pop();
             return res;
         }
 

@@ -1,4 +1,9 @@
 #pragma once
+#include <memory>
+#include <opencv2/core.hpp>
+#include "sync_queue.h"
+#include "video_frame.h"
+
 namespace ols {
     struct QueueData {
         virtual ~QueueData() {}

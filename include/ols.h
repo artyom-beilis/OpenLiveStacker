@@ -1,4 +1,9 @@
 #pragma once
+#include "camera.h"
+#include "data_items.h"
+#include "video_generator.h"
+#include <cppcms/service.h>
+#include <thread>
 
 namespace ols {
 
@@ -8,7 +13,17 @@ namespace ols {
         OpenLiveStacker();
         ~OpenLiveStacker();
 
+        int http_port = 8080;
+        std::string http_ip = "0.0.0.0";
+        std::string document_root = "www-data";
+
+        void init(std::string driver,int id=0);
+        void run();
+        void shutdown();
+
     private:
+        void stop();
+        void handle_video_frame(CamFrame const &cf);
 
         /// Data Queues
 
@@ -29,8 +44,11 @@ namespace ols {
         
         std::mutex camera_lock_;
         std::unique_ptr<Camera> camera_;
+        std::unique_ptr<CameraDriver> driver_;
 
         std::unique_ptr<VideoGenerator> video_generator_;
+        booster::intrusive_ptr<VideoGeneratorApp> video_generator_app_;
+        std::thread video_generator_thread_;
 
         //std::unique_ptr<Stacker> stacker_;
         //std::thread stacker_thread_;
