@@ -2,14 +2,17 @@
 #include "camera.h"
 #include "data_items.h"
 #include "video_generator.h"
+#include "camera_iface.h"
 #include <cppcms/service.h>
 #include <thread>
 
 namespace ols {
 
 
-    class OpenLiveStacker {
+    class OpenLiveStacker : public CameraInterface {
     public:
+
+        typedef std::unique_lock<std::recursive_mutex> guard;
         OpenLiveStacker();
         ~OpenLiveStacker();
 
@@ -17,9 +20,23 @@ namespace ols {
         std::string http_ip = "0.0.0.0";
         std::string document_root = "www-data";
 
-        void init(std::string driver,int id=0);
+        void init(std::string driver);
         void run();
         void shutdown();
+
+        virtual std::recursive_mutex &lock() 
+        {
+            return camera_lock_;
+        }
+        virtual Camera &cam();
+        virtual void open_camera(int id);
+        virtual void close_camera();
+        virtual void start_stream(CamStreamFormat format);
+        virtual void stop_stream();
+        virtual CameraDriver &driver()
+        {
+            return *driver_;
+        }
 
     private:
         void stop();
@@ -42,7 +59,7 @@ namespace ols {
         ///        |-> converter_queue_ -> Frame2Mat -> stacker_queue_ -> Stacker |-> post_processing_queue_ -> PostProcess -> stacked_display_queue_ -> StackedVideoGenerator
         ///                                                                       |-> stacking_progress_queue_ -> PublishStats  
         
-        std::mutex camera_lock_;
+        std::recursive_mutex camera_lock_;
         std::unique_ptr<Camera> camera_;
         std::unique_ptr<CameraDriver> driver_;
 

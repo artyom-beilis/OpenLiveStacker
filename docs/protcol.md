@@ -83,11 +83,17 @@ Camera controls
             {
                 "id"   : number // camera no - 0..N
                 "name" :  string, // camera name. to display
-                "type" : string, // UVC, ASI, ASCOM, AndroidCamera, VFL 
+                //"type" : string, // UVC, ASI, ASCOM, AndroidCamera, VFL 
             }
         ]
         
-    GET /api/camera/ID - open camera, get list of supported formats/sizes/mods
+    POST /api/camera
+        {
+            "operation" : "open","close" // open or close camera
+            "id" : camera id
+        }
+
+    GET /api/camera/formats - open camera, get list of supported formats/sizes/mods
         [
             {
                 "format_id" : string, // format id
@@ -98,13 +104,14 @@ Camera controls
             },
         ]
 
-    POST /api/camera/ID/stream - start/stop stream
+    POST /api/camera/stream - start/stop stream
         {
             "op" : "start" / "stop" // start or stop the stream
             "format_id" : string, // for start stream provide format you received in the list, for example "1920x1080_mjpeg"
         }
-        return { "status" : "ok"/"fail: reason" }
-    GET /api/camera/ID/options - list camera suppored settings
+        return { "status" : "ok"/"fail", "msg" : STRING" }
+
+    GET /api/camera/options - list camera suppored settings
         [
             {
                 "option_id" : string // option name id for example "exp", "wb"
@@ -120,16 +127,16 @@ Camera controls
                 "default": value // default value if applicable, null for not
             }
         ]
-    POST /api/camera/ID/option/OPTION_ID - set camera settings
+    POST /api/camera/option/OPTION_ID - set camera settings
         { "value" : value }
-        return { "status" : "ok"/"fail: reason" }
-    GET /api/camera/ID/option/OPTION_ID - get current camera option value
+        return { "status" : "ok"/"fail", "msg" : STRING" }
+    GET /api/camera/option/OPTION_ID - get current camera option value
         { "value" : value }
-    GET /api/camera/ID/option/all - get all camera option value
+    GET /api/camera/option/all - get all camera option value
         [ { "option_id" : string, "value" : value }, ... ]
-    POST /api/camera/ID/option/any - update any camera option by list
+    POST /api/camera/option/any - update any camera option by list
         [ { "option_id" : string, "value" : value }, ... ]
-        return { "status" : "ok"/"fail: reason" }
+        return { "status" : "ok"/"fail", "msg" : STRING" }
 
 ### Stacker API
 
@@ -160,7 +167,7 @@ Stacking controls
             "bias": string or null // id of bais frame
             "save_data" : bool // default false - save intermediate data used for stacking for offline processing
         }
-        return { "status" : "ok"/"fail: reason" }
+        return { "status" : "ok"/"fail", "msg" : STRING" }
 
     POST /api/stacker/control
 
@@ -169,7 +176,7 @@ Stacking controls
             // pase and resume for manual tracking, save - finish stacking and save the result, save_and_continue - save intermediate result and continue stacking
             "save_unprocessed" : bool // default false - save floating point image before stretching and converting to 8bit jpeg
         }
-        return { "status" : "ok"/"fail: reason" }
+        return { "status" : "ok"/"fail", "msg" : STRING" }
 
     POST /api/stacker/stretch
         {
@@ -179,7 +186,7 @@ Stacking controls
             "high" : float 0..1 - remove high range, default 1.0
             "gamma" : // gamma correction, default 2.2
         }
-        return { "status" : "ok"/"fail: reason" }
+        return { "status" : "ok"/"fail", "msg" : STRING" }
             
 ### Live Updates
 

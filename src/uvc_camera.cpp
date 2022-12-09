@@ -7,6 +7,7 @@
 #include "libuvc/libuvc.h"
 
 #include <mutex>
+#include <iostream>
 #include <string.h>
 #include <sys/time.h>
 
@@ -36,8 +37,8 @@ namespace ols {
         }
         ~UVCCamera()
         {
-            if(strh_)
-                uvc_stream_stop(strh_);
+            if(stream_active_)
+                uvc_stop_streaming(devh_);
             uvc_close(devh_);
         }
         virtual std::string name()
@@ -98,7 +99,7 @@ namespace ols {
         }
         virtual void start_stream(CamStreamFormat fmt,frame_callback_type cb) 
         {
-            if(strh_)
+            if(stream_active_)
                 stop_stream();
 
             int index = -1;
@@ -140,19 +141,18 @@ namespace ols {
             if(res < 0) {
                 throw UVCError("Failed to start stream : " + std::to_string(res),res);
             }
+            stream_active_ = true;
         }
         virtual void stop_stream() 
         {
-            if(!strh_)
+            if(!stream_active_)
                 return;
             {
                 std::unique_lock<std::mutex> guard(lock_);
                 callback_ = nullptr;
             }
-            uvc_error_t res = uvc_stream_stop(strh_);
-            strh_ = nullptr;
-            if(res < 0)
-                throw UVCError("Failed to stop stream",res);
+            uvc_stop_streaming(devh_);
+            stream_active_ = false;
         }
         virtual std::vector<CamOptionId> supported_options() 
         {
@@ -198,7 +198,7 @@ namespace ols {
         std::string name_;
         uvc_device_handle_t *devh_ = nullptr;
         uvc_stream_ctrl_t ctrl_;
-        uvc_stream_handle_t *strh_ = nullptr;
+        bool stream_active_ = true;
         std::vector<CamStreamFormat> formats_;
         int frame_counter_ = 0;
         // protected by mutex

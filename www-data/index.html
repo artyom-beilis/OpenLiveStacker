@@ -3,7 +3,91 @@
 <head>
     <title>OpenLiveStacker</title>
 </head>
+<style>
+    body, td { font-size: 5mm ; color:red ; font-family: sans; background-color:black }
+    a:link {color: red;}
+    a:visited { color: red; }
+    a:active { color:red; }
+    a:hover { color:red; }
+    button { border-radius:2mm; height:10mm; font-size:5mm ; text-align:center; vertical-align: middle; background-color:black; color:red; border: 2px solid red }
+</style>
 <body>
-    <img style="width:80%" alt="streaming test" src="/api/video/live" />
+<script>
+function restCall(method,url,request,on_response)
+{
+    var xhr = new XMLHttpRequest()
+    xhr.open(method,url,true)
+    xhr.onload = function() {
+        var response = JSON.parse(xhr.responseText);
+        if('status' in response && response.status == 'fail') {
+            alert(response.error);
+            return;
+        }
+        on_response(response)
+    };
+    if(request != null) {
+        xhr.setRequestHeader('Content-Type','application/json');
+        xhr.send(JSON.stringify(request));
+    }
+    else {
+        xhr.send();
+    }
+}
+
+function run()
+{
+    restCall("get","/api/camera",null,listCameras);
+}
+
+function listCameras(cameras)
+{
+    var sel = document.getElementById('camera_select')
+    for(var i=0;i<cameras.length;i++) {
+        var option = document.createElement("option");
+        option.text = cameras[i].name
+        option.value = cameras[i].id.toString()
+        sel.add(option)
+    }
+}
+
+function open_camera()
+{
+    var cam_id = document.getElementById('camera_select').value;
+    restCall('post','/api/camera', { operation: 'open',id:parseInt(cam_id) }, function(msg) {
+        restCall('get','/api/camera/formats', null, (formats)=> {
+            var sel = document.getElementById('stream_format')
+            for(var i=sel.length-1;i>=0;i--) {
+                sel.options.remove(i);
+            }
+            for(var i=0;i<formats.length;i++) {
+                var option = document.createElement("option");
+                option.text = formats[i].format_id
+                option.value = formats[i].format_id
+                sel.add(option)
+            }
+        });
+    });
+}
+
+function start_stream()
+{
+    var format_id = document.getElementById('stream_format').value;
+    restCall('post','/api/camera/stream',{op:'start',format_id:format_id},(r)=>{
+        document.getElementById('video').innerHTML = '<img style="width:80%" alt="streaming test" src="/api/video/live" />';
+    });
+}
+
+
+window.onload = (event) => {
+  run();
+};
+
+</script> 
+<p>
+    Camera: <select id="camera_select"></select><button onclick="open_camera()">Open</button>
+    Format: <select id="stream_format"></select><button onclick="start_stream()" >Stream</button>
+</p>
+<p id='video'></p>
+
 </body>
 </html>

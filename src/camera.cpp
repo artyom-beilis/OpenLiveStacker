@@ -33,17 +33,37 @@ static char const *option_names[] = {
 
 std::string cam_option_id_to_string_id(CamOptionId id)
 {
-    int nid = id;
-    if(nid < 0 || nid >= sizeof(option_string_ids)/sizeof(option_string_ids[0]))
+    size_t nid = id;
+    if(nid >= sizeof(option_string_ids)/sizeof(option_string_ids[0]))
         throw CamError("Invalid option id");
     return option_string_ids[nid];
 }
 
+std::string stream_type_to_str(CamStreamType s)
+{
+    switch(s) {
+    case stream_yuv2: return "yuv2";
+    case stream_mjpeg: return "mjpeg";
+    default:
+        throw CamError("Invalid Stream type");
+    }
+}
+
+CamStreamType stream_type_from_str(std::string s)
+{
+    if(s=="mjpeg")
+        return stream_mjpeg;
+    if(s=="yuv2")
+        return stream_yuv2;
+    throw CamError("Invalid stream type " + s);
+}
+
+
 
 std::string cam_option_id_to_name(CamOptionId id)
 {
-    int nid = id;
-    if(nid < 0 || nid >= sizeof(option_names)/sizeof(option_names[0]))
+    size_t nid = id;
+    if(nid >= sizeof(option_names)/sizeof(option_names[0]))
         throw CamError("Invalid option id");
     return option_names[nid];
 }

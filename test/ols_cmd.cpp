@@ -8,7 +8,7 @@ int main()
     try {
 
         ols::OpenLiveStacker stacker;
-        stacker.init("UVC",0);
+        stacker.init("UVC");
         stacker.run();
         stacker.shutdown();
     }
@@ -16,5 +16,6 @@ int main()
         std::cerr << "failed:" << e.what() << std::endl;
         return 1;
     }
+    std::cout << "Done" << std::endl;
     return 0;
 }

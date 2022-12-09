@@ -59,6 +59,9 @@ namespace ols {
         stream_error,
     };
 
+    std::string stream_type_to_str(CamStreamType s);
+    CamStreamType stream_type_from_str(std::string s);
+
     struct CamStreamFormat {
         CamStreamType format;
         int width,height;
