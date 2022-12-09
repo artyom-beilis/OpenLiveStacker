@@ -4,6 +4,8 @@
 #include <cppcms/http_response.h>
 #include <cppcms/service.h>
 #include <booster/log.h>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 #include <set>
 
 namespace ols {
@@ -96,8 +98,19 @@ namespace ols {
             if(frame->format.format == stream_mjpeg) {
                 frame->jpeg_frame = frame->source_frame;
             }
+            else if(frame->format.format == stream_yuv2) {
+                if(frame->source_frame->size() != frame->format.height*frame->format.width*2)
+                    throw std::runtime_error("Invalid frame size");
+                cv::Mat yuv2(frame->format.height,frame->format.width,CV_8UC2,frame->source_frame->data());
+                cv::Mat rgb;
+                cv::cvtColor(yuv2,rgb,cv::COLOR_YUV2BGR_YUYV);
+                std::vector<unsigned char> buf;
+                cv::imencode(".jpeg",rgb,buf);
+                frame->frame = rgb;
+                frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
+            }
             else {
-                BOOSTER_ERROR("stacker") << "Only mjpeg video genetator is supported for now";
+                BOOSTER_ERROR("stacker") << "Only mjpeg video genetator is supported for now got " << stream_type_to_str(frame->format.format);
                 return;
             }
             app_->frame_handler(frame->jpeg_frame);
