@@ -121,9 +121,9 @@ Camera controls
                 "name" : string // option name human readable: "Exposure", "White Ballance"
                 "type" : string // "boolean", "integer", "float", etc
                 "min"  : value // min value for integer/float
+                "cur"  : value // current value for integer/float
                 "max"  : value // max value for integer/float
                 "step" : value  // step unit for integer/float
-                "unit" : string // unit of the value "K" for WB, "ms" for exposure, "%" for gain etc, human readable
                 "default": value // default value if applicable, null for not
             }
         ]

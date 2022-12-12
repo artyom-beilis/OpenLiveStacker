@@ -156,15 +156,139 @@ namespace ols {
         }
         virtual std::vector<CamOptionId> supported_options() 
         {
-            return std::vector<CamOptionId>();
+            return std::vector<CamOptionId>({
+                opt_auto_exp,
+                opt_auto_wb,
+                opt_exp,
+                opt_wb,
+                opt_gain,
+                opt_gamma,
+            });
         }
-        virtual CamParam get_parameter(CamOptionId /*id*/)
+        template<typename ItemType,typename FunctionType>
+        void update_parameters(CamParam &r,FunctionType func,double scale,bool current_only)
         {
-            throw UVCError("Option not supported");
+            ItemType vals[5];
+            uvc_req_code codes[5]={UVC_GET_CUR,UVC_GET_MIN,UVC_GET_DEF,UVC_GET_RES,UVC_GET_MAX};
+            int limit = current_only ? 1 : 5;
+            for(int i=0;i<limit;i++) {
+                uvc_error_t res = func(devh_,vals + i,codes[i]);
+                if(res < 0)
+                    throw UVCError("Failed to read value",res);
+            }
+            r.cur_val   = vals[0]*scale;
+            r.min_val   = vals[1]*scale;
+            r.def_val   = vals[2]*scale;
+            r.step_size = vals[3]*scale;
+            r.max_val   = vals[4]*scale;
         }
-        virtual void set_parameter(CamOptionId /*id*/,double /*value*/)
+        virtual CamParam get_parameter(CamOptionId op_id,bool current_only = false)
         {
-            throw UVCError("Option not supported");
+            CamParam r;
+            memset(&r,0,sizeof(r));
+            r.option = op_id;
+            switch(op_id) {
+            case opt_auto_exp:
+                {
+                    r.type = type_bool;
+                    uint8_t cur,def = 0;
+                    uvc_error_t res = uvc_get_ae_mode(devh_,&cur,UVC_GET_CUR);
+                    if(res < 0)
+                        throw UVCError("AE query failed",res);
+                    if(!current_only) {
+                        uvc_error_t res = uvc_get_ae_mode(devh_,&def,UVC_GET_DEF);
+                        if(res < 0)
+                            throw UVCError("AE query failed",res);
+                    }
+                    
+                    r.step_size = r.max_val =  1;
+                    r.min_val = 0;
+                    r.cur_val = cur == 2 || cur == 8;
+                    r.def_val = def == 2 || def == 8;
+                }
+                break;
+            case opt_auto_wb:
+                {
+                    r.type = type_bool;
+                    uint8_t cur,def = 0;
+                    uvc_error_t res = uvc_get_white_balance_temperature_auto(devh_,&cur,UVC_GET_CUR);
+                    if(res < 0)
+                        throw UVCError("WB query failed",res);
+                    if(!current_only) {
+                        uvc_error_t res = uvc_get_white_balance_temperature_auto(devh_,&def,UVC_GET_DEF);
+                        if(res < 0)
+                            throw UVCError("WB query failed",res);
+                    }
+                    
+                    r.step_size = r.max_val =  1;
+                    r.min_val = 0;
+                    r.cur_val = cur != 0;
+                    r.def_val = def != 0;
+                }
+                break;
+            case opt_exp:
+                r.type = type_msec;
+                update_parameters<uint32_t>(r,uvc_get_exposure_abs,0.1,current_only);
+                break;
+            case opt_wb:
+                r.type = type_kelvin;
+                update_parameters<uint16_t>(r,uvc_get_white_balance_temperature,1.0,current_only);
+                break;
+            case opt_gamma:
+                r.type = type_number;
+                update_parameters<uint16_t>(r,uvc_get_gamma,1e-2,current_only);
+                break;
+            case opt_gain:
+                r.type = type_number;
+                update_parameters<uint16_t>(r,uvc_get_gain,1,current_only);
+                break;
+            default:
+                throw UVCError("Option not supported" + cam_option_id_to_name(op_id));
+            }
+            return r;
+        }
+        virtual void set_parameter(CamOptionId opt_id,double value)
+        {
+            uvc_error_t res;
+            switch(opt_id) {
+            case opt_auto_exp:
+                if(value != 0){
+                    res = uvc_set_ae_mode(devh_,2);
+                    if(res < 0) {
+                        res = uvc_set_ae_mode(devh_,8);
+                    }
+                }
+                else {
+                    res = uvc_set_ae_mode(devh_,0);
+                    if(res < 0) {
+                        res = uvc_set_ae_mode(devh_,4);
+                        if(res < 0) {
+                            res = uvc_set_ae_mode(devh_,1);
+                        }
+                    }
+                }
+                break;
+            case opt_auto_wb:
+                res = uvc_set_white_balance_temperature_auto(devh_,value ? 1 : 0);
+                break;
+            case opt_exp:
+                res = uvc_set_exposure_abs(devh_,value*10);
+                break;
+            case opt_wb:
+                res = uvc_set_white_balance_temperature(devh_,value);
+                break;
+            case opt_gain:
+                res = uvc_set_gain(devh_,value);
+                break;
+            case opt_gamma:
+                res = uvc_set_gamma(devh_,value*100); 
+                break;
+            default:
+                throw UVCError("Option not supported" + cam_option_id_to_name(opt_id));
+            }
+            if(res < 0) {
+                throw UVCError("Failed to set option" + cam_option_id_to_name(opt_id),res);
+            }
         }
 
      

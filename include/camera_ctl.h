@@ -21,6 +21,41 @@ namespace ols {
             dispatcher().map("POST","/?",&CameraControlApp::start_stop,this);
             dispatcher().map("GET","/formats/?",&CameraControlApp::formats,this);
             dispatcher().map("POST","/stream/?",&CameraControlApp::stream,this);
+            dispatcher().map("GET","/options/?",&CameraControlApp::options,this);
+            dispatcher().map("POST","/option/(\\w+)",&CameraControlApp::set_opt,this,1);
+        }
+
+
+        void set_opt(std::string id)
+        {
+            double value = content_.get<double>("value");
+            CamOptionId opt = cam_option_id_from_string_id(id);
+            guard g(cam_->lock());
+            cam_->cam().set_parameter(opt,value);
+        }
+        void options()
+        {
+            std::vector<CamParam> params;
+            {
+                guard g(cam_->lock());
+                auto &cam = cam_->cam();
+                auto opts = cam.supported_options();
+                for(auto opt:opts) {
+                    CamParam param = cam.get_parameter(opt);
+                    params.push_back(param);
+                }
+            }
+            for(unsigned i=0;i<params.size();i++) {
+                CamParam param = params[i];
+                response_[i]["option_id"] = cam_option_id_to_string_id(param.option);
+                response_[i]["name"] = cam_option_id_to_name(param.option);
+                response_[i]["type"] = cam_option_type_to_str(param.type);
+                response_[i]["step"] = param.step_size;
+                response_[i]["cur"] = param.cur_val;
+                response_[i]["min"] = param.min_val;
+                response_[i]["max"] = param.max_val;
+                response_[i]["default"] = param.def_val;
+            }
         }
 
         void list_cameras()

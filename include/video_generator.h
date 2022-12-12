@@ -99,7 +99,7 @@ namespace ols {
                 frame->jpeg_frame = frame->source_frame;
             }
             else if(frame->format.format == stream_yuv2) {
-                if(frame->source_frame->size() != frame->format.height*frame->format.width*2)
+                if(int(frame->source_frame->size()) != frame->format.height*frame->format.width*2)
                     throw std::runtime_error("Invalid frame size");
                 cv::Mat yuv2(frame->format.height,frame->format.width,CV_8UC2,frame->source_frame->data());
                 cv::Mat rgb;

@@ -59,6 +59,25 @@ CamStreamType stream_type_from_str(std::string s)
 }
 
 
+static char const *cam_option_type_names[]={"bool","number","msec","percent","kelvin"};
+
+std::string cam_option_type_to_str(CamOptionType type)
+{
+    unsigned id = type;
+    if(id >= sizeof(cam_option_type_names)/sizeof(cam_option_type_names[0]))
+        throw CamError("Invalid type");
+    return cam_option_type_names[id];
+}
+CamOptionType cam_option_type_from_str(std::string const &name)
+{
+    for(unsigned i=0;i<sizeof(cam_option_type_names)/sizeof(cam_option_type_names[0]);i++) {
+        if(cam_option_type_names[i] == name) {
+            return static_cast<CamOptionType>(i);
+        }
+    }
+    throw CamError("Invalid type:" + name);
+}
+
 
 std::string cam_option_id_to_name(CamOptionId id)
 {

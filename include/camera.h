@@ -32,16 +32,14 @@ namespace ols {
 
     enum CamOptionType {
         type_bool,
-        type_int,
-        type_float
+        type_number,
+        type_msec,
+        type_percent,
+        type_kelvin,
     };
 
-    enum CamOptionUnit {
-        unit_none,
-        unit_msec,
-        unit_percent,
-        unit_kelvin,
-    };
+    std::string cam_option_type_to_str(CamOptionType type);
+    CamOptionType cam_option_type_from_str(std::string const &name);
 
     struct CamParam {
         CamOptionId option;
@@ -112,7 +110,7 @@ namespace ols {
         /// list of camera controls that the camera supports
         virtual std::vector<CamOptionId> supported_options() = 0;
         /// get camera control
-        virtual CamParam get_parameter(CamOptionId id) = 0;
+        virtual CamParam get_parameter(CamOptionId id,bool current_only = false) = 0;
         /// set camera control
         virtual void set_parameter(CamOptionId id,double value) = 0;
         virtual ~Camera() {}

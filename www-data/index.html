@@ -73,7 +73,7 @@ function start_stream()
 {
     var format_id = document.getElementById('stream_format').value;
     restCall('post','/api/camera/stream',{op:'start',format_id:format_id},(r)=>{
-        document.getElementById('video').innerHTML = '<img style="width:80%" alt="streaming test" src="/api/video/live" />';
+        document.getElementById('video').innerHTML = '<img style="width:95%; align:center" alt="streaming video" src="/api/video/live" />';
     });
 }
 
