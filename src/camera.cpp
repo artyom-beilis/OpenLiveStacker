@@ -25,10 +25,10 @@ std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)
 }
 
 static char const *option_string_ids[] = {
-    "auto_exp", "auto_wb", "exp", "wb", "gain", "gamma"
+    "auto_exp", "auto_wb", "exp", "wb", "gain", "gamma", "brightness","contrast",
 };
 static char const *option_names[] = {
-    "Auto Exposure", "Auto White Balance", "Exposure", "White Balance", "Gain", "Gamma"
+    "Auto Exposure", "Auto White Balance", "Exposure", "White Balance", "Gain", "Gamma", "Brightness", "Contrast"
 };
 
 std::string cam_option_id_to_string_id(CamOptionId id)

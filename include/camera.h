@@ -20,6 +20,8 @@ namespace ols {
         opt_wb,
         opt_gain,
         opt_gamma,
+        opt_brightness,
+        opt_contrast,
         opt_count
     };
 

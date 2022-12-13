@@ -20,11 +20,26 @@ namespace ols {
             dispatcher().map("GET","/?",&CameraControlApp::list_cameras,this);
             dispatcher().map("POST","/?",&CameraControlApp::start_stop,this);
             dispatcher().map("GET","/formats/?",&CameraControlApp::formats,this);
+            dispatcher().map("GET","/status/?",&CameraControlApp::status,this);
             dispatcher().map("POST","/stream/?",&CameraControlApp::stream,this);
             dispatcher().map("GET","/options/?",&CameraControlApp::options,this);
             dispatcher().map("POST","/option/(\\w+)",&CameraControlApp::set_opt,this,1);
         }
 
+        void status()
+        {
+            switch(cam_->status()) {
+            case CameraInterface::cam_closed:
+                response_["status"]="closed";
+                break;
+            case CameraInterface::cam_open:
+                response_["status"]="open";
+                break;
+            case CameraInterface::cam_streaming:
+                response_["status"]="streaming";
+                break;
+            }
+        }
 
         void set_opt(std::string id)
         {

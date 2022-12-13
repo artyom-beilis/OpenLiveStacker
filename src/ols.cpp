@@ -14,12 +14,24 @@ OpenLiveStacker::~OpenLiveStacker()
 {
 }
 
+CameraInterface::CamStatus OpenLiveStacker::status()
+{
+    guard g(camera_lock_);
+    if(!camera_)
+        return cam_closed;
+    if(stream_active_)
+        return cam_streaming;
+    else
+        return cam_open;
+
+}
 
 void OpenLiveStacker::open_camera(int id) 
 {
     close_camera();
     guard g(camera_lock_);
     camera_ = std::move(driver_->open_camera(id));
+    stream_active_ = false;
 }
 Camera &OpenLiveStacker::cam() 
 {
@@ -35,12 +47,14 @@ void OpenLiveStacker::close_camera()
         return;
     camera_->stop_stream();
     camera_.reset();
+    stream_active_ = false;
 }
 
 void OpenLiveStacker::stop_stream()
 {
     guard g(camera_lock_);
     cam().stop_stream();
+    stream_active_ = false;
 }
 void OpenLiveStacker::start_stream(CamStreamFormat format)
 {
@@ -48,6 +62,8 @@ void OpenLiveStacker::start_stream(CamStreamFormat format)
     cam().start_stream(format,[=](CamFrame const &cf) {
         handle_video_frame(cf);
     });
+    current_format_ = format;
+    stream_active_ = true;
 }
 
 void OpenLiveStacker::init(std::string driver_name)

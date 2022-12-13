@@ -29,9 +29,14 @@ namespace ols {
             return camera_lock_;
         }
         virtual Camera &cam();
+        virtual CamStatus status();
         virtual void open_camera(int id);
         virtual void close_camera();
         virtual void start_stream(CamStreamFormat format);
+        virtual CamStreamFormat stream_format()
+        {
+            return current_format_;
+        }
         virtual void stop_stream();
         virtual CameraDriver &driver()
         {
@@ -62,6 +67,8 @@ namespace ols {
         std::recursive_mutex camera_lock_;
         std::unique_ptr<Camera> camera_;
         std::unique_ptr<CameraDriver> driver_;
+        bool stream_active_ = false;
+        CamStreamFormat current_format_;
 
         std::unique_ptr<VideoGenerator> video_generator_;
         booster::intrusive_ptr<VideoGeneratorApp> video_generator_app_;

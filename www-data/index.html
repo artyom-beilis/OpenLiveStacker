@@ -10,6 +10,21 @@
     a:active { color:red; }
     a:hover { color:red; }
     button { border-radius:2mm; height:10mm; font-size:5mm ; text-align:center; vertical-align: middle; background-color:black; color:red; border: 2px solid red }
+    .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
+    .settings_background {
+        background: url(/media/img/settings.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
+    #live_stream_video {
+        display: block;
+        height: 100%
+        margin: 5mm auto;
+    }
+    #video {
+        height:90vh;
+        text-align:center;
+        width:100%
+    }
 </style>
 <body>
 <script>
@@ -48,46 +63,149 @@ function listCameras(cameras)
         option.value = cameras[i].id.toString()
         sel.add(option)
     }
+    restCall("get","/api/camera/status",null,checkOpenStatus);
 }
 
-function open_camera()
+function checkOpenStatus(st)
+{
+    if(st.status == 'closed') {
+        return;
+    }
+    else if(st.status == 'open') {
+        loadFormats()
+    }
+    else if(st.status == 'streaming') {
+        loadFormats();
+        showLiveVideo();
+    }
+
+}
+
+function loadFormats()
+{
+    document.getElementById('open_camera').style.display='none';
+    document.getElementById('std_controls').style.display='inline';
+    showConfig(true);
+    restCall('get','/api/camera/formats', null, (formats)=> {
+        var sel = document.getElementById('stream_format')
+        for(var i=sel.length-1;i>=0;i--) {
+            sel.options.remove(i);
+        }
+        for(var i=0;i<formats.length;i++) {
+            var option = document.createElement("option");
+            option.text = formats[i].format_id
+            option.value = formats[i].format_id
+            sel.add(option)
+        }
+    });
+}
+
+function openCamera()
 {
     var cam_id = document.getElementById('camera_select').value;
     restCall('post','/api/camera', { operation: 'open',id:parseInt(cam_id) }, function(msg) {
-        restCall('get','/api/camera/formats', null, (formats)=> {
-            var sel = document.getElementById('stream_format')
-            for(var i=sel.length-1;i>=0;i--) {
-                sel.options.remove(i);
-            }
-            for(var i=0;i<formats.length;i++) {
-                var option = document.createElement("option");
-                option.text = formats[i].format_id
-                option.value = formats[i].format_id
-                sel.add(option)
-            }
-        });
+        loadFormats();
     });
 }
 
-function start_stream()
+function updateControl(optid,value)
+{
+    restCall('post','/api/camera/option/' + optid,{'value':value},(e)=>{});
+}
+function updateBoolControl(optid,value)
+{
+    updateControl(optid,value ? 1 : 0);
+}
+
+function updateNumControl(optid)
+{
+    var val = document.getElementById('control_opt_' + optid).value;
+    console.log("Value " + val)
+    val = parseFloat(val);
+    updateControl(optid,val);
+}
+
+
+function prepareControns(ctls)
+{
+    var controls = document.getElementById('cam_controls');
+    var controls_str = ''
+    for(var i=0;i<ctls.length;i++) {
+        var ctl = ctls[i];
+        var unit='';
+        if(ctl.type == 'percent')
+            unit='(%)';
+        else if(ctl.type == 'msec')
+            unit='(ms)';
+        else if(ctl.type == 'kelvin')
+            unit='(K)';
+        var control_str = `<td>${ctl.name}${unit}</td>`;
+        if(ctl.type == 'bool') {
+            var checked = ctl.cur != 0 ? 'checked' : '';
+            control_str += `<td><input type="checkbox" ${checked} onchange="updateBoolControl('${ctl.option_id}',this.checked ? 1 : 0);" /></td>`;
+            control_str += '<td>&nbsp;</td><td>&nbsp;</td>';
+        }
+        else {
+            control_str +=`<td><input id="control_opt_${ctl.option_id}" type="text" value="${ctl.cur}" /></td>`;
+            control_str +=`<td><button onclick="updateNumControl('${ctl.option_id}')">Set</button></td>`;
+            control_str +=`<td>[${ctl.min},${ctl.max}]</td>`;
+        }
+        controls_str += '<tr>' + control_str + '</tr>\n';
+    }
+    controls.innerHTML = controls_str;
+    console.log(controls_str);
+}
+
+function showLiveVideo()
+{
+    restCall('get','/api/camera/options',null,prepareControns);
+    document.getElementById('video').innerHTML = '<img id="live_stream_video" style="width:95%;" alt="streaming video" src="/api/video/live" />';
+}
+
+function startStream()
 {
     var format_id = document.getElementById('stream_format').value;
     restCall('post','/api/camera/stream',{op:'start',format_id:format_id},(r)=>{
-        document.getElementById('video').innerHTML = '<img style="width:95%; align:center" alt="streaming video" src="/api/video/live" />';
+        showLiveVideo();
     });
+    showConfig(false);
 }
 
+function showConfig(v)
+{
+    console.log('CONFIG ' + v)
+	document.getElementById('config').style.display = v ? 'inline' : 'none';
+}
 
 window.onload = (event) => {
   run();
 };
 
-</script> 
-<p>
-    Camera: <select id="camera_select"></select><button onclick="open_camera()">Open</button>
-    Format: <select id="stream_format"></select><button onclick="start_stream()" >Stream</button>
-</p>
-<p id='video'></p>
 
+
+</script> 
+<p id="open_camera"   style="display:inline" >Camera: <select id="camera_select"></select><button onclick="openCamera()">Open</button></p>
+<p id='std_controls' style="display:none">
+    <button class="comp_but settings_background" onclick="showConfig(true);">&nbsp;</button>
+</p>
+<div class="config_div" id="config" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
+    <span style="position:absolute; right:1mm; top:1mm">
+        <button class="incdec_but" onclick="showConfig(false);">X</button>
+    </span>
+    <p>Format: <select id="stream_format"></select><button onclick="startStream()" >Stream</button></p>
+    <table>
+    <thead>
+        <tr>
+            <td>Name</td>
+            <td>Value</td>
+            <td>&nbsp;</td>
+            <td>Range</td>
+        </td>
+    <td>
+    <tbody id='cam_controls' >
+    </tbody>
+    </table>
+</div>
+<p id='video' ></p>
 </body>
 </html>

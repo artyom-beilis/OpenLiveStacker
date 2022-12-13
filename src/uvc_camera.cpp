@@ -10,6 +10,7 @@
 #include <iostream>
 #include <string.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 namespace ols {
     class UVCError : public CamError {
@@ -156,14 +157,33 @@ namespace ols {
         }
         virtual std::vector<CamOptionId> supported_options() 
         {
-            return std::vector<CamOptionId>({
-                opt_auto_exp,
-                opt_auto_wb,
-                opt_exp,
-                opt_wb,
-                opt_gain,
-                opt_gamma,
-            });
+            std::vector<CamOptionId> controls;
+            uvc_input_terminal_t const *ct = uvc_get_camera_terminal(devh_);
+            uvc_processing_unit_t const *pu = uvc_get_processing_units(devh_); 
+            uint32_t u32;
+            uint16_t u16;
+            int16_t i16;
+
+            if(ct && (ct->bmControls & ((1<<UVC_CT_AE_MODE_CONTROL) | (1<<UVC_CT_AE_PRIORITY_CONTROL))))
+                controls.push_back(opt_auto_exp);
+            if(pu && (pu->bmControls & ((1<<UVC_PU_WHITE_BALANCE_TEMPERATURE_AUTO_CONTROL) | (1<<UVC_PU_WHITE_BALANCE_COMPONENT_CONTROL))))
+                controls.push_back(opt_auto_wb);
+            if(ct && (ct->bmControls & (1<<UVC_CT_EXPOSURE_TIME_ABSOLUTE_CONTROL)) && uvc_get_exposure_abs(devh_,&u32,UVC_GET_CUR) >= 0)
+                controls.push_back(opt_exp);
+            if(pu && (pu->bmControls & (1<<UVC_PU_WHITE_BALANCE_TEMPERATURE_CONTROL)) && uvc_get_white_balance_temperature(devh_,&u16,UVC_GET_CUR)>=0)
+                controls.push_back(opt_wb);
+            if(pu && (pu->bmControls & (1<<UVC_PU_GAIN_CONTROL)) && uvc_get_gain(devh_,&u16,UVC_GET_CUR)>=0)
+                controls.push_back(opt_gain);
+            if(pu && (pu->bmControls & (1<<UVC_PU_GAMMA_CONTROL)) && uvc_get_gamma(devh_,&u16,UVC_GET_CUR)>=0)
+                controls.push_back(opt_gamma);
+            if(pu && (pu->bmControls & (1<<UVC_PU_BRIGHTNESS_CONTROL)) && uvc_get_brightness(devh_,&i16,UVC_GET_CUR)>=0)
+                controls.push_back(opt_brightness);
+            if(pu && (pu->bmControls & (1<<UVC_PU_CONTRAST_CONTROL)) && uvc_get_contrast(devh_,&u16,UVC_GET_CUR)>=0)
+                controls.push_back(opt_contrast);
+            std::cerr << std::hex << ct->bmControls << " " << pu->bmControls << std::endl;
+            for(auto v:controls)
+                std::cout << "Got supported: " << cam_option_id_to_name(v) << std::endl;
+            return controls;
         }
         template<typename ItemType,typename FunctionType>
         void update_parameters(CamParam &r,FunctionType func,double scale,bool current_only)
@@ -172,9 +192,16 @@ namespace ols {
             uvc_req_code codes[5]={UVC_GET_CUR,UVC_GET_MIN,UVC_GET_DEF,UVC_GET_RES,UVC_GET_MAX};
             int limit = current_only ? 1 : 5;
             for(int i=0;i<limit;i++) {
-                uvc_error_t res = func(devh_,vals + i,codes[i]);
+                int attempts = 0;
+                uvc_error_t res;
+                do {
+                    res = func(devh_,vals + i,codes[i]);
+                    attempts ++;
+                    if(res < 0)
+                        usleep(100000);
+                } while(attempts < 5 && res < 0);
                 if(res < 0)
-                    throw UVCError("Failed to read value",res);
+                    throw UVCError("Failed to read value of " + cam_option_id_to_name(r.option) + " for " + std::to_string(i),res);
             }
             r.cur_val   = vals[0]*scale;
             r.min_val   = vals[1]*scale;
@@ -212,12 +239,18 @@ namespace ols {
                     r.type = type_bool;
                     uint8_t cur,def = 0;
                     uvc_error_t res = uvc_get_white_balance_temperature_auto(devh_,&cur,UVC_GET_CUR);
-                    if(res < 0)
-                        throw UVCError("WB query failed",res);
-                    if(!current_only) {
-                        uvc_error_t res = uvc_get_white_balance_temperature_auto(devh_,&def,UVC_GET_DEF);
+                    if(res < 0) {
+                        res = uvc_get_white_balance_component_auto(devh_,&cur,UVC_GET_CUR);
                         if(res < 0)
                             throw UVCError("WB query failed",res);
+                    }
+                    if(!current_only) {
+                        uvc_error_t res = uvc_get_white_balance_temperature_auto(devh_,&def,UVC_GET_DEF);
+                        if(res < 0) {
+                            res = uvc_get_white_balance_component_auto(devh_,&def,UVC_GET_DEF);
+                            if(res < 0)
+                                throw UVCError("WB query failed",res);
+                        }
                     }
                     
                     r.step_size = r.max_val =  1;
@@ -241,6 +274,14 @@ namespace ols {
             case opt_gain:
                 r.type = type_number;
                 update_parameters<uint16_t>(r,uvc_get_gain,1,current_only);
+                break;
+            case opt_brightness:
+                r.type = type_number;
+                update_parameters<int16_t>(r,uvc_get_brightness,1,current_only);
+                break;
+            case opt_contrast:
+                r.type = type_number;
+                update_parameters<uint16_t>(r,uvc_get_contrast,1,current_only);
                 break;
             default:
                 throw UVCError("Option not supported" + cam_option_id_to_name(op_id));
@@ -270,6 +311,8 @@ namespace ols {
                 break;
             case opt_auto_wb:
                 res = uvc_set_white_balance_temperature_auto(devh_,value ? 1 : 0);
+                if(res < 0)
+                    res = uvc_set_white_balance_component_auto(devh_,value ? 1:0);
                 break;
             case opt_exp:
                 res = uvc_set_exposure_abs(devh_,value*10);
@@ -282,6 +325,12 @@ namespace ols {
                 break;
             case opt_gamma:
                 res = uvc_set_gamma(devh_,value*100); 
+                break;
+            case opt_brightness:
+                res = uvc_set_brightness(devh_,value);
+                break;
+            case opt_contrast:
+                res = uvc_set_contrast(devh_,value);
                 break;
             default:
                 throw UVCError("Option not supported" + cam_option_id_to_name(opt_id));

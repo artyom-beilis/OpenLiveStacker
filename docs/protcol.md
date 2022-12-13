@@ -92,6 +92,9 @@ Camera controls
             "operation" : "open","close" // open or close camera
             "id" : camera id
         }
+    GET /api/camera/status
+        
+        { "status" : "open"/ "closed" /"streaming" - current status } 
 
     GET /api/camera/formats - open camera, get list of supported formats/sizes/mods
         [

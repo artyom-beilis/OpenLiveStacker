@@ -32,7 +32,8 @@ namespace ols {
             ctl_pause,
             ctl_resume,
             ctl_save,
-            ctl_save_and_continue
+            ctl_save_and_continue,
+            ctl_update
         };
         ControlType op = ctl_init;
 
@@ -42,5 +43,6 @@ namespace ols {
         bool calibration = false;
         bool auto_stretch = true;
         double strech_low=0,strech_high=1,strech_gamma=2.2;
+        bool include_live = false;
     };
 }
