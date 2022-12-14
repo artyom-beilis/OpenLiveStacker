@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>OpenLiveStacker</title>
 </head>
 <style>
@@ -16,18 +17,22 @@
         background-size: 10mm 10mm;
     }
     #live_stream_video {
-        display: block;
-        height: 100%
-        margin: 5mm auto;
+        padding:0;
+        margin:0;
     }
     #video {
-        height:90vh;
         text-align:center;
         width:100%
+        padding: 0;
+        margin:0;
     }
 </style>
 <body>
 <script>
+
+var global_width = 0;
+var global_height = 0;
+
 function restCall(method,url,request,on_response)
 {
     var xhr = new XMLHttpRequest()
@@ -72,10 +77,14 @@ function checkOpenStatus(st)
         return;
     }
     else if(st.status == 'open') {
-        loadFormats()
+        loadFormats();
+        loadControls();
     }
     else if(st.status == 'streaming') {
+        global_width = st.width;
+        global_height = st.height;
         loadFormats();
+        loadControls();
         showLiveVideo();
     }
 
@@ -105,6 +114,7 @@ function openCamera()
     var cam_id = document.getElementById('camera_select').value;
     restCall('post','/api/camera', { operation: 'open',id:parseInt(cam_id) }, function(msg) {
         loadFormats();
+        loadControls();
     });
 }
 
@@ -123,6 +133,7 @@ function updateNumControl(optid)
     console.log("Value " + val)
     val = parseFloat(val);
     updateControl(optid,val);
+    return false;
 }
 
 
@@ -143,12 +154,13 @@ function prepareControns(ctls)
         if(ctl.type == 'bool') {
             var checked = ctl.cur != 0 ? 'checked' : '';
             control_str += `<td><input type="checkbox" ${checked} onchange="updateBoolControl('${ctl.option_id}',this.checked ? 1 : 0);" /></td>`;
-            control_str += '<td>&nbsp;</td><td>&nbsp;</td>';
+            control_str += '<td>&nbsp;</td>';
+            control_str += `<td>${ctl.default != 0 ? 'on' : 'off'}</td>`;
         }
         else {
-            control_str +=`<td><input id="control_opt_${ctl.option_id}" type="text" value="${ctl.cur}" /></td>`;
-            control_str +=`<td><button onclick="updateNumControl('${ctl.option_id}')">Set</button></td>`;
+            control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input id="control_opt_${ctl.option_id}" type="text" value="${ctl.cur}" /></form></td>`;
             control_str +=`<td>[${ctl.min},${ctl.max}]</td>`;
+            control_str +=`<td>${ctl.default}</td>`;
         }
         controls_str += '<tr>' + control_str + '</tr>\n';
     }
@@ -156,16 +168,54 @@ function prepareControns(ctls)
     console.log(controls_str);
 }
 
-function showLiveVideo()
+function loadControls()
 {
     restCall('get','/api/camera/options',null,prepareControns);
-    document.getElementById('video').innerHTML = '<img id="live_stream_video" style="width:95%;" alt="streaming video" src="/api/video/live" />';
+}
+
+function calcImgSize()
+{
+    var W = window.innerWidth;
+    var H = window.innerHeight;
+    var img_H,img_W;
+    var p_top=0,p_left=0;
+    var w2h = global_width/global_height
+    if(W/H > w2h) {
+        img_H = H;
+        img_W = H*w2h;
+        p_left = (W - img_W)/2;
+    }
+    else {
+        img_W = W;
+        img_H = W/w2h;
+        p_top = (H - img_H) / 2;
+    }
+    console.log(JSON.stringify({cw:W,ch:H,iw:global_width,ih:global_height,fw:img_W,fh:img_H}));
+    return [img_W,img_H,p_left,p_top]
+}
+
+function showLiveVideo()
+{
+    document.getElementById('video').innerHTML = `<img id="live_stream_video" alt="streaming video" src="/api/video/live" />`;
+    onResize(null);
+}
+
+function onResize(ev)
+{
+    var video = document.getElementById('live_stream_video');
+    var size = calcImgSize();
+    video.style.width = size[0] + 'px';
+    video.style.height = size[1] + 'px';
+    video.style.marginLeft = size[2] + 'px';
+    video.style.marginTop  = size[3] + 'px';
 }
 
 function startStream()
 {
     var format_id = document.getElementById('stream_format').value;
     restCall('post','/api/camera/stream',{op:'start',format_id:format_id},(r)=>{
+        global_width = r.width;
+        global_height = r.height;
         showLiveVideo();
     });
     showConfig(false);
@@ -181,11 +231,14 @@ window.onload = (event) => {
   run();
 };
 
+window.onresize = onResize;
+
 
 
 </script> 
+<div id='video' style="position:absolute; left:0; top:0; z-index:-1"></div>
 <p id="open_camera"   style="display:inline" >Camera: <select id="camera_select"></select><button onclick="openCamera()">Open</button></p>
-<p id='std_controls' style="display:none">
+<p id='std_controls' style="display:none;" >
     <button class="comp_but settings_background" onclick="showConfig(true);">&nbsp;</button>
 </p>
 <div class="config_div" id="config" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
@@ -198,14 +251,13 @@ window.onload = (event) => {
         <tr>
             <td>Name</td>
             <td>Value</td>
-            <td>&nbsp;</td>
             <td>Range</td>
+            <td>Default</td>
         </td>
     <td>
     <tbody id='cam_controls' >
     </tbody>
     </table>
 </div>
-<p id='video' ></p>
 </body>
 </html>

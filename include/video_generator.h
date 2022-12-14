@@ -95,21 +95,33 @@ namespace ols {
         }
         void process_frame(std::shared_ptr<CameraFrame> frame)
         {
-            if(frame->format.format == stream_mjpeg) {
+            switch(frame->format.format) {
+            case stream_mjpeg:
                 frame->jpeg_frame = frame->source_frame;
-            }
-            else if(frame->format.format == stream_yuv2) {
-                if(int(frame->source_frame->size()) != frame->format.height*frame->format.width*2)
-                    throw std::runtime_error("Invalid frame size");
-                cv::Mat yuv2(frame->format.height,frame->format.width,CV_8UC2,frame->source_frame->data());
-                cv::Mat rgb;
-                cv::cvtColor(yuv2,rgb,cv::COLOR_YUV2BGR_YUYV);
-                std::vector<unsigned char> buf;
-                cv::imencode(".jpeg",rgb,buf);
-                frame->frame = rgb;
-                frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
-            }
-            else {
+                break;
+            case stream_yuv2:
+                {
+                    if(int(frame->source_frame->size()) != frame->format.height*frame->format.width*2)
+                        BOOSTER_ERROR("stacker") << "Invalid frame size got " << frame->source_frame->size() << " bytes, expected " << (frame->format.height*frame->format.width*2);
+                        return;
+                    cv::Mat yuv2(frame->format.height,frame->format.width,CV_8UC2,frame->source_frame->data());
+                    cv::Mat rgb;
+                    cv::cvtColor(yuv2,rgb,cv::COLOR_YUV2BGR_YUYV);
+                    std::vector<unsigned char> buf;
+                    cv::imencode(".jpeg",rgb,buf);
+                    frame->frame = rgb;
+                    frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
+                }
+                break;
+            case stream_error:
+                {
+                    char const *begin = static_cast<char const *>(frame->source_frame->data());
+                    char const *end = begin + frame->source_frame->size();
+                    std::string msg(begin,end);
+                    BOOSTER_ERROR("stacker") << "Got frame with error " << msg;
+                    return;
+                }
+            default:
                 BOOSTER_ERROR("stacker") << "Only mjpeg video genetator is supported for now got " << stream_type_to_str(frame->format.format);
                 return;
             }

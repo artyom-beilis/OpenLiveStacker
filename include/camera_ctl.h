@@ -37,6 +37,11 @@ namespace ols {
                 break;
             case CameraInterface::cam_streaming:
                 response_["status"]="streaming";
+                {
+                    CamStreamFormat format = cam_->stream_format();
+                    response_["width"]=format.width;
+                    response_["height"]=format.height;
+                }
                 break;
             }
         }
@@ -107,6 +112,9 @@ namespace ols {
                     throw CamError("No such format: " + format_id);
                 }
                 cam_->start_stream(p->second);
+                response_["status"]="ok";
+                response_["width"]=p->second.width;
+                response_["height"]=p->second.height;
             }
             else {
                 throw CamError("Invalid operation " + op);
