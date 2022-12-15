@@ -7,13 +7,15 @@ This is the data flow (up down)
               |    ----
               |   /
             Video Generator: bayer/yuv2rgb, rgb2jpeg, jpeg2rgb when stacking
-              | \
-              |  - Save Debug Images
+              | \                       \
+              |  - Save Debug Images     - Live Video Generator
               |
             preprocessor: rgb2float, darks/flats, derotate
               |
-            Stacker: forward live video/stacked frames, stack images, stretch
+            Stacker: stack images
               |
-              |- Live Video: send live video for stacked/non-stacked image
-              |- Preview Video: send downscaled with max pooling live video to show while stacking
               |- Stats: send stacking stats/status to web client
+              |
+            PostProcessor: stretch, create_output_jpeg
+              |
+              |- Stacked Video: send video of stacked images
