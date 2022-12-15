@@ -11,7 +11,12 @@ find_path(OPENCV_INC opencv2/core.hpp HINTS /opt/opencv-4.6/include/opencv4 NO_D
 
 include_directories(${OPENCV_INC})
 
-add_library(ols SHARED src/uvc_camera.cpp src/camera.cpp src/ols.cpp)
+add_library(ols SHARED 
+    src/uvc_camera.cpp 
+    src/camera.cpp 
+    src/ols.cpp
+    src/video_generator.cpp
+    )
 target_link_libraries(ols uvc cppcms booster ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
 add_executable(test_camera test/test_camera.cpp)
 add_executable(ols_cmd test/ols_cmd.cpp)

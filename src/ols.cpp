@@ -92,10 +92,7 @@ void OpenLiveStacker::init(std::string driver_name)
     
     video_generator_app_ = new VideoGeneratorApp(*web_service_);
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
-    //web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this),cppcms::mount_point("/camera((/.*)?)",1),cppcms::app::asynchronous);
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this),cppcms::mount_point("/camera((/.*)?)",1));
-    
-    video_generator_.reset(new VideoGenerator(converter_queue_,video_generator_app_));
 }
 
 void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
@@ -106,11 +103,12 @@ void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
     frame->format.height = cf.height;
     frame->timestamp = cf.unix_timestamp;
     frame->source_frame = std::shared_ptr<VideoFrame>(new VideoFrame(cf.data,cf.data_size));
-    converter_queue_->push(frame);
+    video_generator_queue_->push(frame);
 }
 void OpenLiveStacker::run()
 {
-    video_generator_thread_ = std::move(std::thread([=](){ video_generator_->run(); }));
+    video_generator_thread_ = std::move(start_generator(video_generator_queue_,video_display_queue_));
+    video_display_queue_->call_on_push(video_generator_app_->get_callback());
     web_service_->run();
     stop();
     
@@ -121,11 +119,12 @@ void OpenLiveStacker::shutdown()
 }
 void OpenLiveStacker::stop()
 {
-    camera_->stop_stream();
-    converter_queue_->push(std::shared_ptr<QueueData>(new ShutDownData()));
+    if(camera_)
+        camera_->stop_stream();
+    video_generator_queue_->push(std::shared_ptr<QueueData>(new ShutDownData()));
+    video_generator_queue_.reset();
+    video_display_queue_.reset();
     video_generator_thread_.join();
-    video_generator_app_ = nullptr;
-    video_generator_.reset();
     camera_.reset();
     driver_.reset();
 }

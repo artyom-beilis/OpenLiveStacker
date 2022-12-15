@@ -1,6 +1,7 @@
 #pragma once
 #include "camera.h"
 #include "data_items.h"
+#include "video_stream.h"
 #include "video_generator.h"
 #include "camera_iface.h"
 #include <cppcms/service.h>
@@ -49,20 +50,8 @@ namespace ols {
 
         /// Data Queues
 
-        queue_pointer_type converter_queue_         = std::shared_ptr<queue_type>(new queue_type());
-        queue_pointer_type stacker_queue_           = std::shared_ptr<queue_type>(new queue_type());
-        queue_pointer_type post_processing_queue_   = std::shared_ptr<queue_type>(new queue_type());
-        queue_pointer_type stacked_display_queue_   = std::shared_ptr<queue_type>(new queue_type());
-        queue_pointer_type video_display_queue_     = std::shared_ptr<queue_type>(new queue_type());
-        queue_pointer_type data_save_queue_         = std::shared_ptr<queue_type>(new queue_type());
-        queue_pointer_type stacking_progress_queue_ = std::shared_ptr<queue_type>(new queue_type());
-
-        /// Flow
-
-        /// Camera |-> data_save_queue_ -> DebugFrameSaver
-        ///        |-> video_display_queue_ -> RawVideoGenerator 
-        ///        |-> converter_queue_ -> Frame2Mat -> stacker_queue_ -> Stacker |-> post_processing_queue_ -> PostProcess -> stacked_display_queue_ -> StackedVideoGenerator
-        ///                                                                       |-> stacking_progress_queue_ -> PublishStats  
+        queue_pointer_type video_generator_queue_    = std::shared_ptr<queue_type>(new queue_type());
+        queue_pointer_type video_display_queue_      = std::shared_ptr<queue_type>(new queue_type());
         
         std::recursive_mutex camera_lock_;
         std::unique_ptr<Camera> camera_;
@@ -70,7 +59,6 @@ namespace ols {
         bool stream_active_ = false;
         CamStreamFormat current_format_;
 
-        std::unique_ptr<VideoGenerator> video_generator_;
         booster::intrusive_ptr<VideoGeneratorApp> video_generator_app_;
         std::thread video_generator_thread_;
 
