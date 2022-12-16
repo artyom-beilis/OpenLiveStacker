@@ -2,7 +2,7 @@
 #include <cmath>
 #include <iostream>
 #include <tuple>
-namespace old {
+namespace ols {
 class Derotator {
 public:
     static constexpr float PI = 3.14159265f;

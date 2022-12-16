@@ -14,7 +14,7 @@ namespace ols {
     public:
 
         typedef std::unique_lock<std::recursive_mutex> guard;
-        OpenLiveStacker();
+        OpenLiveStacker(std::string data_dir = "./data");
         ~OpenLiveStacker();
 
         int http_port = 8080;
@@ -52,6 +52,10 @@ namespace ols {
 
         queue_pointer_type video_generator_queue_    = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type video_display_queue_      = std::shared_ptr<queue_type>(new queue_type());
+        queue_pointer_type preprocessor_queue_       = std::shared_ptr<queue_type>(new queue_type());
+        queue_pointer_type stacker_queue_            = std::shared_ptr<queue_type>(new queue_type());
+        queue_pointer_type stack_display_queue_      = std::shared_ptr<queue_type>(new queue_type());
+        queue_pointer_type debug_save_queue_         = std::shared_ptr<queue_type>(new queue_type());
         
         std::recursive_mutex camera_lock_;
         std::unique_ptr<Camera> camera_;
@@ -59,11 +63,16 @@ namespace ols {
         bool stream_active_ = false;
         CamStreamFormat current_format_;
 
-        booster::intrusive_ptr<VideoGeneratorApp> video_generator_app_;
-        std::thread video_generator_thread_;
+        std::string data_dir_;
+        std::string debug_dir_;
 
-        //std::unique_ptr<Stacker> stacker_;
-        //std::thread stacker_thread_;
+        booster::intrusive_ptr<VideoGeneratorApp> video_generator_app_;
+        booster::intrusive_ptr<VideoGeneratorApp> stacked_video_generator_app_;
+        
+        std::thread video_generator_thread_;
+        std::thread debug_save_thread_;
+        std::thread preprocessor_thread_;
+        std::thread stacker_thread_;
         
         std::shared_ptr<cppcms::service> web_service_;
 

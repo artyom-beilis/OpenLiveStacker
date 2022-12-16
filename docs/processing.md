@@ -1,14 +1,14 @@
 This is the data flow (up down)
 
 
-            CAMERA    Control
+            CAMERA    Control (app)
             (frames)  (Control Stacking)
               |         /
               |    ----
               |   /
             Video Generator: bayer/yuv2rgb, rgb2jpeg, jpeg2rgb when stacking
               | \                       \
-              |  - Save Debug Images     - Live Video Generator
+              |  - Save Debug Images     - Live Video Generator (app)
               |
             preprocessor: rgb2float, darks/flats, derotate
               |
@@ -16,6 +16,4 @@ This is the data flow (up down)
               |
               |- Stats: send stacking stats/status to web client
               |
-            PostProcessor: stretch, create_output_jpeg
-              |
-              |- Stacked Video: send video of stacked images
+              |- Stacked Video: send video of stacked images (app)

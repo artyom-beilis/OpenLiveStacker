@@ -7,9 +7,14 @@
 namespace ols {
     class VideoGenerator {
     public:
-        VideoGenerator(queue_pointer_type queue,queue_pointer_type output): 
+        VideoGenerator(queue_pointer_type queue,
+                       queue_pointer_type stacking_output,
+                       queue_pointer_type live_output,
+                       queue_pointer_type debug): 
             data_queue_(queue),
-            out_(output)
+            stack_out_(stacking_output),
+            live_out_(live_output),
+            debug_out_(debug)
         {
         }
         void process_frame(std::shared_ptr<CameraFrame> frame)
@@ -22,7 +27,13 @@ namespace ols {
                     if(stacking_active_) {
                         size_t len = frame->jpeg_frame->size();
                         cv::Mat buffer(1,len,CV_8UC1,frame->jpeg_frame->data());
-                        frame->frame = cv::imdecode(buffer,cv::IMREAD_UNCHANGED);
+                        try {
+                            frame->frame = cv::imdecode(buffer,cv::IMREAD_UNCHANGED);
+                        }
+                        catch(std::exception const &e) {
+                            BOOSTER_ERROR("stacker") << "Failed to extract jpeg";
+                            return;
+                        }
                     }
                 }
                 break;
@@ -56,7 +67,11 @@ namespace ols {
                 BOOSTER_ERROR("stacker") << "Only mjpeg video genetator is supported for now got " << stream_type_to_str(frame->format.format);
                 return;
             }
-            out_->push(frame);
+            live_out_->push(frame);
+            if(stacking_active_)
+                stack_out_->push(frame);
+            if(debug_active_ && stacking_active_)
+                debug_out_->push(frame);
         }
         void run()
         {
@@ -64,7 +79,9 @@ namespace ols {
                 auto data_ptr = data_queue_->pop();
                 auto stop_ptr = std::dynamic_pointer_cast<ShutDownData>(data_ptr);
                 if(stop_ptr) {
-                    out_->push(data_ptr);
+                    live_out_->push(data_ptr);
+                    stack_out_->push(data_ptr);
+                    debug_out_->push(data_ptr);
                     break;
                 }
                 auto frame_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
@@ -76,6 +93,9 @@ namespace ols {
                 if(ctl_ptr){
                     switch(ctl_ptr->op) {
                     case StackerControl::ctl_init:
+                        stacking_active_ = true;
+                        debug_active_ = ctl_ptr->save_inputs;
+                        break;
                     case StackerControl::ctl_resume:
                     case StackerControl::ctl_save_and_continue:
                     case StackerControl::ctl_update:
@@ -86,21 +106,26 @@ namespace ols {
                         stacking_active_ = false;
                         break;
                     }
+                    live_out_->push(data_ptr);
+                    stack_out_->push(data_ptr);
+                    debug_out_->push(data_ptr);
                 }
-                out_->push(data_ptr);
-
+                
                 BOOSTER_ERROR("stacker") << "Invalid data for video generator";
             }
         }
     private:
-        queue_pointer_type data_queue_;
-        queue_pointer_type out_;
+        queue_pointer_type data_queue_, stack_out_, live_out_, debug_out_;
         bool stacking_active_ = false;
+        bool debug_active_ = false;
     };
 
-    std::thread start_generator(queue_pointer_type input,queue_pointer_type output)
+    std::thread start_generator(queue_pointer_type input,
+                                queue_pointer_type stacking_output,
+                                queue_pointer_type live_output,
+                                queue_pointer_type debug_save)
     {
-        std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,output));
+        std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,stacking_output,live_output,debug_save));
         std::thread t([=](){vg->run();});
         return std::move(t);
     }

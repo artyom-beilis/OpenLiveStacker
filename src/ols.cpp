@@ -4,10 +4,16 @@
 #include <cppcms/applications_pool.h>
 #include <cppcms/mount_point.h>
 #include "camera_ctl.h"
+#include "processors.h"
+#include <sys/types.h>
+#include <sys/stat.h>
 
 namespace ols {
-OpenLiveStacker::OpenLiveStacker()
+OpenLiveStacker::OpenLiveStacker(std::string data_dir)
 {
+    mkdir(data_dir.c_str(),0777);
+    debug_dir_ = data_dir + "/debug";
+    mkdir(debug_dir_.c_str(),0777);
 }
 
 OpenLiveStacker::~OpenLiveStacker()
@@ -91,7 +97,9 @@ void OpenLiveStacker::init(std::string driver_name)
     web_service_ = std::shared_ptr<cppcms::service>(new cppcms::service(config));
     
     video_generator_app_ = new VideoGeneratorApp(*web_service_);
+    stacked_video_generator_app_ = new VideoGeneratorApp(*web_service_);
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
+    web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this),cppcms::mount_point("/camera((/.*)?)",1));
 }
 
@@ -107,8 +115,17 @@ void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
 }
 void OpenLiveStacker::run()
 {
-    video_generator_thread_ = std::move(start_generator(video_generator_queue_,video_display_queue_));
     video_display_queue_->call_on_push(video_generator_app_->get_callback());
+    stack_display_queue_->call_on_push(stacked_video_generator_app_->get_callback());
+
+    video_generator_thread_ = std::move(start_generator(video_generator_queue_,
+                                                        preprocessor_queue_,
+                                                        video_display_queue_,
+                                                        debug_save_queue_));
+
+    debug_save_thread_ = std::move(start_debug_saver(debug_save_queue_,debug_dir_));
+    preprocessor_thread_ = std::move(start_preprocessor(preprocessor_queue_,stacker_queue_));
+    stacker_thread_ = std::move(start_stacker(stacker_queue_,stack_display_queue_));
     web_service_->run();
     stop();
     
@@ -122,9 +139,19 @@ void OpenLiveStacker::stop()
     if(camera_)
         camera_->stop_stream();
     video_generator_queue_->push(std::shared_ptr<QueueData>(new ShutDownData()));
+
     video_generator_queue_.reset();
+    preprocessor_queue_.reset();
+    stacker_queue_.reset();
     video_display_queue_.reset();
+    debug_save_queue_.reset();
+    stack_display_queue_.reset();
+
     video_generator_thread_.join();
+    debug_save_thread_.join();
+    preprocessor_thread_.join();
+    stacker_thread_.join();
+
     camera_.reset();
     driver_.reset();
 }

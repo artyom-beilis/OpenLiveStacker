@@ -38,7 +38,8 @@ namespace ols {
         };
         ControlType op = ctl_init;
 
-        std::string frame_id; /// identification of stacking
+        std::string output_path; /// identification of stacking
+        std::string name;
         bool save_inputs = false;
         int width = 0;
         int height = 0;
@@ -48,7 +49,7 @@ namespace ols {
         bool derotate_mirror = false; /// inverse direction for mirror image
         double ra=-1,de=-1,lat=-1,lon=-1; /// object data an
 
-        double soruce_gamma = 1.0; /// to linear space gamma
+        double source_gamma = 1.0; /// to linear space gamma
 
         std::string darks_path; /// if darks applied darks frame
         
