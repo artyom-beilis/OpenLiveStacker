@@ -4,6 +4,7 @@
 #include <cppcms/applications_pool.h>
 #include <cppcms/mount_point.h>
 #include "camera_ctl.h"
+#include "stacker_ctl_app.h"
 #include "processors.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -11,6 +12,7 @@
 namespace ols {
 OpenLiveStacker::OpenLiveStacker(std::string data_dir)
 {
+    data_dir_ = data_dir;
     mkdir(data_dir.c_str(),0777);
     debug_dir_ = data_dir + "/debug";
     mkdir(debug_dir_.c_str(),0777);
@@ -101,6 +103,9 @@ void OpenLiveStacker::init(std::string driver_name)
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
     web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this),cppcms::mount_point("/camera((/.*)?)",1));
+    web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(data_dir_,video_generator_queue_),
+                                            cppcms::mount_point("/camera((/.*)?)",1),
+                                            cppcms::app::asynchronous);
 }
 
 void OpenLiveStacker::handle_video_frame(CamFrame const &cf)

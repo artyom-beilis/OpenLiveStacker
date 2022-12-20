@@ -168,7 +168,8 @@ namespace ols {
                 controls.push_back(opt_auto_exp);
             if(pu && (pu->bmControls & ((1<<UVC_PU_WHITE_BALANCE_TEMPERATURE_AUTO_CONTROL) | (1<<UVC_PU_WHITE_BALANCE_COMPONENT_CONTROL))))
                 controls.push_back(opt_auto_wb);
-            if(ct && (ct->bmControls & (1<<UVC_CT_EXPOSURE_TIME_ABSOLUTE_CONTROL)) && uvc_get_exposure_abs(devh_,&u32,UVC_GET_CUR) >= 0)
+            //if(ct && (ct->bmControls & (1<<UVC_CT_EXPOSURE_TIME_ABSOLUTE_CONTROL)) && uvc_get_exposure_abs(devh_,&u32,UVC_GET_CUR) >= 0)
+            if(uvc_get_exposure_abs(devh_,&u32,UVC_GET_CUR) >= 0)
                 controls.push_back(opt_exp);
             if(pu && (pu->bmControls & (1<<UVC_PU_WHITE_BALANCE_TEMPERATURE_CONTROL)) && uvc_get_white_balance_temperature(devh_,&u16,UVC_GET_CUR)>=0)
                 controls.push_back(opt_wb);
@@ -180,9 +181,6 @@ namespace ols {
                 controls.push_back(opt_brightness);
             if(pu && (pu->bmControls & (1<<UVC_PU_CONTRAST_CONTROL)) && uvc_get_contrast(devh_,&u16,UVC_GET_CUR)>=0)
                 controls.push_back(opt_contrast);
-            std::cerr << std::hex << ct->bmControls << " " << pu->bmControls << std::endl;
-            for(auto v:controls)
-                std::cout << "Got supported: " << cam_option_id_to_name(v) << std::endl;
             return controls;
         }
         template<typename ItemType,typename FunctionType>

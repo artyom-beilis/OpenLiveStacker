@@ -150,7 +150,7 @@ Stacking controls
 
         {
             "name" : string // unique id of stacking - for saving
-            "type": "dso"/ "calibration" // live stacking for DSO, calibration frames (no registration) 
+            "calibration": "dso"/ "calibration" // live stacking for DSO, calibration frames (no registration) 
             "location" : null or { // required for derotation
                 "ra": float // RA of object in degrees
                 "de": float // DE of object in degrees"
@@ -160,6 +160,7 @@ Stacking controls
                 "lon": float // observers longitude degees
                 "name": string or null // optional, for example M31
             },
+            "source_gamma" : float, default 1.0 // gamma used for image correction
             "comment": string or null // optional comment to save with the image
             "image_flip": bool // default false - inverse rotation (for newtonian/mirror diagonal)
             "field_rotation" : bool // default false, if true target and location must be provided
@@ -190,6 +191,9 @@ Stacking controls
             "gamma" : // gamma correction, default 2.2
         }
         return { "status" : "ok"/"fail", "msg" : STRING" }
+
+    GET /api/stacker/status
+        return { "status" : 
             
 ### Live Updates
 

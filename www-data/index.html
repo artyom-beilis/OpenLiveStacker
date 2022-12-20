@@ -240,7 +240,15 @@ window.onresize = onResize;
 <p id="open_camera"   style="display:inline" >Camera: <select id="camera_select"></select><button onclick="openCamera()">Open</button></p>
 <p id='std_controls' style="display:none;" >
     <button class="comp_but settings_background" onclick="showConfig(true);">&nbsp;</button>
+    <button class="comp_but" onclick="showStack(true);">S</button>
+    <button class="comp_but" onclick="cltStack('pause');">&#x23F8;</button>
+    <button class="comp_but" onclick="ctlStack('save');" >&#x1F4BE;</button>
 </p>
+<div class="config_div" id="stack" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
+    <span style="position:absolute; right:1mm; top:1mm">
+        <button class="incdec_but" onclick="showStack(false);">X</button>
+    </span>
+</div>
 <div class="config_div" id="config" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showConfig(false);">X</button>
