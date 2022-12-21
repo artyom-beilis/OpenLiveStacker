@@ -8,8 +8,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <fstream>
 #include <iomanip>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include "util.h"
 
 namespace ols {
     class PreProcessor {
@@ -209,11 +208,7 @@ namespace ols {
 
         std::string timestamp()
         {
-            time_t now;
-            time(&now);
-            char ts[256];
-            strftime(ts,sizeof(ts),"%Y-%m-%d %H:%M:%S",localtime(&now));
-            return ts;
+            return ftime("%Y-%m-%d %H:%M:%S",time(nullptr));
         }
 
 
@@ -251,21 +246,13 @@ namespace ols {
             setup["frames"] = cframe_count_;
             save_tiff(calib,tiff_path);
             cppcms::json::value db;
-            bool found = false;
-            {
-                std::ifstream indx(db_path);
-                if(!indx) {
-                    db[0] = setup;
-                    found = true;
-                }
-                else {
-                    if(!db.load(indx,true)) {
-                        BOOSTER_ERROR("stacker") << "Error parsing " << db_path << " darks DB file " << std::endl;
-                        db = cppcms::json::value();
-                        db[0] = setup;
-                        found = true;
-                    }
-                }
+            std::ifstream indx(db_path);
+            bool found=false;
+            if(!db.load(indx,true)) {
+                BOOSTER_ERROR("stacker") << "Error parsing " << db_path << " darks DB file " << std::endl;
+                db = cppcms::json::value();
+                db[0] = setup;
+                found = true;
             }
             cppcms::json::array &ar=db.array();
             for(size_t i=0;!found && i<ar.size();i++) {
@@ -352,7 +339,6 @@ namespace ols {
             out_(output_dir),
             counter_(0)
         {
-            mkdir(out_.c_str(),0777);
         }
         void run()
         {
@@ -401,7 +387,7 @@ namespace ols {
                 {
                     dirname_ = out_ + "/" + ctl->name;
                     counter_ = 0;
-                    mkdir(dirname_.c_str(),0777);
+                    make_dir(dirname_);
                     cppcms::json::value v;
                     v["name"]=ctl->name;
                     v["width"] = ctl->width;

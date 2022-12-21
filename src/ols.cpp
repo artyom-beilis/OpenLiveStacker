@@ -3,20 +3,28 @@
 #include <cppcms/json.h>
 #include <cppcms/applications_pool.h>
 #include <cppcms/mount_point.h>
+#include <fstream>
 #include "camera_ctl.h"
 #include "stacker_ctl_app.h"
 #include "processors.h"
-#include <sys/types.h>
-#include <sys/stat.h>
 
 namespace ols {
 OpenLiveStacker::OpenLiveStacker(std::string data_dir)
 {
     data_dir_ = data_dir;
-    mkdir(data_dir.c_str(),0777);
+    make_dir(data_dir_);
     debug_dir_ = data_dir + "/debug";
-    mkdir(debug_dir_.c_str(),0777);
+    make_dir(debug_dir_);
+    make_dir(data_dir_ + "/stacked");
+    make_dir(data_dir_ + "/calibration");
+    if(!exists(data_dir_ + "/calibration/index.json")) {
+        std::ofstream f(data_dir_ + "/calibration/index.json");
+        if(!f)
+            throw std::runtime_error("Failed to create calibration index");
+        f<<"[]"<<std::endl;
+    }
 }
+
 
 OpenLiveStacker::~OpenLiveStacker()
 {
@@ -91,6 +99,8 @@ void OpenLiveStacker::init(std::string driver_name)
     config["service"]["disable_global_exit_handling"] = false;
     config["file_server"]["enable"]=true;
     config["file_server"]["document_root"]=document_root;
+    config["file_server"]["alias"][0]["url"] = "/data";
+    config["file_server"]["alias"][0]["path"] = data_dir_;
     config["http"]["script"]="/api";
     config["http"]["timeout"]=5;
     config["logging"]["stderr"] = true;
@@ -103,7 +113,7 @@ void OpenLiveStacker::init(std::string driver_name)
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
     web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this),cppcms::mount_point("/camera((/.*)?)",1));
-    web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(data_dir_,video_generator_queue_),
+    web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(this,data_dir_,video_generator_queue_),
                                             cppcms::mount_point("/camera((/.*)?)",1),
                                             cppcms::app::asynchronous);
 }

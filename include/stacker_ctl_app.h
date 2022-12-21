@@ -1,6 +1,7 @@
 #pragma once
 #include "data_items.h"
 #include "ctl_app.h"
+#include "camera_iface.h"
 
 #include <cppcms/application.h>
 #include <cppcms/http_context.h>
@@ -8,23 +9,21 @@
 #include <cppcms/url_dispatcher.h>
 #include <cppcms/service.h>
 #include <booster/log.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-
+#include "util.h"
 namespace ols {
     class StackerControlApp : public ControlAppBase {
     public:
         StackerControlApp(cppcms::service &srv,
+                          CameraInterface *iface,
                           std::string data_dir,
                           queue_pointer_type queue): 
             ControlAppBase(srv),
+            cam_(iface),
             data_dir_(data_dir),
             queue_(queue)
         {
             stacked_path_ = data_dir_ + "/stacked";
-            mkdir(stacked_path_.c_str(),0777);
             calibration_path_ = data_dir_ + "/calibration";
-            mkdir(calibration_path_.c_str(),0777);
             dispatcher().map("POST","/start/?",&StackerControlApp::start,this);
             dispatcher().map("POST","/control/?",&StackerControlApp::control,this);
             dispatcher().map("GET", "/status/?",&StackerControlApp::status,this);
@@ -60,19 +59,29 @@ namespace ols {
         {
             std::shared_ptr<StackerControl> cmd(new StackerControl());
             cmd->op = StackerControl::ctl_init;
+            auto format = cam_->stream_format();
+            cmd->width = format.width;
+            cmd->height = format.height;
             cmd->calibration = content_.get("type","dso") == "calibration";
             cmd->name = content_.get<std::string>("name");
             cmd->save_inputs = content_.get("save_data",false);
             if(!cmd->calibration) {
-                char ts[256];
-                time_t now=time(nullptr);
-                strftime(ts,sizeof(ts),"_%Y%m%d_%H%M%S",localtime(&now));
-                cmd->output_path = stacked_path_ + "/" + cmd->name + ts;
+                cmd->output_path = stacked_path_ + "/" + cmd->name + ftime("_%Y%m%d_%H%M%S",time(nullptr));
             }
             else {
                 cmd->output_path = calibration_path_;
             }
-            cmd->source_gamma = content_.get("source_gamma",cmd->source_gamma);
+            try {
+                if(format.format == stream_mjpeg || format.format == stream_yuv2) { 
+                    std::unique_lock<std::recursive_mutex> guard(cam_->lock());
+                    cmd->source_gamma = cam_->cam().get_parameter(opt_gamma,true).cur_val;
+                }
+                else
+                    cmd->source_gamma = 1.0;
+            }
+            catch(CamError const &) {
+                cmd->source_gamma = 1.0;
+            }
             cmd->lat = content_.get("target.lat",cmd->lat);
             cmd->lon = content_.get("target.lon",cmd->lon);
             cmd->ra = content_.get("location.ra",cmd->ra);
@@ -86,6 +95,7 @@ namespace ols {
             queue_->push(cmd);
         }
     private:
+        CameraInterface *cam_;
         std::string data_dir_;
         std::string stacked_path_;
         std::string calibration_path_;
