@@ -23,6 +23,8 @@ namespace ols {
                         throw CamError("Invalid JSON");
                     }
                     content_.swap(request);
+                    std::cerr << "GOT:" << url << std::endl;
+                    content_.save(std::cerr,cppcms::json::readable);
                 }
 
                 cppcms::application::main(url);
@@ -31,6 +33,9 @@ namespace ols {
                     response_["status"] = "ok";
                 }
                 response_.save(response().out(),cppcms::json::readable);
+                std::cerr << "RESP:" << url << std::endl;
+                response_.save(std::cerr,cppcms::json::readable);
+
             }
             catch(std::exception const &e) {
                 cppcms::json::value err;

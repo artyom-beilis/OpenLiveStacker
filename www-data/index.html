@@ -57,7 +57,14 @@ function restCall(method,url,request,on_response)
 function run()
 {
     restCall("get","/api/camera",null,listCameras);
+    if(navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos)=>{
+            document.getElementById("stack_lat").value=pos.coords.latitude.toFixed(2);
+            document.getElementById("stack_lon").value=pos.coords.longitude.toFixed(2);
+        });
+    }
 }
+
 
 function listCameras(cameras)
 {
@@ -86,8 +93,14 @@ function checkOpenStatus(st)
         loadFormats();
         loadControls();
         showLiveVideo();
+        restCall('get','/api/stacker/status',null,checkStackerStatus)
     }
-
+}
+function checkStackerStatus(st)
+{
+    if(st.status == 'idle')
+        return;
+    showStackedVideo(true);
 }
 
 function loadFormats()
@@ -194,10 +207,58 @@ function calcImgSize()
     return [img_W,img_H,p_left,p_top]
 }
 
+function updateCalibFrames(data)
+{
+    var sel = document.getElementById('stack_darks');
+    var selected = sel.value;
+    for(var i=sel.length-1;i>=0;i--) {
+        sel.options.remove(i);
+    }
+    var found=false;
+    for(var i=-1;i<data.length;i++) {
+        var fid = 'N/A';
+        var width=global_width;
+        var height=global_height;
+        if(i >= 0) {
+            fid = data[i].id;
+            width = data[i].width;
+            height = data[i].height;
+        }
+        if(width != global_width || height != global_height)
+            continue;
+        var option = document.createElement("option");
+        option.text = fid;
+        option.value = fid;
+        sel.add(option)
+        if(fid == selected)
+            found=true;
+    }
+    sel.value = selected;
+}
+
+function loadCalibFrames()
+{
+    restCall('get','/data/calibration/index.json',null,updateCalibFrames);
+}
+
+function showStackedVideo(stacked_on)
+{
+    if(stacked_on) {
+        showStream('stacked')
+    }
+    else
+        showStream('live')
+}
+
+function showStream(name)
+{
+    document.getElementById('video').innerHTML = `<img id="live_stream_video" alt="streaming video" src="/api/video/${name}" />`;
+    onResize(null);
+}
+
 function showLiveVideo()
 {
-    document.getElementById('video').innerHTML = `<img id="live_stream_video" alt="streaming video" src="/api/video/live" />`;
-    onResize(null);
+    showStream('live');
 }
 
 function onResize(ev)
@@ -221,11 +282,70 @@ function startStream()
     showConfig(false);
 }
 
+function showStack(v)
+{
+    if(v) {
+        loadCalibFrames();
+    }
+	document.getElementById('stack').style.display = v ? 'inline' : 'none';
+}
+
+
 function showConfig(v)
 {
     console.log('CONFIG ' + v)
 	document.getElementById('config').style.display = v ? 'inline' : 'none';
 }
+
+function getVal(name)
+{
+    return document.getElementById('stack_' + name).value;
+}
+
+function getBVal(name)
+{
+    return document.getElementById('stack_' + name).checked;
+}
+
+function ctlStack(status)
+{
+    restCall('post','/api/stacker/control',{operation:status},(s)=> {
+        if(status == 'save') {
+            showStackedVideo(false);
+        }
+    });
+}
+
+function startStack()
+{
+    var darks = getVal('darks');
+    if(darks == 'N/A') {
+        darks = null;
+    }
+    var config={
+        name:               getVal("name"),
+        save_data:          getBVal("save_data"),
+        field_derotation:   getBVal("field_derotation"),
+        image_flip:         getBVal("image_flip"),
+        auto_stretch:       getBVal("auto_stretch"),
+        type:               getBVal("calibration") ? "calibration" : "dso",
+        location : {
+            lat:            parseFloat(getVal("lat")),
+            lon:            parseFloat(getVal("lon"))
+        },
+        target: {
+            ra:             parseFloat(getVal("ra")),
+            de:             parseFloat(getVal("de"))
+        },
+        darks : darks
+    };
+    console.log(config)
+    restCall('post','/api/stacker/start',config,(e)=>{
+        showStackedVideo(true);
+        showStack(false);
+    });
+}
+
 
 window.onload = (event) => {
   run();
@@ -234,20 +354,32 @@ window.onload = (event) => {
 window.onresize = onResize;
 
 
-
 </script> 
 <div id='video' style="position:absolute; left:0; top:0; z-index:-1"></div>
 <p id="open_camera"   style="display:inline" >Camera: <select id="camera_select"></select><button onclick="openCamera()">Open</button></p>
 <p id='std_controls' style="display:none;" >
     <button class="comp_but settings_background" onclick="showConfig(true);">&nbsp;</button>
     <button class="comp_but" onclick="showStack(true);">S</button>
-    <button class="comp_but" onclick="cltStack('pause');">&#x23F8;</button>
+    <button class="comp_but" onclick="ctlStack('pause');">&#x23F8;</button>
+    <button class="comp_but" onclick="ctlStack('resume');">&#x23F5;</button>
     <button class="comp_but" onclick="ctlStack('save');" >&#x1F4BE;</button>
 </p>
 <div class="config_div" id="stack" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showStack(false);">X</button>
     </span>
+    <table>
+    <tr><td>Name</td><td><input id="stack_name" type="text" value="" ></td><td>&nbsp;</td></tr>
+    <tr><td>Calibrate</td><td><input id="stack_calibration" type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr><td>Save</td><td><input id="stack_save_data" type="checkbox" checked ></td><td>&nbsp;</td></tr>
+    <tr><td>Derotate</td><td><input id="stack_field_derotation" type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr><td>Derotate Mirror</td><td><input id="stack_image_flip" type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr><td>Auto Stretch</td><td><input id="stack_auto_stretch" checked type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr><td>Target</td><td>RA:<input id="stack_ra" type="text" ></td><td>DE:<input id="stack_de" type="text" ></td></tr>
+    <tr><td>Geolocation</td><td>Lat:<input id="stack_lat" type="text" ></td><td>Lon:<input id="stack_lon" type="text" ></td></tr>
+    <tr><td>Darks</td><td><select id="stack_darks"></select></td><td>&nbsp;</td></tr>
+    <tr><td><button onclick='startStack();'>Start</button></td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    </table>
 </div>
 <div class="config_div" id="config" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
     <span style="position:absolute; right:1mm; top:1mm">

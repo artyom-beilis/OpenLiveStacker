@@ -8,6 +8,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <fstream>
 #include <iomanip>
+#include <chrono>
 #include "util.h"
 
 namespace ols {
@@ -167,11 +168,13 @@ namespace ols {
 
         std::shared_ptr<CameraFrame> generate_output_frame(cv::Mat img)
         {
+            cv::Mat img8;
+            img.convertTo(img8,CV_8UC3,255);
             std::shared_ptr<CameraFrame> frame(new CameraFrame());
-            frame->format.width = img.cols;
-            frame->format.height = img.rows;
+            frame->format.width = img8.cols;
+            frame->format.height = img8.rows;
             std::vector<unsigned char> buf;
-            cv::imencode(".jpeg",img,buf);
+            cv::imencode(".jpeg",img8,buf);
             frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
             return frame;
         }
@@ -186,17 +189,21 @@ namespace ols {
         {
             std::string path = output_path_;
             std::string ipath = output_path_;
+            std::string tpath = output_path_;
             if(final_image) {
                 path += "_stacked.jpeg";
                 ipath += "_stacked.json";
+                tpath += "_stacked.tiff";
             }
             else {
                 std::string suffix = "_interm_" + std::to_string(stacker_->stacked_count());
                 path += suffix+ ".jpeg";    
                 ipath += suffix + ".json";
+                tpath += suffix + "_stacked.tiff";
             }
+            save_tiff(stacker_->get_raw_stacked_image(),tpath);
+            auto frame = generate_output_frame(stacker_->get_stacked_image());
             std::ofstream f(path,std::ofstream::binary);
-            auto frame = generate_output_frame(stacker_->get_stacked_image());;
             f.write((char*)frame->jpeg_frame->data(),frame->jpeg_frame->size());
             f.close();
             out_->push(frame);
@@ -214,24 +221,39 @@ namespace ols {
 
         std::shared_ptr<CameraFrame> handle_video(std::shared_ptr<CameraFrame> video)
         {
+            std::shared_ptr<CameraFrame> res;
+		    auto start = std::chrono::high_resolution_clock::now();
             try {
                 if(calibration_) {
                     cframe_ +=  video->processed_frame;
                     cframe_count_ ++;
-                    return video;
-                }
-                if(stacker_->stack_image(video->processed_frame,restart_)) {
-                    restart_ = false;
-                    return generate_output_frame(stacker_->get_stacked_image());
+                    res = video;
+                    auto end = std::chrono::high_resolution_clock::now();
+                    double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
+                    BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms";
                 }
                 else {
-                    BOOSTER_INFO("stacker") << "Failed to stack frame";
+                    if(stacker_->stack_image(video->processed_frame,restart_)) {
+                        restart_ = false;
+		                auto p1 = std::chrono::high_resolution_clock::now();
+                        res = generate_output_frame(stacker_->get_stacked_image());
+                        auto p2 = std::chrono::high_resolution_clock::now();
+                        double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p1-start).count();
+                        double gtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p2-p1).count();
+                        BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms, generation " << (1e3*gtime) << " ms";
+                    }
+                    else {
+                        BOOSTER_INFO("stacker") << "Failed to stack frame";
+                        auto end = std::chrono::high_resolution_clock::now();
+                        double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
+                        BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms";
+                    }
                 }
             }
             catch(std::exception const &e) {
                 BOOSTER_ERROR("stacker") << "Stacking Failed";
             }
-            return std::shared_ptr<CameraFrame>();
+            return res;
         }
         void save_calibration()
         {
@@ -244,6 +266,9 @@ namespace ols {
             setup["path"] = name_ + ".tiff";
             setup["date"] = timestamp();
             setup["frames"] = cframe_count_;
+            setup["width"] = calib.cols;
+            setup["height"] = calib.rows;
+            BOOSTER_INFO("stacker") << "Saving calibration frame to " << tiff_path;
             save_tiff(calib,tiff_path);
             cppcms::json::value db;
             std::ifstream indx(db_path);
@@ -277,6 +302,7 @@ namespace ols {
                 calibration_ = ctl->calibration;
                 output_path_ = ctl->output_path;
                 name_ = ctl->name;
+                stacker_.reset();
                 if(calibration_) {
                     cframe_ = cv::Mat(height_,width_,CV_32FC3);
                     cframe_count_ = 0;
@@ -367,6 +393,9 @@ namespace ols {
             if(video->format.format == stream_mjpeg) {
                 std::ofstream f(base_name + ".jpeg",std::ofstream::binary);
                 f.write((char*)video->source_frame->data(),video->source_frame->size());
+                if(!f) {
+                    BOOSTER_ERROR("stacker") << "Failed to save jpeg to " << base_name << ".jpeg ";
+                }
                 f.close();
             }
             else {
@@ -374,11 +403,12 @@ namespace ols {
                     save_tiff(video->frame,base_name + ".tiff");
                 }
                 catch(std::exception const &e){
-                    BOOSTER_ERROR("stacker") << "Failed to saved tiff to " << base_name << ".tiff: " << e.what();
+                    BOOSTER_ERROR("stacker") << "Failed to save tiff to " << base_name << ".tiff: " << e.what();
                 }
             }
             std::ofstream log(dirname_ + "/log.txt",std::ofstream::app);
             log << counter_ <<"," << std::fixed << std::setprecision(3) << video->timestamp << std::endl;
+            counter_++;
         }
         void handle_config(std::shared_ptr<StackerControl> ctl)
         {

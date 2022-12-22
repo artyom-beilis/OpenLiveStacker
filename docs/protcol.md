@@ -151,11 +151,11 @@ Stacking controls
         {
             "name" : string // unique id of stacking - for saving
             "calibration": "dso"/ "calibration" // live stacking for DSO, calibration frames (no registration) 
-            "location" : null or { // required for derotation
+            "target" : null or { // required for derotation
                 "ra": float // RA of object in degrees
                 "de": float // DE of object in degrees"
             }
-            "target" : or null {  // required for derotation
+            "location" : or null {  // required for derotation
                 "lat": float // observers lattitude degees
                 "lon": float // observers longitude degees
                 "name": string or null // optional, for example M31
@@ -164,7 +164,7 @@ Stacking controls
             "comment": string or null // optional comment to save with the image
             "image_flip": bool // default false - inverse rotation (for newtonian/mirror diagonal)
             "field_rotation" : bool // default false, if true target and location must be provided
-            "autostretch" : bool // stretch , default true
+            "auto_stretch" : bool // stretch , default true
             // calibration frames, id taken from /media/data/calibration/index.json
             "darks": string or null // id of dark frames 
             "flats": string or null // id of flat frames

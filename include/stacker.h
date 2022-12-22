@@ -76,10 +76,15 @@ namespace ols {
         {
             return fully_stacked_count_;
         }
-        
+       
+        cv::Mat get_raw_stacked_image()
+        {
+            return sum_ * (1.0/ fully_stacked_count_);
+        }
+
         cv::Mat get_stacked_image()
         {
-            cv::Mat tmp = sum_ * (1.0/ fully_stacked_count_);
+            cv::Mat tmp = get_raw_stacked_image();
             if(enable_stretch_) {
                 double scale[3];
                 calc_wb(tmp(fully_stacked_area_),scale);

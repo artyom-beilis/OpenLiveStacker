@@ -25,8 +25,9 @@ namespace ols {
             TIFFSetField(out,TIFFTAG_IMAGEWIDTH,data.cols);
             TIFFSetField(out,TIFFTAG_IMAGELENGTH,data.rows);
             TIFFSetField(out,TIFFTAG_SAMPLESPERPIXEL,data.channels());
-            TIFFSetField(out,TIFFTAG_BITSPERSAMPLE,data.depth());
+            TIFFSetField(out,TIFFTAG_BITSPERSAMPLE,data.elemSize1()*8);
             TIFFSetField(out,TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
+            TIFFSetField(out,TIFFTAG_PLANARCONFIG,PLANARCONFIG_CONTIG);
             TIFFSetField(out,TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
             switch(data.type() & CV_MAT_DEPTH_MASK) {
             case CV_8U:
@@ -45,11 +46,11 @@ namespace ols {
             default:
                 throw std::runtime_error("Unsupported matrix format");
             }
-            int n = TIFFScanlineSize(out);
-            if(n != data.cols * data.channels() * data.depth())
+            size_t n = TIFFScanlineSize(out);
+            if(n != data.cols * data.channels() * data.elemSize1())
                 throw std::runtime_error("Internal error scanline size is inconsistent");
             for(int i=0;i<data.rows;i++) { 
-                if(TIFFWriteScanline(out,(char*)(data.data) + data.step[0]*i,i,0) != 1)
+                if(TIFFWriteScanline(out,(char*)(data.data) + data.step[0]*i,i,0) < 0)
                     throw std::runtime_error("Failed to write tiff image");
             }
         }
@@ -77,25 +78,25 @@ namespace ols {
                 throw std::runtime_error("Invalid format for " + file);
             int type = -1;
             switch(depth) {
-            case 1:
+            case 8:
                 switch(format) {
                 case SAMPLEFORMAT_INT: type = CV_MAKETYPE(CV_8S,spp);  break;
                 case SAMPLEFORMAT_UINT: type = CV_MAKETYPE(CV_8U,spp);  break;
                 }
                 break;
-            case 2:
+            case 16:
                 switch(format) {
                 case SAMPLEFORMAT_INT: type = CV_MAKETYPE(CV_16S,spp);  break;
                 case SAMPLEFORMAT_UINT: type = CV_MAKETYPE(CV_16U,spp);  break;
                 }
                 break;
-            case 4:
+            case 32:
                 switch(format) {
                 case SAMPLEFORMAT_INT: type = CV_MAKETYPE(CV_32S,spp);  break;
                 case SAMPLEFORMAT_IEEEFP: type = CV_MAKETYPE(CV_32F,spp);  break;
                 }
                 break;
-            case 8:
+            case 64:
                 switch(format) {
                 case SAMPLEFORMAT_IEEEFP: type = CV_MAKETYPE(CV_64F,spp);  break;
                 }
@@ -108,7 +109,7 @@ namespace ols {
                 throw std::runtime_error("Internal error in stride/scanline size in " + file);
             }
             for(unsigned i=0;i<height;i++) {
-                if(TIFFReadScanline(in,(char*)res.data + res.step[0]*i,i,0)!=1)
+                if(TIFFReadScanline(in,(char*)res.data + res.step[0]*i,i,0)<0)
                     throw std::runtime_error("Failed to read " + file);
             }
             TIFFClose(in);

@@ -66,7 +66,10 @@ namespace ols {
             cmd->name = content_.get<std::string>("name");
             cmd->save_inputs = content_.get("save_data",false);
             if(!cmd->calibration) {
-                cmd->output_path = stacked_path_ + "/" + cmd->name + ftime("_%Y%m%d_%H%M%S",time(nullptr));
+                if(!cmd->name.empty())
+                    cmd->name += "_";
+                cmd->name += ftime("%Y%m%d_%H%M%S",time(nullptr));
+                cmd->output_path = stacked_path_ + "/" + cmd->name; 
             }
             else {
                 cmd->output_path = calibration_path_;
@@ -82,13 +85,14 @@ namespace ols {
             catch(CamError const &) {
                 cmd->source_gamma = 1.0;
             }
-            cmd->lat = content_.get("target.lat",cmd->lat);
-            cmd->lon = content_.get("target.lon",cmd->lon);
-            cmd->ra = content_.get("location.ra",cmd->ra);
-            cmd->de = content_.get("location.de",cmd->de);
+            cmd->lat = content_.get("location.lat",cmd->lat);
+            cmd->lon = content_.get("location.lon",cmd->lon);
+            cmd->ra = content_.get("target.ra",cmd->ra);
+            cmd->de = content_.get("target.de",cmd->de);
             cmd->derotate_mirror = content_.get("image_flip",cmd->derotate_mirror);
             cmd->derotate = content_.get("field_rotation",cmd->derotate);
             cmd->darks_path = content_.get("darks",cmd->darks_path);
+            cmd->auto_stretch = content_.get("auto_stretch",cmd->auto_stretch);
             if(!cmd->darks_path.empty())
                 cmd->darks_path = calibration_path_ + "/" + cmd->darks_path + ".tiff";
             status_ = "stacking";

@@ -114,7 +114,7 @@ void OpenLiveStacker::init(std::string driver_name)
     web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this),cppcms::mount_point("/camera((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(this,data_dir_,video_generator_queue_),
-                                            cppcms::mount_point("/camera((/.*)?)",1),
+                                            cppcms::mount_point("/stacker((/.*)?)",1),
                                             cppcms::app::asynchronous);
 }
 

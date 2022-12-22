@@ -109,6 +109,7 @@ namespace ols {
                     live_out_->push(data_ptr);
                     stack_out_->push(data_ptr);
                     debug_out_->push(data_ptr);
+                    continue;
                 }
                 
                 BOOSTER_ERROR("stacker") << "Invalid data for video generator";
