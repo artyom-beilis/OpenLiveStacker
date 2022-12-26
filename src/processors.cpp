@@ -385,6 +385,10 @@ namespace ols {
                 }
             }
         }
+        std::string log_file()
+        {
+            return dirname_ + "/log.txt";
+        }
         void handle_video(std::shared_ptr<CameraFrame> video)
         {
             char fname[256];
@@ -406,7 +410,7 @@ namespace ols {
                     BOOSTER_ERROR("stacker") << "Failed to save tiff to " << base_name << ".tiff: " << e.what();
                 }
             }
-            std::ofstream log(dirname_ + "/log.txt",std::ofstream::app);
+            std::ofstream log(log_file(),std::ofstream::app);
             log << counter_ <<"," << std::fixed << std::setprecision(3) << video->timestamp << std::endl;
             counter_++;
         }
@@ -439,6 +443,13 @@ namespace ols {
                     v.save(info,cppcms::json::readable);
                 }
                 break;
+            case StackerControl::ctl_pause:
+                {
+                    std::ofstream log(log_file(),std::ofstream::app);
+                    log << "PAUSE,0" << std::endl;
+                }
+                break;
+
             default:
                 /// not much to do
                 ;
