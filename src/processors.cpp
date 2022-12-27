@@ -43,7 +43,7 @@ namespace ols {
         bool handle_video(std::shared_ptr<CameraFrame> video)
         {
             if(video->frame.rows != height_ || video->frame.cols != width_) {
-                BOOSTER_ERROR("stacker") << "Invalid mat frame size";
+                BOOSTER_ERROR("stacker") << "Invalid mat frame size, expecting " << height_ << "x" << width_ << " got " << video->frame.rows<< "x"<<video->frame.cols;
                 return false;
             }
             video->frame.convertTo(video->processed_frame,CV_32FC3,1/(255.0));
@@ -60,6 +60,7 @@ namespace ols {
                     double angle = derotator_->getAngleDeg(first_frame_ts_,video->timestamp);
                     if(derotate_mirror_)
                         angle = -angle;
+                    BOOSTER_INFO("stacker") << "Derotating by " << angle << " dir " << (derotate_mirror_ ? "inv" : "str");
                     auto M = cv::getRotationMatrix2D(cv::Point2f(width_/2,height_/2),angle,1.0f);
                     cv::Mat frame_rotated;
                     cv::warpAffine(video->processed_frame,frame_rotated,M,cv::Size(width_,height_));
@@ -148,21 +149,25 @@ namespace ols {
                 auto data_ptr = in_->pop();
                 auto stop_ptr = std::dynamic_pointer_cast<ShutDownData>(data_ptr);
                 if(stop_ptr) {
-                    out_->push(data_ptr);
+                    if(out_)
+                        out_->push(data_ptr);
                     break;
                 }
                 auto video_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
                 if(video_ptr) {
                     auto res = handle_video(video_ptr);
-                    if(res)
-                        out_->push(res);
+                    if(res) {
+                        if(out_)
+                            out_->push(res);
+                    }
                     continue;
                 }
                 auto config_ptr = std::dynamic_pointer_cast<StackerControl>(data_ptr);
                 if(config_ptr) {
                     handle_config(config_ptr);
                 }
-                out_->push(data_ptr);
+                if(out_)
+                    out_->push(data_ptr);
             }
         }
 
@@ -181,7 +186,9 @@ namespace ols {
 
         void send_updated_image()
         {
-            out_->push(generate_output_frame(stacker_->get_stacked_image()));
+            if(out_) {
+                out_->push(generate_output_frame(stacker_->get_stacked_image()));
+            }
         }
 
 
@@ -206,7 +213,8 @@ namespace ols {
             std::ofstream f(path,std::ofstream::binary);
             f.write((char*)frame->jpeg_frame->data(),frame->jpeg_frame->size());
             f.close();
-            out_->push(frame);
+            if(out_)
+                out_->push(frame);
             std::ofstream log(ipath);
             log << "Object: " << name_ << "\n";
             log << "When: " <<timestamp() << "\n";
@@ -236,10 +244,13 @@ namespace ols {
                     if(stacker_->stack_image(video->processed_frame,restart_)) {
                         restart_ = false;
 		                auto p1 = std::chrono::high_resolution_clock::now();
-                        res = generate_output_frame(stacker_->get_stacked_image());
-                        auto p2 = std::chrono::high_resolution_clock::now();
                         double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p1-start).count();
-                        double gtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p2-p1).count();
+                        double gtime = 0;
+                        if(out_) {
+                            res = generate_output_frame(stacker_->get_stacked_image());
+                            auto p2 = std::chrono::high_resolution_clock::now();
+                            gtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p2-p1).count();
+                        }
                         BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms, generation " << (1e3*gtime) << " ms";
                     }
                     else {
@@ -424,7 +435,7 @@ namespace ols {
                     v["height"] = ctl->height;
                     v["darks"] = ctl->darks_path;
                     v["calibration"] = ctl->calibration;
-                    v["derote"] = ctl->derotate;
+                    v["derotate"] = ctl->derotate;
                     v["derotate_mirror"] = ctl->derotate_mirror;
                     v["ra"] = ctl->ra;
                     v["de"] = ctl->de;

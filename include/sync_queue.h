@@ -10,6 +10,10 @@ namespace ols {
     class sync_queue {
     public:
 
+        sync_queue(size_t limit = std::numeric_limits<size_t>::max()) : limit_(limit)
+        {
+        }
+
         typedef std::function<void(T)> callback_type;
 
         void call_on_push(std::function<void(T)> cb)
@@ -32,6 +36,9 @@ namespace ols {
                 cb_(v);
                 return;
             }
+            while(data_.size() >= limit_) {
+                cond_has_room_.wait(guard);
+            }
             data_.push(v);
             cond_.notify_one();
         }
@@ -44,12 +51,15 @@ namespace ols {
             }
             T res = data_.front();
             data_.pop();
+            cond_has_room_.notify_one();
             return res;
         }
 
     private:
+        size_t limit_;
         std::queue<T> data_;
         std::condition_variable cond_;
+        std::condition_variable cond_has_room_;
         callback_type cb_;
         std::mutex lock_;
     };

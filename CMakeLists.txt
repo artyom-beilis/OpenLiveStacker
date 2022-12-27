@@ -23,5 +23,7 @@ add_library(ols SHARED
 target_link_libraries(ols tiff uvc cppcms booster ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
 add_executable(test_camera test/test_camera.cpp)
 add_executable(ols_cmd test/ols_cmd.cpp)
+add_executable(offline_ols test/offline_sim.cpp)
 target_link_libraries(test_camera ols)
 target_link_libraries(ols_cmd ols)
+target_link_libraries(offline_ols ols)

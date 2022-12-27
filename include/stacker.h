@@ -1,6 +1,7 @@
 #pragma once
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <booster/log.h>
 namespace ols {
 
     struct Stacker {
@@ -306,16 +307,18 @@ namespace ols {
             }
             else {
                 float step_avg_ = sqrt(step_sum_sq_ / count_frames_);
-                constexpr int missed_in_a_row_limit = 5;
+                constexpr int missed_in_a_row_limit = INT_MAX;
                 constexpr float pixel_0_threshold = 3;
                 float step = sqrt(step_sq_);
                 float step_limit = std::max((2 + (float)sqrt(missed_frames_)) * step_avg_,pixel_0_threshold);
-#ifdef DEBUG            
-                printf("Step size %5.2f from (%d,%d) to (%d,%d) limit =%5.1f avg_step=%5.1f\n",step,
+                char log_txt[256];
+                snprintf(log_txt,sizeof(log_txt),
+                        "Step size %5.2f from (%d,%d) to (%d,%d) limit =%5.1f avg_step=%5.1f\n",step,
                         current_position_.x,current_position_.y,
                         p.x,p.y,
                         step_limit,step_avg_);
-#endif            
+                BOOSTER_INFO("stacker") << log_txt;
+
                 if(missed_frames_ > missed_in_a_row_limit || step > step_limit) {
                     missed_frames_ ++;
                     return false;
