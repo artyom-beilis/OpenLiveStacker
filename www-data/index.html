@@ -399,14 +399,22 @@ function startStack()
 
     var name = getVal('name').trim();
     var obj = getVal('object').trim();
-    if(name == '')
-        name = obj;
-    else if(obj != '')
-        name = name + '_' + obj;
+
+    var calib = getBVal("calibration");
+    if(!calib) {
+        if(name == '')
+            name = obj;
+        else if(obj != '')
+            name = name + '_' + obj;
+    }
     name = name.replace(/ /g,'_');
     const name_pat = /^[A-Za-z0-9_.\-]*$/g;
     if(!name.match(name_pat)) {
         alert('Name and Object should contain only English letters, digits, "_", "-" and "."')
+        return;
+    }
+    if(calib && name=='') {
+        alert('Provide name for calibration frame');
         return;
     }
 
@@ -416,7 +424,7 @@ function startStack()
         field_derotation:   field_derotation,
         image_flip:         getBVal("image_flip"),
         auto_stretch:       getBVal("auto_stretch"),
-        type:               getBVal("calibration") ? "calibration" : "dso",
+        type:               calib ? "calibration" : "dso",
         location : {
             lat:            lat,
             lon:            lon,
