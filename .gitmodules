@@ -1,0 +1,3 @@
+[submodule "external/OpenNGC"]
+	path = external/OpenNGC
+	url = https://github.com/mattiaverga/OpenNGC.git

@@ -90,7 +90,7 @@ namespace ols {
             cmd->ra = content_.get("target.ra",cmd->ra);
             cmd->de = content_.get("target.de",cmd->de);
             cmd->derotate_mirror = content_.get("image_flip",cmd->derotate_mirror);
-            cmd->derotate = content_.get("field_rotation",cmd->derotate);
+            cmd->derotate = content_.get("field_derotation",cmd->derotate);
             cmd->darks_path = content_.get("darks",cmd->darks_path);
             cmd->auto_stretch = content_.get("auto_stretch",cmd->auto_stretch);
             if(!cmd->darks_path.empty())

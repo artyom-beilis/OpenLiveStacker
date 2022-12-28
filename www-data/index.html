@@ -28,10 +28,69 @@
     }
 </style>
 <body>
+<script src="/media/js/jsdb.js"></script>
 <script>
 
 var global_width = 0;
 var global_height = 0;
+
+function parseRA(svalue)
+{
+    const re_float = /^(\d+\.\d+)$/;
+    const re_colon = /^(\d+):(\d+)(?::(\d+(.\d+)?))?$/;
+    const re_hms = /^(\d+)[hH \t]\s*(\d+)[mM'′]\s*(?:(\d+(.\d+)?)(?:s|S|′′|″|''))?$/;
+    const re_space = /^(\d+)\s+(\d+)(?:\s+(\d+(.\d+)?))?$/;
+    var res = svalue.match(re_float);
+    var deg = null;
+    if(res) {
+        deg = parseFloat(res[1]);
+        if(deg < 0 || deg > 360)
+            return null;
+        return deg;
+    }
+    res = svalue.match(re_colon) || svalue.match(re_hms) || svalue.match(re_space);
+    if(!res)
+        return null;
+    var h = parseInt(res[1]);
+    var m = parseInt(res[2]);
+    var s = 0;
+    if(res[3]) {
+        s = parseFloat(res[3]);
+    }
+    if(h  >= 24 || m >= 60 || s >= 60) {
+        return null
+    }
+    deg = 15 * (h + (60 * m + s) / 3600.0 );
+    return deg;
+}
+
+function parseDEC(svalue)
+{
+    const re_float = /^([+-−]?\d+.\d+?)$/;
+    const re_colon = /^([-+−]?)(\d+):(\d+)(?::(\d+(.\d+)?))?$/;
+    const re_dms = /^([-+−]?)(\d+)[dD° \t]\s*(\d+)[mM'′]\s*(?:(\d+(.\d+)?)(?:s|S|″|′′|''))?$/;
+    const re_space = /^([-+−]?)(\d+)\s+(\d+)(?:\s+(\d+(.\d+)?))?$/;
+    var res = svalue.match(re_float)
+    if(res) {
+        var deg = parseFloat(res[1])
+        if(deg < -90 || deg > 90)
+            return null;
+        return deg;
+    }
+    res = svalue.match(re_colon) || svalue.match(re_dms) || svalue.match(re_space);
+    if(!res)
+        return null;
+    var sig = (res[1] == '-' || res[1] == '−')? -1.0 : 1.0;
+    var d = parseInt(res[2]);
+    var m = parseInt(res[3]);
+    var s = 0;
+    if(res[4]) {
+        s = parseFloat(res[3]);
+    }
+    if(d  > 90 || m >= 60 || s >= 60)
+        return null;
+    return sig*(d + (60 * m + s) / 3600.0);
+}
 
 function restCall(method,url,request,on_response)
 {
@@ -322,20 +381,49 @@ function startStack()
     if(darks == 'N/A') {
         darks = null;
     }
+    var ra=parseRA(getVal("ra"));
+    var de=parseDEC(getVal("de"));
+    var lat = parseFloat(getVal("lat"));
+    var lon = parseFloat(getVal("lon"));
+    var field_derotation = getBVal("field_derotation");
+    if(field_derotation) {
+        if(isNaN(lat) || isNaN(lon) || ra==null || de==null) {
+            alert('Need RA, DE and geolocation for derotation');
+            return;
+        }
+    }
+    if(isNaN(lat))
+        lat = 0;
+    if(isNaN(lon))
+        lon = 0;
+
+    var name = getVal('name').trim();
+    var obj = getVal('object').trim();
+    if(name == '')
+        name = obj;
+    else if(obj != '')
+        name = name + '_' + obj;
+    name = name.replace(/ /g,'_');
+    const name_pat = /^[A-Za-z0-9_.\-]*$/g;
+    if(!name.match(name_pat)) {
+        alert('Name and Object should contain only English letters, digits, "_", "-" and "."')
+        return;
+    }
+
     var config={
-        name:               getVal("name"),
+        name:               name,
         save_data:          getBVal("save_data"),
-        field_derotation:   getBVal("field_derotation"),
+        field_derotation:   field_derotation,
         image_flip:         getBVal("image_flip"),
         auto_stretch:       getBVal("auto_stretch"),
         type:               getBVal("calibration") ? "calibration" : "dso",
         location : {
-            lat:            parseFloat(getVal("lat")),
-            lon:            parseFloat(getVal("lon"))
+            lat:            lat,
+            lon:            lon,
         },
         target: {
-            ra:             parseFloat(getVal("ra")),
-            de:             parseFloat(getVal("de"))
+            ra:             ra,
+            de:             de,
         },
         darks : darks
     };
@@ -346,6 +434,16 @@ function startStack()
     });
 }
 
+function updateRADE(name)
+{
+    var coord=['','']
+    name = name.toUpperCase();
+    if(name in jsdb) {
+        coord = jsdb[name]
+    }
+    document.getElementById('stack_ra').value = coord[0];
+    document.getElementById('stack_de').value = coord[1];
+}
 
 window.onload = (event) => {
   run();
@@ -375,6 +473,7 @@ window.onresize = onResize;
     <tr><td>Derotate</td><td><input id="stack_field_derotation" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr><td>Derotate Mirror</td><td><input id="stack_image_flip" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr><td>Auto Stretch</td><td><input id="stack_auto_stretch" checked type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr><td>Object ID</td><td><input oninput="updateRADE(this.value)" id="stack_object" type="text" value="" ></td><td>for example: M31, NGC457</td></tr>
     <tr><td>Target</td><td>RA:<input id="stack_ra" type="text" ></td><td>DE:<input id="stack_de" type="text" ></td></tr>
     <tr><td>Geolocation</td><td>Lat:<input id="stack_lat" type="text" ></td><td>Lon:<input id="stack_lon" type="text" ></td></tr>
     <tr><td>Darks</td><td><select id="stack_darks"></select></td><td>&nbsp;</td></tr>

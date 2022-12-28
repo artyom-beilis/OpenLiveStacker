@@ -27,3 +27,8 @@ add_executable(offline_ols test/offline_sim.cpp)
 target_link_libraries(test_camera ols)
 target_link_libraries(ols_cmd ols)
 target_link_libraries(offline_ols ols)
+add_custom_command(TARGET ols POST_BUILD
+    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/make_db.py ${CMAKE_CURRENT_SOURCE_DIR}/www-data/media/js/jsdb.js
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Building DB"
+)
