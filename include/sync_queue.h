@@ -4,6 +4,7 @@
 #include <queue>
 #include <memory>
 #include <thread>
+#include <functional>
 
 namespace ols {
     template<typename T>

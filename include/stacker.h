@@ -12,6 +12,7 @@ namespace ols {
             exp_multiplier_(exp_multiplier)
         {
             fully_stacked_area_ = cv::Rect(0,0,width,height);
+            fully_stacked_count_ = 0;
             if(roi_size == -1) {
                 window_size_ = std::min(height,width);
                 #if 0
@@ -38,7 +39,9 @@ namespace ols {
             }
             
             sum_ = cv::Mat(height,width,CV_32FC3);
+            sum_.setTo(0);
             count_ = cv::Mat(height,width,CV_32FC3);
+            count_.setTo(0);
             make_fft_blur();
         }
 
@@ -80,6 +83,7 @@ namespace ols {
        
         cv::Mat get_raw_stacked_image()
         {
+            BOOSTER_INFO("stacked") << "So far stacked " << fully_stacked_count_ << std::endl;
             return sum_ * (1.0/ fully_stacked_count_);
         }
 
@@ -278,8 +282,14 @@ namespace ols {
                 scale[i] /= cnt;
             // normalize once again
             double smin = std::min(scale[0],std::min(scale[1],scale[2]));
-            for(int i=0;i<3;i++)
-                scale[i] /= smin;
+            if(smin > 0) {
+                for(int i=0;i<3;i++)
+                    scale[i] /= smin;
+            }
+            else {
+                for(int i=0;i<3;i++)
+                    scale[i] = 1.0;
+            }
             printf("WB [%f,%f,%f]\n",scale[0],scale[1],scale[2]);
             for(int i=0;i<3;i++)
                 scale[i] /= maxV;
@@ -345,7 +355,11 @@ namespace ols {
             cv::Mat res,shift;
             cv::mulSpectrums(fft_roi_,dft,res,0,true);
             cv::Mat dspec;
+#if CV_VERSION_MAJOR >= 4 && CV_VERSION_MINOR >= 5
             cv::divSpectrums(res,cv::abs(res),dspec,0);
+#else
+            dspec = res / cv::abs(res);
+#endif            
             cv::idft(dspec,shift,cv::DFT_REAL_OUTPUT);
             cv::Point pos;
 #ifdef DEBUG
@@ -437,7 +451,9 @@ namespace ols {
         cv::Mat manual_frame_;
         float tgt_gamma_ = 1.0f;
         bool enable_stretch_ = true;
-        float low_per_= 0.5f;
+        //float low_per_= 0.5f;
+        //float high_per_=99.999f;
+        float low_per_= 0.05;
         float high_per_=99.999f;
     };
 

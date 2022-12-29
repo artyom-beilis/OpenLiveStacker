@@ -191,6 +191,15 @@ namespace ols {
             }
         }
 
+        cv::Mat to16bit(cv::Mat m)
+        {
+            cv::Mat m2 = cv::max(0,m);
+            double max_v;
+            cv::minMaxLoc(m2,nullptr,&max_v);
+            cv::Mat res;
+            m2.convertTo(res,CV_16UC3,65535/max_v);
+            return res;
+        }
 
         void save_stacked_image_and_send(bool final_image)
         {
@@ -208,7 +217,7 @@ namespace ols {
                 ipath += suffix + ".json";
                 tpath += suffix + "_stacked.tiff";
             }
-            save_tiff(stacker_->get_raw_stacked_image(),tpath);
+            save_tiff(to16bit(stacker_->get_raw_stacked_image()),tpath);
             auto frame = generate_output_frame(stacker_->get_stacked_image());
             std::ofstream f(path,std::ofstream::binary);
             f.write((char*)frame->jpeg_frame->data(),frame->jpeg_frame->size());
