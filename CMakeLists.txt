@@ -3,11 +3,19 @@ project(OpenLiveStacker)
 
 include_directories(include)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2 -g")
+option(OPENCV_ROOT "Path to OpenCV Library" "")
 
-find_library(OPENCV_CORE        opencv_core      HINTS /opt/opencv-4.6/lib/ NO_DEFAULT_PATH)
-find_library(OPENCV_IMGPROC     opencv_imgproc   HINTS /opt/opencv-4.6/lib/ NO_DEFAULT_PATH)
-find_library(OPENCV_IMGCODECS   opencv_imgcodecs HINTS /opt/opencv-4.6/lib/ NO_DEFAULT_PATH)
-find_path(OPENCV_INC opencv2/core.hpp HINTS /opt/opencv-4.6/include/opencv4 NO_DEFAULT_PATH )
+if(OPENCV_ROOT)
+    find_library(OPENCV_CORE        opencv_core      HINTS ${OPENCV_ROOT}/lib/ NO_DEFAULT_PATH)
+    find_library(OPENCV_IMGPROC     opencv_imgproc   HINTS ${OPENCV_ROOT}/lib/ NO_DEFAULT_PATH)
+    find_library(OPENCV_IMGCODECS   opencv_imgcodecs HINTS ${OPENCV_ROOT}/lib/ NO_DEFAULT_PATH)
+    find_path(OPENCV_INC opencv2/core.hpp HINTS ${OPENCV_ROOT}/include/opencv4;${OPENCV_ROOT}/include NO_DEFAULT_PATH )
+else()
+    find_library(OPENCV_CORE        opencv_core      )
+    find_library(OPENCV_IMGPROC     opencv_imgproc   )
+    find_library(OPENCV_IMGCODECS   opencv_imgcodecs )
+    find_path(OPENCV_INC opencv2/core.hpp)
+endif()
 
 include_directories(${OPENCV_INC})
 

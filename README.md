@@ -12,7 +12,11 @@
     - In near future: Raspberry PI, Android, maybe windows
 - Camera
     - Implemented: UVC Based like webcam, sv105
-    - Future: INDI Library (for wide range of cameras), Android camera, ASI ZWO SDK (mostly for android)
+    - Future extected drivers:
+        - Watch directoy for files (universal integration with ekos)
+        - Android camera
+        - ASI ZWO SDK (mostly for android and Linux likely as well)
+        - INDI Library (for wide range of cameras)
 - Switch pure JS UI to better looking one
 - Integrate as Android App
 
@@ -23,7 +27,7 @@
 - libtiff
 - libuvc 
 - cppcms 2.0 beta
-- OpenCV >= 4.6 core, imgproc, imgcodecs
+- OpenCV >= 3.2 core, imgproc, imgcodecs
 - C++11 enabled compiler
 
 Just run
