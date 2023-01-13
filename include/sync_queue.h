@@ -5,11 +5,16 @@
 #include <memory>
 #include <thread>
 #include <functional>
+#include <atomic>
 
 namespace ols {
+    struct sync_queue_base {
+        static std::atomic<long> items;
+    };
     template<typename T>
-    class sync_queue {
+    class sync_queue : public sync_queue_base {
     public:
+    
 
         sync_queue(size_t limit = std::numeric_limits<size_t>::max()) : limit_(limit)
         {
@@ -24,8 +29,9 @@ namespace ols {
             if(cb_) {
                 while(!data_.empty()) {
                     auto item = data_.front();
-                    cb_(item);
                     data_.pop();
+                    --items;
+                    cb_(item);
                 }
             }
         }
@@ -40,6 +46,7 @@ namespace ols {
             while(data_.size() >= limit_) {
                 cond_has_room_.wait(guard);
             }
+            ++items;
             data_.push(v);
             cond_.notify_one();
         }
@@ -52,6 +59,7 @@ namespace ols {
             }
             T res = data_.front();
             data_.pop();
+            --items;
             cond_has_room_.notify_one();
             return res;
         }

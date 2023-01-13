@@ -1,4 +1,5 @@
 #include "util.h"
+#include "sync_queue.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -7,6 +8,8 @@
 #include <system_error>
 
 namespace ols {
+    std::atomic<long> sync_queue_base::items;
+
     void make_dir(std::string const &path)
     {
         int r = mkdir(path.c_str(),0777);

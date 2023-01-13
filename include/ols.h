@@ -63,6 +63,8 @@ namespace ols {
         bool stream_active_ = false;
         CamStreamFormat current_format_;
 
+        int dropped_ = 0;
+
         std::string data_dir_;
         std::string debug_dir_;
 

@@ -120,6 +120,10 @@ void OpenLiveStacker::init(std::string driver_name)
 
 void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
 {
+    if(video_generator_queue_->items > 20) {
+        BOOSTER_WARNING("stacker") << "Processing is overloaded, dropping frame #" << (++dropped_);
+        return;
+    }
     std::shared_ptr<CameraFrame> frame(new CameraFrame());
     frame->format.format = cf.format;
     frame->format.width  = cf.width;
