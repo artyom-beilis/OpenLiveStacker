@@ -2,6 +2,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <booster/log.h>
+#include "cv_util.h"
 namespace ols {
 
     struct Stacker {
@@ -104,7 +105,10 @@ namespace ols {
                 tmp = cv::max(0,cv::min(1,tmp));
                 float g=cv::max(1.0,cv::min(2.2,log(mean)/log(0.25)));
                 printf("Mean %f gamma=%f\n",mean,g);
-                cv::pow(tmp,1/g,tmp);
+                //cv::pow(tmp,1/g,tmp);
+                // make fine gamma steps for efficient caching
+                g=round(g*10)*0.1;
+                gamma_comp_.apply(tmp,1/g);
             }
             else {
                 double max_v,min_v;
@@ -113,7 +117,8 @@ namespace ols {
                     min_v = 0;
                 tmp = cv::max(0,(tmp - float(min_v))*float(1.0/(max_v-min_v)));
                 if(tgt_gamma_!=1.0f) {
-                    cv::pow(tmp,1/tgt_gamma_,tmp);
+                    //cv::pow(tmp,1/tgt_gamma_,tmp);
+                    gamma_comp_.apply(tmp,1/tgt_gamma_);
                 }
             }
             return tmp;
@@ -455,6 +460,8 @@ namespace ols {
         //float high_per_=99.999f;
         float low_per_= 0.05;
         float high_per_=99.999f;
+
+        CachedGamma gamma_comp_;
     };
 
 

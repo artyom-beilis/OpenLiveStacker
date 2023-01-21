@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 project(OpenLiveStacker)
 
 include_directories(include)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2 -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2 -g -mavx -msse4.2")
 option(OPENCV_ROOT "Path to OpenCV Library" "")
 
 if(OPENCV_ROOT)
@@ -27,6 +27,7 @@ add_library(ols SHARED
     src/tiffmat.cpp
     src/processors.cpp
     src/util.cpp
+    src/cv_util.cpp
     )
 target_link_libraries(ols tiff uvc cppcms booster ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
 add_executable(test_camera test/test_camera.cpp)

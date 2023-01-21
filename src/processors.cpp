@@ -46,11 +46,14 @@ namespace ols {
                 BOOSTER_ERROR("stacker") << "Invalid mat frame size, expecting " << height_ << "x" << width_ << " got " << video->frame.rows<< "x"<<video->frame.cols;
                 return false;
             }
+		    auto start = std::chrono::high_resolution_clock::now();
             video->frame.convertTo(video->processed_frame,CV_32FC3,1/(255.0));
             if(calibration_)
                 return true;
-            if(gamma_ != 1.0)
-                cv::pow(video->processed_frame,gamma_,video->processed_frame);
+            if(gamma_ != 1.0) {
+                gamma_calc_.apply(video->processed_frame,gamma_);
+                //cv::pow(video->processed_frame,gamma_,video->processed_frame);
+            }
             if(apply_darks_)
                 video->processed_frame -= darks_;
             if(derotator_) {
@@ -67,6 +70,9 @@ namespace ols {
                     video->processed_frame = frame_rotated;
                 }
             }
+		    auto end = std::chrono::high_resolution_clock::now();
+            double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
+            BOOSTER_INFO("stacker") << "preprosessing took " << (1e3*time) << " ms";
             return true;
         }
         void handle_config(std::shared_ptr<StackerControl> ctl)
@@ -102,10 +108,9 @@ namespace ols {
                 darks_ = load_tiff(darks_path);
                 if(darks_.rows == height_ && darks_.cols == width_) {
                     apply_darks_ = true;
-                    cv::Mat tmp;
                     if(gamma_ != 1.0) {
-                        cv::pow(darks_,gamma_,tmp);
-                        darks_ = tmp;
+                        //cv::pow(darks_,gamma_,darks_);
+                        gamma_calc_.apply(darks_,gamma_);
                     }
                 }
                 else {
@@ -128,6 +133,7 @@ namespace ols {
         bool derotate_mirror_;
         cv::Mat darks_;
         bool apply_darks_;
+        CachedGamma gamma_calc_;
     };
 
     std::thread start_preprocessor(queue_pointer_type in,queue_pointer_type out)
