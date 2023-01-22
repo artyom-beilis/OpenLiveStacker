@@ -128,6 +128,7 @@ void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
     frame->format.format = cf.format;
     frame->format.width  = cf.width;
     frame->format.height = cf.height;
+    frame->bayer = cf.bayer;
     frame->timestamp = cf.unix_timestamp;
     frame->source_frame = std::shared_ptr<VideoFrame>(new VideoFrame(cf.data,cf.data_size));
     video_generator_queue_->push(frame);

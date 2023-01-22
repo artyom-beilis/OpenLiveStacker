@@ -56,7 +56,20 @@ namespace ols {
     enum CamStreamType {
         stream_yuv2,
         stream_mjpeg,
+        stream_rgb24,
+        stream_raw8,
+        stream_raw16,
+        stream_mono8,
+        stream_mono16,
         stream_error,
+    };
+
+    enum CamBayerType {
+        bayer_na,
+        bayer_rg,
+        bayer_bg,
+        bayer_gr,
+        bayer_gb
     };
 
     std::string stream_type_to_str(CamStreamType s);
@@ -75,6 +88,7 @@ namespace ols {
     ///
     struct CamFrame {
         CamStreamType format; /// image format
+        CamBayerType bayer = bayer_na;
         int frame_counter;    /// frame counter since camera started
         double unix_timestamp; /// time in sconds since Jan 1, 1970 when image was captured, inlcuding subsecond units
         int width;  /// image width
@@ -122,6 +136,7 @@ namespace ols {
     /// Base class for driver to implement
     class CameraDriver {
     public:
+        static void load_driver(std::string const &name,std::string base_path="");
         /// list supported drivers
         static std::vector<std::string> drivers();
         /// get driver - by its order in the \a drivers result

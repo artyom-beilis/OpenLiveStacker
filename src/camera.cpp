@@ -1,23 +1,51 @@
 #include "camera.h"
-#include "uvc_camera.h"
+#include <dlfcn.h>
+
+extern "C" typedef ols::CameraDriver *(*cam_generator_ptr_type)(int);
 
 namespace ols {
+
+static std::vector<std::string> driver_names;
+static std::vector<cam_generator_ptr_type> driver_calls;
+
+void CameraDriver::load_driver(std::string const &name,std::string base_path)
+{
+    if(!base_path.empty())
+        base_path += "/";
+    void *h = dlopen((base_path + "libols_driver_" + name + ".so").c_str(),RTLD_LAZY);
+    if(!h)
+        throw CamError("Failed to load driver " + name);
+    void *func = dlsym(h,("ols_get_" + name + "_driver").c_str());
+    if(!func) {
+        dlclose(h);
+        throw CamError("Failed to find driver entry for " + name);
+    }
+    driver_calls.insert(driver_calls.begin(),reinterpret_cast<cam_generator_ptr_type>(func));
+    driver_names.insert(driver_names.begin(),name);
+}
+
 std::vector<std::string> CameraDriver::drivers()
 {
-    return std::vector<std::string>({"UVC"});
+    return driver_names;
 }
 
 std::unique_ptr<CameraDriver> CameraDriver::get(int id)
 {
-    if(id!=0)
+    if((unsigned)id >= driver_calls.size())
         throw CamError("Invalid driver id"); 
-    return get_uvc_driver();
+    std::unique_ptr<CameraDriver> r(driver_calls.at(id)(-1));
+    return r;
 }
 std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)
 {
     switch(fmt.format) {
     case stream_yuv2: out << "YUV2"; break;
     case stream_mjpeg: out << "MJPEG"; break;
+    case stream_rgb24: out << "RGB24"; break;
+    case stream_raw8:  out << "RAW8"; break;
+    case stream_raw16:  out << "RAW16"; break;
+    case stream_mono8:  out << "MONO8"; break;
+    case stream_mono16:  out << "MONO16"; break;
     default: out << "Unknown";
     }
     out << ":" << fmt.width << "x" << fmt.height <<"@" << fmt.framerate;
@@ -43,6 +71,11 @@ std::string stream_type_to_str(CamStreamType s)
 {
     switch(s) {
     case stream_yuv2: return "yuv2";
+    case stream_rgb24: return "rgb24";
+    case stream_raw8: return "raw8";
+    case stream_raw16: return "raw16";
+    case stream_mono8: return "mono8";
+    case stream_mono16: return "mono16";
     case stream_mjpeg: return "mjpeg";
     default:
         throw CamError("Invalid Stream type");
@@ -55,6 +88,16 @@ CamStreamType stream_type_from_str(std::string s)
         return stream_mjpeg;
     if(s=="yuv2")
         return stream_yuv2;
+    if(s=="rgb24")
+        return stream_rgb24;
+    if(s=="raw8")
+        return stream_raw8;
+    if(s=="raw16")
+        return stream_raw16;
+    if(s=="mono8")
+        return stream_mono8;
+    if(s=="mono16")
+        return stream_mono16;
     throw CamError("Invalid stream type " + s);
 }
 

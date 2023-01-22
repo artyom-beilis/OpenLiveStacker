@@ -17,8 +17,56 @@ namespace ols {
             debug_out_(debug)
         {
         }
+        void handle_jpeg_stack(std::shared_ptr<CameraFrame> frame,cv::Mat rgb,bool copy)
+        {
+            std::vector<unsigned char> buf;
+            
+            cv::Mat normalized;
+            if(rgb.elemSize1() == 2)
+                rgb.convertTo(normalized,CV_8UC3,(1.0/255.0));
+            else if(rgb.elemSize1() == 4)
+                rgb.convertTo(normalized,CV_8UC3,(1.0/16777215.0));
+            else
+                normalized = rgb;
+
+            cv::imencode(".jpeg",normalized,buf);
+
+            frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
+            if(stacking_active_) {
+                if(copy)
+                    frame->frame = rgb.clone();
+                else
+                    frame->frame = rgb;
+            }
+        }
         void process_frame(std::shared_ptr<CameraFrame> frame)
         {
+            int bpp=-1;
+            switch(frame->format.format) {
+            case stream_mjpeg: 
+                bpp=-1;
+                break;
+            case stream_mono8:
+            case stream_raw8:
+                bpp=1;
+                break;
+            case stream_yuv2: 
+            case stream_mono16:
+            case stream_raw16:
+                bpp=2; 
+                break;
+            case stream_rgb24:
+                bpp=3;
+                break;
+            default:
+                BOOSTER_ERROR("stacker") << "Got invalid format";
+                return;
+            }
+            if(bpp>0 && int(frame->source_frame->size()) != frame->format.height*frame->format.width*bpp) {
+                BOOSTER_ERROR("stacker") << "Invalid frame size got " << frame->source_frame->size() 
+                            << " bytes, expected " << (frame->format.height*frame->format.width*bpp);
+                return;
+            }
             switch(frame->format.format) {
             case stream_mjpeg:
                 {
@@ -39,20 +87,42 @@ namespace ols {
                 break;
             case stream_yuv2:
                 {
-                    if(int(frame->source_frame->size()) != frame->format.height*frame->format.width*2) {
-                        BOOSTER_ERROR("stacker") << "Invalid frame size got " << frame->source_frame->size() 
-                                    << " bytes, expected " << (frame->format.height*frame->format.width*2);
-                        return;
-                    }
                     cv::Mat yuv2(frame->format.height,frame->format.width,CV_8UC2,frame->source_frame->data());
                     cv::Mat rgb;
                     cv::cvtColor(yuv2,rgb,cv::COLOR_YUV2BGR_YUYV);
-                    std::vector<unsigned char> buf;
-                    cv::imencode(".jpeg",rgb,buf);
-                    frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
-                    // keep rgb if needed
-                    if(stacking_active_)
-                        frame->frame = rgb;
+                    handle_jpeg_stack(frame,rgb,false);
+                }
+                break;
+            case stream_rgb24:
+                {
+                    cv::Mat rgb(frame->format.height,frame->format.width,CV_8UC3,frame->source_frame->data());
+                    handle_jpeg_stack(frame,rgb,true);
+                }
+                break;
+            case stream_raw8:
+            case stream_raw16:
+                {
+                    cv::Mat bayer(frame->format.height,frame->format.width,(bpp==1 ? CV_8UC1 : CV_16UC1),frame->source_frame->data());
+                    cv::Mat rgb;
+                    switch(frame->bayer) {
+                    case bayer_rg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerRGGB2BGR); break;
+                    case bayer_gr:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGRBG2BGR); break;
+                    case bayer_bg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerBGGR2BGR); break;
+                    case bayer_gb:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGBRG2BGR); break;
+                    default:
+                        BOOSTER_ERROR("stacker") << "Invalid bayer patter";
+                    }
+                    handle_jpeg_stack(frame,rgb,false);
+                }
+                break;
+            case stream_mono8:
+            case stream_mono16:
+                {
+                    #warning "Better mono handling is needed rather than converting Gray 2 RGB)"
+                    cv::Mat mono(frame->format.height,frame->format.width,(bpp==1 ? CV_8UC1 : CV_16UC1),frame->source_frame->data());
+                    cv::Mat rgb;
+                    cv::cvtColor(mono,rgb,cv::COLOR_GRAY2BGR); 
+                    handle_jpeg_stack(frame,rgb,false);
                 }
                 break;
             case stream_error:

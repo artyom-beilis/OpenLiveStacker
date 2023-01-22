@@ -511,3 +511,16 @@ i                   throw UVCError("Failed to set no discovery option");
         return driver;
     }
 };
+
+
+extern "C" ols::CameraDriver *ols_get_uvc_driver(int fd)
+{
+    try {
+        auto p = ols::get_uvc_driver(fd);
+        return p.release();
+    }
+    catch(std::exception const &e) {
+        fprintf(stderr,"Failed to load driver %s",e.what());
+        return nullptr;
+    }
+}
