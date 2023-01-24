@@ -110,9 +110,9 @@ namespace ols {
             cfg.source_gamma = v.get<double>("source_gamma");
             cfg.darks_path = v.get<std::string>("darks");
             cfg.auto_stretch = v.get<bool>("auto_stretch");
-            cfg.strech_low = v.get<double>("strech_low");
-            cfg.strech_high = v.get<double>("strech_high");
-            cfg.strech_gamma = v.get<double>("strech_gamma");
+            cfg.stretch_low = v.get<double>("stretch_low");
+            cfg.stretch_high = v.get<double>("stretch_high");
+            cfg.stretch_gamma = v.get<double>("stretch_gamma");
 
             if(!cfg.calibration)
                 cfg.output_path =  output_dir_ + "/" + cfg.name;

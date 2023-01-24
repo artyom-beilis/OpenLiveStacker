@@ -51,8 +51,9 @@ namespace ols {
                 return true;
             if(gamma_ != 1.0)
                 cv::pow(video->processed_frame,gamma_,video->processed_frame);
-            if(apply_darks_)
-                video->processed_frame -= darks_;
+            if(apply_darks_) {
+                video->processed_frame = cv::max(0,video->processed_frame - darks_);
+            }
             if(derotator_) {
                 if(first_frame_ts_ == 0)
                     first_frame_ts_ = video->timestamp;
@@ -329,7 +330,7 @@ namespace ols {
                 }
                 else {
                     stacker_.reset(new Stacker(width_,height_));
-                    stacker_->set_target_gamma(ctl->auto_stretch ? -1 : ctl->strech_gamma);
+                    stacker_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
                     restart_ = true;
                 }
                 break;
@@ -352,7 +353,7 @@ namespace ols {
                 break;
             case StackerControl::ctl_update:
                 if(stacker_) {
-                    stacker_->set_target_gamma(ctl->auto_stretch ? -1 : ctl->strech_gamma);
+                    stacker_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
                     send_updated_image();
                 }
                 break;
@@ -456,11 +457,26 @@ namespace ols {
                     v["lon"] = ctl->lon;
                     v["source_gamma"] = ctl->source_gamma;
                     v["auto_stretch"] = ctl->auto_stretch;
-                    v["strech_gamma"] = ctl->strech_gamma;
-                    v["strech_low"] = ctl->strech_low;
-                    v["strech_high"] = ctl->strech_high;
+                    v["stretch_low"] = ctl->stretch_low;
+                    v["stretch_high"] = ctl->stretch_high;
+                    v["stretch_gamma"] = ctl->stretch_gamma;
                     std::ofstream info(dirname_ + "/info.json");
                     v.save(info,cppcms::json::readable);
+                }
+                break;
+            case StackerControl::ctl_update:
+                {
+                    std::ifstream info_r(dirname_ + "/info.json");
+                    cppcms::json::value v;
+                    if(v.load(info_r,true)) {
+                        info_r.close();
+                        std::ofstream info(dirname_ + "/info.json");
+                        v["auto_stretch"] = ctl->auto_stretch;
+                        v["stretch_low"] = ctl->stretch_low;
+                        v["stretch_high"] = ctl->stretch_high;
+                        v["stretch_gamma"] = ctl->stretch_gamma;
+                        v.save(info,cppcms::json::readable);
+                    }
                 }
                 break;
             case StackerControl::ctl_pause:

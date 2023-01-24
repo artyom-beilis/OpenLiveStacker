@@ -168,12 +168,13 @@ namespace ols {
                         break;
                     case StackerControl::ctl_resume:
                     case StackerControl::ctl_save_and_continue:
-                    case StackerControl::ctl_update:
                         stacking_active_ = true;
                         break;
                     case StackerControl::ctl_pause:
                     case StackerControl::ctl_save:
                         stacking_active_ = false;
+                        break;
+                    case StackerControl::ctl_update:
                         break;
                     }
                     live_out_->push(data_ptr);

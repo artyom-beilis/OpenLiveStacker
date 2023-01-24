@@ -26,6 +26,7 @@ namespace ols {
             calibration_path_ = data_dir_ + "/calibration";
             dispatcher().map("POST","/start/?",&StackerControlApp::start,this);
             dispatcher().map("POST","/control/?",&StackerControlApp::control,this);
+            dispatcher().map("POST","/stretch/?",&StackerControlApp::stretch,this);
             dispatcher().map("GET", "/status/?",&StackerControlApp::status,this);
         }
         void status()
@@ -53,6 +54,16 @@ namespace ols {
             }
             else
                 throw std::runtime_error("Unknown operation " + op);
+            queue_->push(cmd);
+        }
+        void stretch()
+        {
+            std::shared_ptr<StackerControl> cmd(new StackerControl());
+            cmd->op = StackerControl::ctl_update;
+            cmd->auto_stretch = content_.get("auto_stretch",cmd->auto_stretch);
+            cmd->stretch_low = content_.get("stretch_low",cmd->stretch_low);
+            cmd->stretch_high = content_.get("stretch_high",cmd->stretch_high);
+            cmd->stretch_gamma = content_.get("stretch_gamma",cmd->stretch_gamma);
             queue_->push(cmd);
         }
         void start()
@@ -93,6 +104,9 @@ namespace ols {
             cmd->derotate = content_.get("field_derotation",cmd->derotate);
             cmd->darks_path = content_.get("darks",cmd->darks_path);
             cmd->auto_stretch = content_.get("auto_stretch",cmd->auto_stretch);
+            cmd->stretch_low = content_.get("stretch_low",cmd->stretch_low);
+            cmd->stretch_high = content_.get("stretch_high",cmd->stretch_high);
+            cmd->stretch_gamma = content_.get("stretch_gamma",cmd->stretch_gamma);
             if(!cmd->darks_path.empty())
                 cmd->darks_path = calibration_path_ + "/" + cmd->darks_path + ".tiff";
             status_ = "stacking";

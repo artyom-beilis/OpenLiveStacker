@@ -349,6 +349,10 @@ function showStack(v)
 	document.getElementById('stack').style.display = v ? 'inline' : 'none';
 }
 
+function showPP(v)
+{
+	document.getElementById('pp_control').style.display = v ? 'inline' : 'none';
+}
 
 function showConfig(v)
 {
@@ -366,12 +370,31 @@ function getBVal(name)
     return document.getElementById('stack_' + name).checked;
 }
 
+function getPVal(name)
+{
+    return document.getElementById('stack_' + name).value * 0.01;
+}
+
 function ctlStack(status)
 {
     restCall('post','/api/stacker/control',{operation:status},(s)=> {
         if(status == 'save') {
             showStackedVideo(false);
         }
+    });
+}
+
+function updatePP()
+{
+
+    var config={
+        auto_stretch:       getBVal("auto_stretch"),
+        stretch_low:        getPVal('stretch_low'),
+        stretch_high:       getPVal('stretch_high'),
+        stretch_gamma:      getPVal('stretch_gamma'),
+    };
+    console.log(config)
+    restCall('post','/api/stacker/stretch',config,(e)=>{
     });
 }
 
@@ -424,6 +447,9 @@ function startStack()
         field_derotation:   field_derotation,
         image_flip:         getBVal("image_flip"),
         auto_stretch:       getBVal("auto_stretch"),
+        stretch_low:        getPVal('stretch_low'),
+        stretch_high:       getPVal('stretch_high'),
+        stretch_gamma:      getPVal('stretch_gamma'),
         type:               calib ? "calibration" : "dso",
         location : {
             lat:            lat,
@@ -469,6 +495,7 @@ window.onresize = onResize;
     <button class="comp_but" onclick="ctlStack('pause');">&#x23F8;</button>
     <button class="comp_but" onclick="ctlStack('resume');">&#x23F5;</button>
     <button class="comp_but" onclick="ctlStack('save');" >&#x1F4BE;</button>
+    <button class="comp_but" onclick="showPP(true);" >P</button>
 </p>
 <div class="config_div" id="stack" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
     <span style="position:absolute; right:1mm; top:1mm">
@@ -480,13 +507,23 @@ window.onresize = onResize;
     <tr><td>Save</td><td><input id="stack_save_data" type="checkbox" checked ></td><td>&nbsp;</td></tr>
     <tr><td>Derotate</td><td><input id="stack_field_derotation" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr><td>Derotate Mirror</td><td><input id="stack_image_flip" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr><td>Auto Stretch</td><td><input id="stack_auto_stretch" checked type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr><td>Object ID</td><td><input oninput="updateRADE(this.value)" id="stack_object" type="text" value="" ></td><td>for example: M31, NGC457</td></tr>
     <tr><td>Target</td><td>RA:<input id="stack_ra" type="text" ></td><td>DE:<input id="stack_de" type="text" ></td></tr>
     <tr><td>Geolocation</td><td>Lat:<input id="stack_lat" type="text" ></td><td>Lon:<input id="stack_lon" type="text" ></td></tr>
     <tr><td>Darks</td><td><select id="stack_darks"></select></td><td>&nbsp;</td></tr>
     <tr><td><button onclick='startStack();'>Start</button></td><td>&nbsp;</td><td>&nbsp;</td></tr>
     </table>
+</div>
+<div class="config_div" id="pp_control" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background-color: transparent; border: 1px solid red ">
+    <span style="position:absolute; right:1mm; top:1mm">
+        <button class="incdec_but" onclick="showPP(false);">X</button>
+    </span>
+    <p>
+        Auto:<input id="stack_auto_stretch" checked type="checkbox" onchange='updatePP()' >
+        Low: <input type="range" min="0" max="100" value="0" class="slider" id="stack_stretch_low" onchange='updatePP()'>
+        High: <input type="range" min="0" max="100" value="0" class="slider" id="stack_stretch_high" onchange='updatePP()'>
+        Gamma: <input type="range" min="0" max="100" value="50" class="slider" id="stack_stretch_gamma" onchange='updatePP()'>
+    </p>
 </div>
 <div class="config_div" id="config" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
     <span style="position:absolute; right:1mm; top:1mm">

@@ -55,6 +55,6 @@ namespace ols {
         std::string darks_path; /// if darks applied darks frame
         
         bool auto_stretch = true; /// stretch parameters
-        double strech_low=0,strech_high=1,strech_gamma=2.2;
+        double stretch_low=0.5,stretch_high=0.5,stretch_gamma=0.5;
     };
 }

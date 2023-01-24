@@ -11,6 +11,7 @@ namespace ols {
             frames_(0),
             exp_multiplier_(exp_multiplier)
         {
+            set_stretch(true,0,0,0.5f);
             fully_stacked_area_ = cv::Rect(0,0,width,height);
             fully_stacked_count_ = 0;
             if(roi_size == -1) {
@@ -45,16 +46,21 @@ namespace ols {
             make_fft_blur();
         }
 
-        void set_target_gamma(float g)
+        void set_stretch(bool auto_stretch,float low_index,float high_index,float stretch_index)
         {
-            if(g == -1.0f) {
-                enable_stretch_ = true;
-                tgt_gamma_ = 1.0f;
-            }
-            else {
-                tgt_gamma_ = g;
-                enable_stretch_ = false;
-            }
+            enable_stretch_ = auto_stretch;
+            double exp_m1 = exp(-1.0);
+            double eps = 1e-7;
+            
+            double lr = (exp_m1 - exp(-1/(low_index+eps)))/exp_m1;
+            low_per_ =    std::min(5.0,std::max(0.0, 0 * lr + 5 * (1-lr)));
+
+            double hr = (exp_m1 - exp(-1/(high_index+eps)))/exp_m1;
+            high_per_  =   std::min(100.0,std::max(99.0,100.0 * hr + 99.0 * (1-hr)));
+
+            gamma_limit_ = std::max(1.0,std::min(3.8, stretch_index * (2*1.4) + 1.0));
+            mean_target_ = std::min(0.5,std::max(0.25,0*(1-stretch_index) + 0.5 * stretch_index));
+            BOOSTER_INFO("stacker") << "Stretch low:" << low_per_ << " high:"<<high_per_ << " gamma limit=" << gamma_limit_ << " mean target=" << mean_target_;
         }
 
         void make_fft_blur()
@@ -90,31 +96,34 @@ namespace ols {
         cv::Mat get_stacked_image()
         {
             cv::Mat tmp = get_raw_stacked_image();
+            
+            double scale[3];
+            calc_wb(tmp(fully_stacked_area_),scale);
+            tmp = tmp.mul(cv::Scalar(scale[0],scale[1],scale[2]));
+            tmp = cv::max(0,cv::min(1,tmp));
+            double gscale=1.0;
+            double goffset = 0.0;
+            double mean = 0.5;
+
+            stretch(tmp(fully_stacked_area_),gscale,goffset,mean);
+            tmp += cv::Scalar(goffset,goffset,goffset);
+            tmp = tmp.mul(cv::Scalar(gscale,gscale,gscale));
+            tmp = cv::max(0,cv::min(1,tmp));
+
+            float gamma_correction = 1.0f;
             if(enable_stretch_) {
-                double scale[3];
-                calc_wb(tmp(fully_stacked_area_),scale);
-                tmp = tmp.mul(cv::Scalar(scale[0],scale[1],scale[2]));
-                tmp = cv::max(0,cv::min(1,tmp));
-                double gscale=1.0;
-                double goffset = 0.0;
-                double mean = 0.5;
-                stretch(tmp(fully_stacked_area_),gscale,goffset,mean);
-                tmp += cv::Scalar(goffset,goffset,goffset);
-                tmp = tmp.mul(cv::Scalar(gscale,gscale,gscale));
-                tmp = cv::max(0,cv::min(1,tmp));
-                float g=cv::max(1.0,cv::min(2.2,log(mean)/log(0.25)));
-                printf("Mean %f gamma=%f\n",mean,g);
-                cv::pow(tmp,1/g,tmp);
+                gamma_correction = cv::max(1.0,cv::min(gamma_limit_,log(mean)/log(mean_target_)));
             }
             else {
-                double max_v,min_v;
-                cv::minMaxLoc(tmp,&min_v,&max_v);
-                if(min_v < 0)
-                    min_v = 0;
-                tmp = cv::max(0,(tmp - float(min_v))*float(1.0/(max_v-min_v)));
-                if(tgt_gamma_!=1.0f) {
-                    cv::pow(tmp,1/tgt_gamma_,tmp);
-                }
+                gamma_correction = gamma_limit_;
+            }
+            double linear_point = 0.008;
+            double linear_gain = std::pow(linear_point,1/gamma_correction) / linear_point;
+            BOOSTER_INFO("stacker") << "Low per " << low_per_ << " High per "  << high_per_ << " Applying gamma " << gamma_correction << " linear gain " << linear_gain;
+            if(gamma_correction > 1.0) {
+                cv::Mat linear_part = tmp.mul(cv::Scalar::all(linear_gain));
+                cv::pow(tmp,1/gamma_correction,tmp);
+                tmp = cv::min(linear_part,tmp);
             }
             return tmp;
         }
@@ -178,20 +187,21 @@ namespace ols {
         void stretch(cv::Mat img,double &scale,double &offset,double &mean)
         {
             cv::Mat tmp;
-            img.convertTo(tmp,CV_8UC3,255,0);
-            int counters[256]={};
+            static constexpr int hist_bins = 1<<12;
+            img.convertTo(tmp,CV_16UC3,(hist_bins-1),0);
+            int counters[hist_bins]={};
             int N=tmp.rows*tmp.cols;
-            unsigned char *p=tmp.data;
+            uint16_t *p=reinterpret_cast<uint16_t*>(tmp.data);
             for(int i=0;i<N;i++) {
                 unsigned R = *p++;
                 unsigned G = *p++;
                 unsigned B = *p++;
-                unsigned char Y = unsigned(0.3f * R + 0.6f * G + 0.1f * B);
+                unsigned Y = unsigned(0.3f * R + 0.6f * G + 0.1f * B);
                 counters[Y]++;
             }
             int sum = 0;
             int lp=0;
-            for(int i=0;i<255;i++) {
+            for(int i=0;i<hist_bins;i++) {
                 sum+=counters[i];
                 if(sum*100.0f/N >= low_per_) {
                     lp = i;
@@ -200,25 +210,25 @@ namespace ols {
             }
             sum=N;
             int hp=-1;
-            for(int i=255;i>=0;i--) {
+            for(int i=hist_bins-1;i>=0;i--) {
                 sum-=counters[i];
                 if(sum*100.0f/N <= high_per_) {
                     hp = i;
                     break;
                 }
             }
-            scale = 255.0/(hp - lp);
-            offset = -lp/255.0;
+            scale = (hist_bins-1.0)/(hp - lp);
+            offset = -lp/(hist_bins - 1.0);
             mean = 0;
             int total = 0;
             for(int i=0;i<lp;i++) {
                 total += counters[i];
             }
             for(int i=lp;i<=hp;i++) {
-                mean += (i - lp) / 255.0 * counters[i] * scale;
+                mean += (i - lp) / (hist_bins - 1.0) * counters[i] * scale;
                 total += counters[i];
             }
-            for(int i=hp+1;i<255;i++) {
+            for(int i=hp+1;i<hist_bins;i++) {
                 mean += counters[i] * scale;
                 total += counters[i];
             }
@@ -233,58 +243,43 @@ namespace ols {
             int N = tmp.rows*tmp.cols;
             double maxV,minV;
             cv::minMaxLoc(tmp,&minV,&maxV);
-            static constexpr int bins_count = 50;
-            static constexpr int gap = 10;
-            float top_cut = (maxV - minV) / bins_count * (bins_count-1) + minV;
-            float bins[bins_count][3]={};
-            int binsN[bins_count]={};
-            float a = 10 / (maxV - minV);
+#if 0
+            static constexpr int bins_count = 1<<12;
+            float a = bins_count / (maxV - minV);
             float b = -minV;
+            int bins[bins_count][3]={};
             for(int i=0;i<N;i++) {
-                float R = *p++;
-                float G = *p++;
-                float B = *p++;
-                // no saturated
-                if(R >= top_cut || G >= top_cut || B >= top_cut)
-                    continue;
-                float Y = (0.3f * R + 0.6f * G + 0.1f * B);
-                int binNo = std::max(0,std::min(bins_count-1,int((Y - b) * a)));
-                bins[binNo][0] += R;
-                bins[binNo][1] += G;
-                bins[binNo][2] += B;
-                binsN[binNo] ++;
-            }
-            int max_index = 0;
-            int max_cnt = 0;
-            for(int i=1;i<bins_count-1;i++) {
-                if(binsN[i] >= max_cnt) {
-                    max_cnt = binsN[i];
-                    max_index = i;
+                for(int c=0;c<3;c++) {
+                    float V = *p++;
+                    int binNo = std::max(0.0f,std::min(float(bins_count-1),(V+b)*a));
+                    bins[binNo][c] ++;
                 }
             }
-            int indx_start = std::max(1,max_index-gap);
-            int indx_end = std::min(bins_count - 2,max_index+gap);
-            scale[0] = scale[1] = scale[2] = 0;
-            int cnt = 0;
-            for(int i=indx_start;i<=indx_end;i++) {
-                if(binsN[i] == 0)
-                    continue;
-                float R = bins[i][0];
-                float G = bins[i][1];
-                float B = bins[i][2];
-                float maxRGB_norm = std::max(R,std::max(G,B));
-                scale[0] += maxRGB_norm / R * binsN[i];
-                scale[1] += maxRGB_norm / G * binsN[i];
-                scale[2] += maxRGB_norm / B * binsN[i];
-                cnt += binsN[i];
+            for(int c=0;c<3;c++) {
+                int s=0;
+                int i=0;
+                for(i=0;i<bins_count;i++) {
+                    if(s*2 >= N)
+                        break;
+                    s+= bins[i][c];
+                }
+                printf("%d: %d\n",c,i);
+                scale[c] = i;
             }
-            for(int i=0;i<3;i++)
-                scale[i] /= cnt;
+#else
+            scale[0]=scale[1]=scale[2] = 0;
+            for(int i=0;i<N;i++) {
+                for(int c=0;c<3;c++)
+                    scale[c] += (*p++ - minV);
+            }
+#endif                        
             // normalize once again
+            double smax = std::max(scale[0],std::max(scale[1],scale[2]));
             double smin = std::min(scale[0],std::min(scale[1],scale[2]));
+            printf("Mean [%f,%f,%f]\n",scale[0],scale[1],scale[2]);
             if(smin > 0) {
                 for(int i=0;i<3;i++)
-                    scale[i] /= smin;
+                    scale[i] = smax / scale[i];
             }
             else {
                 for(int i=0;i<3;i++)
@@ -294,7 +289,7 @@ namespace ols {
             for(int i=0;i<3;i++)
                 scale[i] /= maxV;
         }
-                
+
 
         void reset_step(cv::Point p)
         {
@@ -449,12 +444,15 @@ namespace ols {
         int manual_exposure_counter_ = 0;
         int exp_multiplier_;
         cv::Mat manual_frame_;
-        float tgt_gamma_ = 1.0f;
         bool enable_stretch_ = true;
-        //float low_per_= 0.5f;
+        float low_per_= .1f;
+        float high_per_=99.99f;
+        
+        double gamma_limit_ = 3.0;
+        double mean_target_ = 0.25;
+
+        //float low_per_= 0.05;
         //float high_per_=99.999f;
-        float low_per_= 0.05;
-        float high_per_=99.999f;
     };
 
 
