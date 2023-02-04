@@ -166,6 +166,7 @@ namespace ols {
             else {
                 cv::Mat fft_frame = calc_fft(frame);
                 cv::Point shift = get_dx_dy(fft_frame);
+                BOOSTER_INFO("stacker") <<"Registration at "<< frames_ <<":" << shift << std::endl;
                 if(restart_position) {
                     add_image(frame,shift);
                     reset_step(shift);
@@ -263,20 +264,22 @@ namespace ols {
                         break;
                     s+= bins[i][c];
                 }
-                printf("%d: %d\n",c,i);
+                printf("Median of %d: %d\n",c,i);
                 scale[c] = i;
             }
+#elif 0
+            scale[0]=scale[1]=scale[2] = 1;
 #else
             scale[0]=scale[1]=scale[2] = 0;
             for(int i=0;i<N;i++) {
-                for(int c=0;c<3;c++)
-                    scale[c] += (*p++ - minV);
+                for(int c=0;c<3;c++) {
+                    scale[c] += *p++;
+                }
             }
 #endif                        
             // normalize once again
             double smax = std::max(scale[0],std::max(scale[1],scale[2]));
             double smin = std::min(scale[0],std::min(scale[1],scale[2]));
-            printf("Mean [%f,%f,%f]\n",scale[0],scale[1],scale[2]);
             if(smin > 0) {
                 for(int i=0;i<3;i++)
                     scale[i] = smax / scale[i];
