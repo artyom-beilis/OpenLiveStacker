@@ -266,9 +266,9 @@ function calcImgSize()
     return [img_W,img_H,p_left,p_top]
 }
 
-function updateCalibFrames(data)
+function updateCalibFramesById(data,elemid)
 {
-    var sel = document.getElementById('stack_darks');
+    var sel = document.getElementById(elemid);
     var selected = sel.value;
     for(var i=sel.length-1;i>=0;i--) {
         sel.options.remove(i);
@@ -293,6 +293,13 @@ function updateCalibFrames(data)
             found=true;
     }
     sel.value = selected;
+}
+
+function updateCalibFrames(data)
+{
+    updateCalibFramesById(data,'stack_darks');
+    updateCalibFramesById(data,'stack_flats');
+    updateCalibFramesById(data,'stack_dark_flats');
 }
 
 function loadCalibFrames()
@@ -404,6 +411,14 @@ function startStack()
     if(darks == 'N/A') {
         darks = null;
     }
+    var flats = getVal('flats');
+    if(flats == 'N/A') {
+        flats = null;
+    }
+    var dark_flats = getVal('dark_flats');
+    if(dark_flats == 'N/A') {
+        dark_flats = null;
+    }
     var ra=parseRA(getVal("ra"));
     var de=parseDEC(getVal("de"));
     var lat = parseFloat(getVal("lat"));
@@ -459,7 +474,9 @@ function startStack()
             ra:             ra,
             de:             de,
         },
-        darks : darks
+        darks : darks,
+        flats : flats,
+        dark_flats : dark_flats
     };
     console.log(config)
     restCall('post','/api/stacker/start',config,(e)=>{
@@ -511,6 +528,8 @@ window.onresize = onResize;
     <tr><td>Target</td><td>RA:<input id="stack_ra" type="text" ></td><td>DE:<input id="stack_de" type="text" ></td></tr>
     <tr><td>Geolocation</td><td>Lat:<input id="stack_lat" type="text" ></td><td>Lon:<input id="stack_lon" type="text" ></td></tr>
     <tr><td>Darks</td><td><select id="stack_darks"></select></td><td>&nbsp;</td></tr>
+    <tr><td>Flats</td><td><select id="stack_flats"></select></td><td>&nbsp;</td></tr>
+    <tr><td>Dark Flats</td><td><select id="stack_dark_flats"></select></td><td>&nbsp;</td></tr>
     <tr><td><button onclick='startStack();'>Start</button></td><td>&nbsp;</td><td>&nbsp;</td></tr>
     </table>
 </div>

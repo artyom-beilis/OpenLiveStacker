@@ -109,6 +109,8 @@ namespace ols {
             cfg.lon = v.get<double>("lon");
             cfg.source_gamma = v.get<double>("source_gamma");
             cfg.darks_path = v.get<std::string>("darks");
+            cfg.flats_path = v.get<std::string>("flats","");
+            cfg.dark_flats_path = v.get<std::string>("dark_flats","");
             cfg.auto_stretch = v.get<bool>("auto_stretch");
             cfg.stretch_low = v.get<double>("stretch_low");
             cfg.stretch_high = v.get<double>("stretch_high");

@@ -36,7 +36,6 @@ Calibration index:
     [
         {"id" : string // idenfification of frame
          "path" : string// path to file relative to calibration
-         "type" : "darks"/"flats"/"bias" // type of calibration frame
          "camera" : string //camera name
          "settings" : settings // camera settings see /api/camera/ID/option/all
          "date": string // local date and time of calibration frame generation

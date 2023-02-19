@@ -103,12 +103,22 @@ namespace ols {
             cmd->derotate_mirror = content_.get("image_flip",cmd->derotate_mirror);
             cmd->derotate = content_.get("field_derotation",cmd->derotate);
             cmd->darks_path = content_.get("darks",cmd->darks_path);
+            cmd->flats_path = content_.get("flats",cmd->flats_path);
+            cmd->dark_flats_path = content_.get("dark_flats",cmd->dark_flats_path);
             cmd->auto_stretch = content_.get("auto_stretch",cmd->auto_stretch);
             cmd->stretch_low = content_.get("stretch_low",cmd->stretch_low);
             cmd->stretch_high = content_.get("stretch_high",cmd->stretch_high);
             cmd->stretch_gamma = content_.get("stretch_gamma",cmd->stretch_gamma);
+
             if(!cmd->darks_path.empty())
                 cmd->darks_path = calibration_path_ + "/" + cmd->darks_path + ".tiff";
+
+            if(!cmd->flats_path.empty())
+                cmd->flats_path = calibration_path_ + "/" + cmd->flats_path + ".tiff";
+
+            if(!cmd->dark_flats_path.empty())
+                cmd->dark_flats_path = calibration_path_ + "/" + cmd->dark_flats_path + ".tiff";
+
             status_ = "stacking";
             queue_->push(cmd);
         }

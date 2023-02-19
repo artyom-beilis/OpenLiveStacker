@@ -53,6 +53,8 @@ namespace ols {
         double source_gamma = 1.0; /// to linear space gamma
 
         std::string darks_path; /// if darks applied darks frame
+        std::string flats_path;
+        std::string dark_flats_path;
         
         bool auto_stretch = true; /// stretch parameters
         double stretch_low=0.5,stretch_high=0.5,stretch_gamma=0.5;

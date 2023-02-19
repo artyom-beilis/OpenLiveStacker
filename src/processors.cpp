@@ -54,6 +54,9 @@ namespace ols {
             if(apply_darks_) {
                 video->processed_frame = cv::max(0,video->processed_frame - darks_);
             }
+            if(apply_flats_) {
+                video->processed_frame = video->processed_frame.mul(flats_);
+            }
             if(derotator_) {
                 if(first_frame_ts_ == 0)
                     first_frame_ts_ = video->timestamp;
@@ -90,6 +93,9 @@ namespace ols {
                 apply_darks_ = false;
                 if(!ctl->darks_path.empty()) 
                     load_darks(ctl->darks_path);
+                apply_flats_ = false;
+                if(!ctl->flats_path.empty())
+                    load_flats(ctl->flats_path,ctl->dark_flats_path);
                 break;
             default:
                 /// not much to do
@@ -97,6 +103,37 @@ namespace ols {
             }
         }
     private:
+        void load_flats(std::string flats_path,std::string dark_flats_path)
+        {
+            try {
+                bool using_dark_flats = false;
+                cv::Mat flats = load_tiff(flats_path);
+                if(!dark_flats_path.empty()) {
+                    cv::Mat dark_flats = load_tiff(dark_flats_path);
+                    flats = cv::max(1e-16f,flats - dark_flats);
+                    using_dark_flats = true;
+                }
+                cv::Mat gray_flats;
+                cv::cvtColor(flats,gray_flats,cv::COLOR_BGR2GRAY);
+                double minV,maxV;
+                cv::minMaxLoc(gray_flats,&minV,&maxV);
+                gray_flats = maxV/gray_flats;
+                cv::cvtColor(gray_flats,flats,cv::COLOR_GRAY2BGR);
+                flats_ = flats;
+                if(flats_.rows == height_ && flats_.cols == width_) {
+                    apply_flats_ = true;
+                    BOOSTER_INFO("stacker") << "Using flats from " << flats_path << ( using_dark_flats ? (" with dark flats " + dark_flats_path) : " without dark flats");
+                }
+                else {
+                    BOOSTER_ERROR("stacker") << "Failed to load flats from " << flats_path << ": size mistmatch";
+                    apply_flats_ = false;
+                }
+            }
+            catch(std::exception const &e) {
+                BOOSTER_ERROR("stacker") << "Failed to load flats from " << flats_path << " and dark flats from " << dark_flats_path << ": " << e.what();
+                apply_flats_ = false;
+            }
+        }
         void load_darks(std::string darks_path)
         {
             try {
@@ -128,7 +165,9 @@ namespace ols {
         double first_frame_ts_;
         bool derotate_mirror_;
         cv::Mat darks_;
+        cv::Mat flats_;
         bool apply_darks_;
+        bool apply_flats_;
     };
 
     std::thread start_preprocessor(queue_pointer_type in,queue_pointer_type out)
@@ -248,7 +287,7 @@ namespace ols {
                     res = video;
                     auto end = std::chrono::high_resolution_clock::now();
                     double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
-                    BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms";
+                    BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms, calibration frame #" << cframe_count_;
                 }
                 else {
                     if(stacker_->stack_image(video->processed_frame,restart_)) {
@@ -280,8 +319,11 @@ namespace ols {
         {
             double factor = 1.0 / cframe_count_;
             cv::Mat calib = cframe_.mul(cv::Scalar(factor,factor,factor)); 
+            double minV,maxV;
+            cv::minMaxLoc(calib,&minV,&maxV);
             std::string tiff_path = output_path_ + "/" + name_ + ".tiff";
             std::string db_path = output_path_ + "/index.json";
+            BOOSTER_INFO("stacker") << "Saving calibration frame to " << tiff_path << " frame " << cframe_count_ << " maxv=" << maxV << " minv=" << minV;
             cppcms::json::value setup;
             setup["id"] = name_;
             setup["path"] = name_ + ".tiff";
