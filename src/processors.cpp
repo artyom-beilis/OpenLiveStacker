@@ -311,7 +311,7 @@ namespace ols {
                 }
             }
             catch(std::exception const &e) {
-                BOOSTER_ERROR("stacker") << "Stacking Failed";
+                BOOSTER_ERROR("stacker") << "Stacking Failed:" << e.what();
             }
             return res;
         }
@@ -490,6 +490,8 @@ namespace ols {
                     v["width"] = ctl->width;
                     v["height"] = ctl->height;
                     v["darks"] = ctl->darks_path;
+                    v["flats"] = ctl->flats_path;
+                    v["dark_flats"] = ctl->dark_flats_path;
                     v["calibration"] = ctl->calibration;
                     v["derotate"] = ctl->derotate;
                     v["derotate_mirror"] = ctl->derotate_mirror;
