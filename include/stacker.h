@@ -7,10 +7,18 @@ namespace ols {
     struct Stacker {
     public:
 
+        bool enable_subpixel_registration = false;
+        int  subpixel_factor_ = 1;
+
         Stacker(int width,int height,int roi_x=-1,int roi_y=-1,int roi_size = -1,int exp_multiplier=1) : 
             frames_(0),
             exp_multiplier_(exp_multiplier)
         {
+            if(!enable_subpixel_registration || subpixel_factor_ == 1) {
+                subpixel_factor_ = 1;
+                enable_subpixel_registration = false;
+            }
+
             set_stretch(true,0,0,0.5f);
             fully_stacked_area_ = cv::Rect(0,0,width,height);
             fully_stacked_count_ = 0;
@@ -39,10 +47,8 @@ namespace ols {
                 dy_ = std::min(height-window_size_,dy_);
             }
             
-            sum_ = cv::Mat(height,width,CV_32FC3);
+            sum_ = cv::Mat(height*subpixel_factor_,width*subpixel_factor_,CV_32FC3);
             sum_.setTo(0);
-            count_ = cv::Mat(height,width,CV_32FC3);
-            count_.setTo(0);
             make_fft_blur();
         }
 
@@ -68,7 +74,7 @@ namespace ols {
             if(window_size_ == 0)
                 return;
             fft_kern_ = cv::Mat(window_size_,window_size_,CV_32FC2);
-            int rad = (window_size_/16);
+            int rad = (window_size_/4);
             for(int r=0;r<window_size_;r++) {
                 for(int c=0;c<window_size_;c++) {
                     int dy = fft_pos(r);
@@ -90,7 +96,13 @@ namespace ols {
         cv::Mat get_raw_stacked_image()
         {
             BOOSTER_INFO("stacked") << "So far stacked " << fully_stacked_count_ << std::endl;
-            return sum_ * (1.0/ fully_stacked_count_);
+            cv::Mat res = sum_ * (1.0/ fully_stacked_count_);
+            if(subpixel_factor_ != 1) {
+                cv::Mat tmp;
+                cv::resize(res,tmp,cv::Size(0,0),1.0/subpixel_factor_,1.0/subpixel_factor_);
+                res = tmp;
+            }
+            return res;
         }
 
         cv::Mat get_stacked_image()
@@ -127,16 +139,6 @@ namespace ols {
             }
             return tmp;
         }
-        void get_stacked(unsigned char *rgb_img)
-        {
-            if(frames_ == 0)
-                memset(rgb_img,0,sum_.rows*sum_.cols*3);
-            else {
-                cv::Mat tgt(sum_.rows,sum_.cols,CV_8UC3,rgb_img);
-                cv::Mat tmp = get_stacked_image();
-                tmp.convertTo(tgt,CV_8UC3,255,0);
-            }
-        }
         
         bool stack_image(cv::Mat frame,bool restart_position = false)
         {
@@ -152,20 +154,20 @@ namespace ols {
                 frame = manual_frame_ * (1.0f / exp_multiplier_);
             }
             if(window_size_ == 0) {
-                add_image(frame,cv::Point(0,0));
+                add_image(frame,cv::Point2f(0,0));
                 frames_ ++;
                 return true;
             }
             bool added = true;
             if(frames_ == 0) {
-                add_image(frame,cv::Point(0,0));
+                add_image(frame,cv::Point2f(0,0));
                 fft_roi_ = calc_fft(frame);
                 frames_ = 1;
-                reset_step(cv::Point(0,0));
+                reset_step(cv::Point2f(0,0));
             }
             else {
                 cv::Mat fft_frame = calc_fft(frame);
-                cv::Point shift = get_dx_dy(fft_frame);
+                cv::Point2f shift = get_dx_dy(fft_frame);
                 BOOSTER_INFO("stacker") <<"Registration at "<< frames_ <<":" << shift << std::endl;
                 if(restart_position) {
                     add_image(frame,shift);
@@ -294,14 +296,14 @@ namespace ols {
         }
 
 
-        void reset_step(cv::Point p)
+        void reset_step(cv::Point2f p)
         {
             current_position_ = p;
             step_sum_sq_ = 0;
             count_frames_ = 0;
             missed_frames_ = 0;
         }
-        bool check_step(cv::Point p)
+        bool check_step(cv::Point2f p)
         {
             float dx = current_position_.x - p.x;
             float dy = current_position_.y - p.y;
@@ -321,7 +323,7 @@ namespace ols {
                 float step_limit = std::max((2 + (float)sqrt(missed_frames_)) * step_avg_,pixel_0_threshold);
                 char log_txt[256];
                 snprintf(log_txt,sizeof(log_txt),
-                        "Step size %5.2f from (%d,%d) to (%d,%d) limit =%5.1f avg_step=%5.1f\n",step,
+                        "Step size %5.2f from (%0.1f,%0.1f) to (%0.1f,%0.1f) limit =%5.1f avg_step=%5.1f\n",step,
                         current_position_.x,current_position_.y,
                         p.x,p.y,
                         step_limit,step_avg_);
@@ -348,49 +350,51 @@ namespace ols {
             else
                 return x;
         }
-        cv::Point get_dx_dy(cv::Mat dft)
+
+        float max3p(float v0,float v1,float v2)
+        {
+            // find max a*x^2 + b*x + c = 0 where x is 0,1,2 and ys = v0, v1, v2
+            // than find extermum of this func
+            float a = (v2 - v0) / 2 - (v1 - v0);
+            float b = (v1 - v0)*2 - (v2 - v0) / 2;
+            if(fabs(a) < 1e-10) // if v0=v1=v2 return center
+                return 0.0f;
+            float x = - b /(2*a);
+            return x - 1.0f;
+        }
+
+        cv::Point2f fft_pos2d(int r,int c,cv::Mat &shift)
+        {
+            float vals[3][3];
+            for(int pr = 0;pr < 3; pr++) {
+                for(int pc = 0; pc < 3; pc ++) {
+                    int n_r = (r + pr - 1 + shift.rows) % shift.rows;
+                    int n_c = (c + pc - 1 + shift.cols) % shift.cols;
+                    vals[pr][pc] = shift.at<float>(n_r,n_c);
+                }
+            }
+            float dc = max3p(vals[1][0],vals[1][1],vals[1][2]);
+            float dr = max3p(vals[0][1],vals[1][1],vals[2][1]);
+            return cv::Point2f(c+dc,r+dr);
+        }
+        cv::Point2f get_dx_dy(cv::Mat dft)
         {
             cv::Mat res,shift;
             cv::mulSpectrums(fft_roi_,dft,res,0,true);
             cv::Mat dspec;
-#if CV_VERSION_MAJOR >= 4 && CV_VERSION_MINOR >= 5
+#if 0 //CV_VERSION_MAJOR >= 4 && CV_VERSION_MINOR >= 5
             cv::divSpectrums(res,cv::abs(res),dspec,0);
 #else
-            dspec = res / cv::abs(res);
+            cv::Mat absval = cv::max(cv::Scalar::all(1e-38),cv::abs(res));
+            cv::divide(res,absval,dspec);
 #endif            
             cv::idft(dspec,shift,cv::DFT_REAL_OUTPUT);
             cv::Point pos;
-#ifdef DEBUG
-            double minv,maxv;
-            cv::minMaxLoc(shift,&minv,&maxv,nullptr,&pos);
-            static int n=1;
-            cv::Mat a,b;
-            a=255*(shift-minv)/(maxv-minv);
-            a.convertTo(b,CV_8UC1);
-            imwritergb(std::to_string(n++) + "_shift.png",b);
-#else
             cv::minMaxLoc(shift,nullptr,nullptr,nullptr,&pos);
-            #if 0
-                std::vector<float> vec(shift.cols);
-                for(int r=0;r<shift.rows;r++) {
-                    for(int c=0;c<shift.cols;c++) {
-                        vec[r]+=shift.at<float>(r,c);
-                    }
-                }
-                int maxp = 0;
-                float maxv = vec[0];
-                for(unsigned i=1;i<vec.size();i++) {
-                    if(vec[i] > maxv) {
-                        maxv = vec[i];
-                        maxp=i;
-                    }
-                }
-                pos.y = maxp;
-                pos.x = 0;
-                printf("Shift = %d\n",fft_pos(maxp));
-            #endif
-#endif        
-            return cv::Point(fft_pos(pos.x),fft_pos(pos.y));
+            if(enable_subpixel_registration)
+                return fft_pos2d(fft_pos(pos.y),fft_pos(pos.x),shift);
+            else
+                return cv::Point2f(fft_pos(pos.x),fft_pos(pos.y));
         }
 
         cv::Mat calc_fft(cv::Mat frame)
@@ -416,7 +420,63 @@ namespace ols {
             return dft;
         }
 
-        void add_image(cv::Mat img,cv::Point shift)
+        void calc_stacked_area(cv::Point shift)
+        {
+            int dx = round(shift.x);
+            int dy = round(shift.y);
+            int width  = (sum_.cols - std::abs(dx));
+            int height = (sum_.rows - std::abs(dy));
+            cv::Rect src_rect = cv::Rect(std::max(dx,0),std::max(dy,0),width,height);
+            fully_stacked_area_ = fully_stacked_area_ & src_rect;
+        }
+
+
+#if 0
+        void add_image_weighted(cv::Mat img,cv::Point shift,float weight)
+        {
+            if(weight == 0)
+                return;
+            int dx = shift.x;
+            int dy = shift.y;
+            int width  = (sum_.cols - std::abs(dx));
+            int height = (sum_.rows - std::abs(dy));
+            cv::Rect src_rect = cv::Rect(std::max(dx,0),std::max(dy,0),width,height);
+            cv::Rect img_rect = cv::Rect(std::max(-dx,0),std::max(-dy,0),width,height);
+
+            if(weight == 1)
+                cv::Mat(sum_,src_rect) += cv::Mat(img,img_rect);
+            else
+                cv::Mat(sum_,src_rect) += cv::Mat(img,img_rect).mul(cv::Scalar::all(weight));
+        }
+
+        void add_image(cv::Mat img,cv::Point2f shift)
+        {
+            calc_stacked_area(cv::Point(shift.x,shift.y));
+
+            float dx = shift.x;
+            float dy = shift.y;
+            int x0 = floor(dx);
+            int x1 = x0 + 1;
+            float xw1 = (dx - x0);
+            float xw0 = 1.0f - xw1;
+
+            int y0 = floor(dy);
+            int y1 = y0 + 1;
+            float yw1 = (dy - y0);
+            float yw0 = 1.0f - yw1;
+            
+            std::cout << "Adding frames x=" << x0 << "-" << x1 << " w" << xw0 << "-" <<xw1 << std::endl; 
+            std::cout << "Adding frames y=" << y0 << "-" << y1 << " w" << yw0 << "-" <<yw1 << std::endl; 
+
+            add_image_weighted(img,cv::Point(x0,y0),xw0*yw0);
+            add_image_weighted(img,cv::Point(x1,y0),xw1*yw0);
+            add_image_weighted(img,cv::Point(x0,y1),xw0*yw1);
+            add_image_weighted(img,cv::Point(x1,y1),xw1*yw1);
+
+            fully_stacked_count_++;
+        }
+#else    
+        void add_image_upscaled(cv::Mat img,cv::Point shift)
         {
             int dx = shift.x;
             int dy = shift.y;
@@ -425,10 +485,29 @@ namespace ols {
             cv::Rect src_rect = cv::Rect(std::max(dx,0),std::max(dy,0),width,height);
             cv::Rect img_rect = cv::Rect(std::max(-dx,0),std::max(-dy,0),width,height);
             cv::Mat(sum_,src_rect) += cv::Mat(img,img_rect);
-            cv::Mat(count_,src_rect) += cv::Scalar(1,1,1);
-            fully_stacked_area_ = fully_stacked_area_ & src_rect;
+        }
+
+        void add_image(cv::Mat img,cv::Point2f shift)
+        {
+            calc_stacked_area(cv::Point(shift.x,shift.y));
+
+            float dx = round(shift.x * subpixel_factor_);
+            float dy = round(shift.y * subpixel_factor_);
+
+            cv::Mat resized;
+            if(subpixel_factor_ != 1) {
+                cv::resize(img,resized,cv::Size(0,0),subpixel_factor_,subpixel_factor_);
+            }
+            else {
+                resized = img;
+            }
+
+            add_image_upscaled(resized,cv::Point(dx,dy));
+
             fully_stacked_count_++;
         }
+#endif        
+
         int frames_;
         bool has_darks_;
         cv::Rect fully_stacked_area_;
@@ -437,10 +516,9 @@ namespace ols {
         cv::Mat darks_;
         cv::Mat darks_gamma_corrected_;
         bool darks_corrected_ = false;
-        cv::Mat count_;
         cv::Mat fft_kern_;
         cv::Mat fft_roi_;
-        cv::Point current_position_;
+        cv::Point2f current_position_;
         int count_frames_,missed_frames_;
         float step_sum_sq_;
         int dx_,dy_,window_size_;
