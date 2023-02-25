@@ -42,6 +42,7 @@ std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)
     case stream_yuv2: out << "YUV2"; break;
     case stream_mjpeg: out << "MJPEG"; break;
     case stream_rgb24: out << "RGB24"; break;
+    case stream_rgb48: out << "RGB48"; break;
     case stream_raw8:  out << "RAW8"; break;
     case stream_raw16:  out << "RAW16"; break;
     case stream_mono8:  out << "MONO8"; break;
@@ -72,6 +73,7 @@ std::string stream_type_to_str(CamStreamType s)
     switch(s) {
     case stream_yuv2: return "yuv2";
     case stream_rgb24: return "rgb24";
+    case stream_rgb48: return "rgb48";
     case stream_raw8: return "raw8";
     case stream_raw16: return "raw16";
     case stream_mono8: return "mono8";
@@ -90,6 +92,8 @@ CamStreamType stream_type_from_str(std::string s)
         return stream_yuv2;
     if(s=="rgb24")
         return stream_rgb24;
+    if(s=="rgb48")
+        return stream_rgb48;
     if(s=="raw8")
         return stream_raw8;
     if(s=="raw16")

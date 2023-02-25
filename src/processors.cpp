@@ -178,9 +178,10 @@ namespace ols {
     
     class StackerProcessor {
     public:
-        StackerProcessor(queue_pointer_type in,queue_pointer_type out) :
+        StackerProcessor(queue_pointer_type in,queue_pointer_type out,std::string data_dir) :
             in_(in),
-            out_(out)
+            out_(out),
+            data_dir_(data_dir)
         {
         }
         void run()
@@ -211,8 +212,26 @@ namespace ols {
             }
         }
 
-        std::shared_ptr<CameraFrame> generate_output_frame(cv::Mat img)
+        void save_stretch(StretchInfo const &stretch)
         {
+            cppcms::json::value s;
+            s["gain"]   = stretch.gain;
+            s["cut"]    = stretch.cut;
+            s["gamma" ] = stretch.gamma;
+            std::string fname = data_dir_ + "/stretch.json";
+            std::ofstream f(fname);
+            if(!f) {
+                BOOSTER_ERROR("stacker") << " Failed to save info to " << fname;
+                return;
+            }
+            s.save(f,cppcms::json::readable);
+            f.close();
+        }
+
+        std::shared_ptr<CameraFrame> generate_output_frame(std::pair<cv::Mat,StretchInfo> data)
+        {
+            cv::Mat img = data.first;
+            save_stretch(data.second);
             cv::Mat img8;
             img.convertTo(img8,CV_8UC3,255);
             std::shared_ptr<CameraFrame> frame(new CameraFrame());
@@ -248,13 +267,13 @@ namespace ols {
             std::string tpath = output_path_;
             if(final_image) {
                 path += "_stacked.jpeg";
-                ipath += "_stacked.json";
+                ipath += "_stacked.txt";
                 tpath += "_stacked.tiff";
             }
             else {
                 std::string suffix = "_interm_" + std::to_string(stacker_->stacked_count());
                 path += suffix+ ".jpeg";    
-                ipath += suffix + ".json";
+                ipath += suffix + ".txt";
                 tpath += suffix + "_stacked.tiff";
             }
             save_tiff(to16bit(stacker_->get_raw_stacked_image()),tpath);
@@ -396,6 +415,7 @@ namespace ols {
             case StackerControl::ctl_update:
                 if(stacker_) {
                     stacker_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
+                    BOOSTER_INFO("stacker") << "Getting to stretch settings in stacker auto="<<ctl->auto_stretch << " low="<<ctl->stretch_low << " high=" << ctl->stretch_high << " gamma=" << ctl->stretch_gamma;
                     send_updated_image();
                 }
                 break;
@@ -406,6 +426,7 @@ namespace ols {
         }
     private:
         queue_pointer_type in_,out_;
+        std::string data_dir_;
         int width_,height_;
         bool calibration_=false;
         std::string output_path_,name_;
@@ -415,9 +436,9 @@ namespace ols {
         bool restart_;
     };
 
-    std::thread start_stacker(queue_pointer_type in,queue_pointer_type out)
+    std::thread start_stacker(queue_pointer_type in,queue_pointer_type out,std::string data_dir)
     {
-        std::shared_ptr<StackerProcessor> p(new StackerProcessor(in,out));
+        std::shared_ptr<StackerProcessor> p(new StackerProcessor(in,out,data_dir));
         return std::thread([=]() { p->run(); });
     }
 
@@ -426,7 +447,8 @@ namespace ols {
         DebugSaver(queue_pointer_type in,std::string output_dir) :
             in_(in),
             out_(output_dir),
-            counter_(0)
+            counter_(0),
+            save_(false)
         {
         }
         void run()
@@ -438,7 +460,7 @@ namespace ols {
                     break;
                 }
                 auto video_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
-                if(video_ptr) {
+                if(save_ && video_ptr) {
                     handle_video(video_ptr);
                     continue;
                 }
@@ -482,6 +504,9 @@ namespace ols {
             switch(ctl->op) {
             case StackerControl::ctl_init:
                 {
+                    save_ = ctl->save_inputs;
+                    if(!save_)
+                        return;
                     dirname_ = out_ + "/" + ctl->name;
                     counter_ = 0;
                     make_dir(dirname_);
@@ -510,6 +535,8 @@ namespace ols {
                 break;
             case StackerControl::ctl_update:
                 {
+                    if(!save_)
+                        return;
                     std::ifstream info_r(dirname_ + "/info.json");
                     cppcms::json::value v;
                     if(v.load(info_r,true)) {
@@ -525,6 +552,8 @@ namespace ols {
                 break;
             case StackerControl::ctl_pause:
                 {
+                    if(!save_)
+                        return;
                     std::ofstream log(log_file(),std::ofstream::app);
                     log << "PAUSE,0" << std::endl;
                 }
@@ -541,6 +570,7 @@ namespace ols {
         std::string out_;
         std::string dirname_;
         int counter_;
+        bool save_;
     };
 
     std::thread start_debug_saver(queue_pointer_type in,std::string debug_dir)

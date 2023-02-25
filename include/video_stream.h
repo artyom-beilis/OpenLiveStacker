@@ -4,14 +4,18 @@
 #include <cppcms/http_response.h>
 #include <cppcms/service.h>
 #include <booster/log.h>
+#include <booster/aio/deadline_timer.h>
 #include <set>
 
 #include "data_items.h"
 namespace ols {
     class VideoGeneratorApp : public cppcms::application {
     public:
+        int frame_rate_ = 10;
+
         std::string boundary = "092345910257012374590237592375935734--";
-        VideoGeneratorApp(cppcms::service &srv) : cppcms::application(srv)
+        VideoGeneratorApp(cppcms::service &srv,std::string const &type) : cppcms::application(srv),type_(type),
+            timer_(srv.get_io_service())
         {
         }
         virtual void main(std::string )
@@ -34,6 +38,8 @@ namespace ols {
                 }
             };
         }
+    
+
         // thread safe method
         void frame_handler(std::shared_ptr<VideoFrame> frame)
         {
@@ -45,8 +51,9 @@ namespace ols {
         void serve(std::shared_ptr<cppcms::http::context> ctx)
         {
             if(frame_) {
-                ctx->response().out()<<"--" << boundary << "\r\nContent-Type: image/jpeg\r\nContent-Length: " << frame_->size() << "\r\n\r\n";
+                ctx->response().out()<<"--" << boundary <<"\r\nContent-Type: image/jpeg\r\nContent-Length: " << frame_->size() << "\r\n\r\n";
                 ctx->response().out().write(static_cast<char*>(frame_->data()),frame_->size());
+                ctx->response().out()<<"\r\n";
             }
             else {
                 // flush headers
@@ -62,7 +69,7 @@ namespace ols {
                 int current_frame = frame_counter_;
                 ctx->async_flush_output([=](cppcms::http::context::completion_type type) {
                     if(type == cppcms::http::context::operation_completed) {
-                        BOOSTER_DEBUG("stacker") << "frame sent async " << frame_counter_;
+                        BOOSTER_DEBUG("stacker") << type_ <<" frame sent async " << frame_counter_;
                         streams_.insert(ctx);
                         if(current_frame != frame_counter_) {
                             serve(ctx);
@@ -75,22 +82,44 @@ namespace ols {
                 streams_.erase(ctx);
             }
             else {
-                BOOSTER_DEBUG("stacker") << "frame sent direct " << frame_counter_;
+                BOOSTER_DEBUG("stacker") << type_ <<" frame sent direct " << frame_counter_;
                 streams_.insert(ctx);
             }
         }
-        void update_frame(std::shared_ptr<VideoFrame> frame)
+        void send_updated_frame()
         {
-            frame_ = frame;
-            frame_counter_++;
+            last_update_ = booster::ptime::now();
             auto send_to = streams_;
             for(auto ctx : send_to) {
                 serve(ctx);
             }
         }
+        void handle_timer()
+        {
+            booster::ptime delay = booster::ptime::milliseconds(1000/frame_rate_);
+            timer_.expires_from_now(delay);
+            if(frame_ && (booster::ptime::now() - last_update_) >= delay)
+                send_updated_frame();
+            timer_.async_wait([=](booster::system::error_code const &) {
+                handle_timer();
+            });
+        }
+        void update_frame(std::shared_ptr<VideoFrame> frame)
+        {
+            if(!frame_) {
+                handle_timer();
+            }
+            frame_ = frame;
+            frame_counter_++;
+            BOOSTER_INFO("stacker") << type_ << " frame " << frame_counter_ << " arrived";
+            send_updated_frame();
+        }
         std::set<std::shared_ptr<cppcms::http::context>> streams_;
         std::shared_ptr<VideoFrame> frame_;
         int frame_counter_ = 0;
+        std::string type_;
+        booster::aio::deadline_timer timer_;
+        booster::ptime last_update_;
     };
 } // namespace
 

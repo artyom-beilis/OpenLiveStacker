@@ -58,6 +58,9 @@ namespace ols {
             case stream_rgb24:
                 bpp=3;
                 break;
+            case stream_rgb48:
+                bpp=6;
+                break;
             default:
                 BOOSTER_ERROR("stacker") << "Got invalid format";
                 return;
@@ -97,6 +100,12 @@ namespace ols {
                 {
                     cv::Mat rgb(frame->format.height,frame->format.width,CV_8UC3,frame->source_frame->data());
                     handle_jpeg_stack(frame,rgb,true);
+                }
+                break;
+            case stream_rgb48:
+                {
+                    cv::Mat rgb(frame->format.height,frame->format.width,CV_16UC3,frame->source_frame->data());
+                    handle_jpeg_stack(frame,rgb,false);
                 }
                 break;
             case stream_raw8:

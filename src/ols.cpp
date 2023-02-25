@@ -104,12 +104,12 @@ void OpenLiveStacker::init(std::string driver_name)
     config["http"]["script"]="/api";
     config["http"]["timeout"]=5;
     config["logging"]["stderr"] = true;
-    config["logging"]["level"] = "debug";
+    config["logging"]["level"] = "info";
 
     web_service_ = std::shared_ptr<cppcms::service>(new cppcms::service(config));
     
-    video_generator_app_ = new VideoGeneratorApp(*web_service_);
-    stacked_video_generator_app_ = new VideoGeneratorApp(*web_service_);
+    video_generator_app_ = new VideoGeneratorApp(*web_service_,"Real time video");
+    stacked_video_generator_app_ = new VideoGeneratorApp(*web_service_,"Stacked video");
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
     web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this),cppcms::mount_point("/camera((/.*)?)",1));
@@ -145,7 +145,7 @@ void OpenLiveStacker::run()
 
     debug_save_thread_ = std::move(start_debug_saver(debug_save_queue_,debug_dir_));
     preprocessor_thread_ = std::move(start_preprocessor(preprocessor_queue_,stacker_queue_));
-    stacker_thread_ = std::move(start_stacker(stacker_queue_,stack_display_queue_));
+    stacker_thread_ = std::move(start_stacker(stacker_queue_,stack_display_queue_,data_dir_));
     web_service_->run();
     stop();
     

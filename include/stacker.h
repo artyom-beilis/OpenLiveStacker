@@ -2,6 +2,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <booster/log.h>
+#include "common_data.h"
 namespace ols {
 
     struct Stacker {
@@ -9,6 +10,10 @@ namespace ols {
 
         bool enable_subpixel_registration = false;
         int  subpixel_factor_ = 1;
+
+        float high_per_=99.99f;
+        double gamma_limit_ = 4.0;
+        double mean_target_ = 0.25;
 
         Stacker(int width,int height,int roi_x=-1,int roi_y=-1,int roi_size = -1,int exp_multiplier=1) : 
             frames_(0),
@@ -55,18 +60,10 @@ namespace ols {
         void set_stretch(bool auto_stretch,float low_index,float high_index,float stretch_index)
         {
             enable_stretch_ = auto_stretch;
-            double exp_m1 = exp(-1.0);
-            double eps = 1e-7;
             
-            double lr = (exp_m1 - exp(-1/(low_index+eps)))/exp_m1;
-            low_per_ =    std::min(5.0,std::max(0.0, 0 * lr + 5 * (1-lr)));
-
-            double hr = (exp_m1 - exp(-1/(high_index+eps)))/exp_m1;
-            high_per_  =   std::min(100.0,std::max(99.0,100.0 * hr + 99.0 * (1-hr)));
-
-            gamma_limit_ = std::max(1.0,std::min(3.8, stretch_index * (2*1.4) + 1.0));
-            mean_target_ = std::min(0.5,std::max(0.25,0*(1-stretch_index) + 0.5 * stretch_index));
-            BOOSTER_INFO("stacker") << "Stretch low:" << low_per_ << " high:"<<high_per_ << " gamma limit=" << gamma_limit_ << " mean target=" << mean_target_;
+            low_cut_  = std::min(1.0f,std::max(0.0f,low_index));
+            high_cut_ = std::max(1.0f,std::min(16.0f,high_index));
+            target_gamma_ = std::max(1.0f,std::min(8.0f,stretch_index));
         }
 
         void make_fft_blur()
@@ -105,7 +102,7 @@ namespace ols {
             return res;
         }
 
-        cv::Mat get_stacked_image()
+        std::pair<cv::Mat,StretchInfo> get_stacked_image()
         {
             cv::Mat tmp = get_raw_stacked_image();
             
@@ -116,28 +113,34 @@ namespace ols {
             double gscale=1.0;
             double goffset = 0.0;
             double mean = 0.5;
-
-            stretch(tmp(fully_stacked_area_),gscale,goffset,mean);
-            tmp += cv::Scalar(goffset,goffset,goffset);
-            tmp = tmp.mul(cv::Scalar(gscale,gscale,gscale));
-            tmp = cv::max(0,cv::min(1,tmp));
-
             float gamma_correction = 1.0f;
+
             if(enable_stretch_) {
+                stretch(tmp(fully_stacked_area_),gscale,goffset,mean);
                 gamma_correction = cv::max(1.0,cv::min(gamma_limit_,log(mean)/log(mean_target_)));
+                BOOSTER_INFO("stacker") << "Stretch mean " << mean << "-> gamma=" << gamma_correction;
             }
             else {
-                gamma_correction = gamma_limit_;
+                gamma_correction = target_gamma_;
+                gscale = high_cut_;
+                goffset = -low_cut_ / gscale;
             }
+            tmp += cv::Scalar::all(goffset);
+            tmp = tmp.mul(cv::Scalar::all(gscale));
+            tmp = cv::max(0,cv::min(1,tmp));
+
             double linear_point = 0.008;
             double linear_gain = std::pow(linear_point,1/gamma_correction) / linear_point;
-            BOOSTER_INFO("stacker") << "Low per " << low_per_ << " High per "  << high_per_ << " Applying gamma " << gamma_correction << " linear gain " << linear_gain;
             if(gamma_correction > 1.0) {
                 cv::Mat linear_part = tmp.mul(cv::Scalar::all(linear_gain));
                 cv::pow(tmp,1/gamma_correction,tmp);
                 tmp = cv::min(linear_part,tmp);
             }
-            return tmp;
+            StretchInfo stretch;
+            stretch.gamma = gamma_correction;
+            stretch.gain = gscale;
+            stretch.cut = - goffset * gscale;
+            return std::make_pair(tmp,stretch);
         }
         
         bool stack_image(cv::Mat frame,bool restart_position = false)
@@ -190,7 +193,7 @@ namespace ols {
         void stretch(cv::Mat img,double &scale,double &offset,double &mean)
         {
             cv::Mat tmp;
-            static constexpr int hist_bins = 1<<12;
+            static constexpr int hist_bins = 1<<10;
             img.convertTo(tmp,CV_16UC3,(hist_bins-1),0);
             int counters[hist_bins]={};
             int N=tmp.rows*tmp.cols;
@@ -202,16 +205,7 @@ namespace ols {
                 unsigned Y = unsigned(0.3f * R + 0.6f * G + 0.1f * B);
                 counters[Y]++;
             }
-            int sum = 0;
-            int lp=0;
-            for(int i=0;i<hist_bins;i++) {
-                sum+=counters[i];
-                if(sum*100.0f/N >= low_per_) {
-                    lp = i;
-                    break;
-                }
-            }
-            sum=N;
+            int sum=N;
             int hp=-1;
             for(int i=hist_bins-1;i>=0;i--) {
                 sum-=counters[i];
@@ -220,8 +214,22 @@ namespace ols {
                     break;
                 }
             }
-            scale = (hist_bins-1.0)/(hp - lp);
+            int end = hp / 2;
+            int max_diff = 0;
+            for(int i=0;i<end-1;i++) {
+                int diff = counters[i+1] - counters[i];
+                max_diff = std::max(diff,max_diff);
+            }
+            int lp = 0;
+            for(int i=0;i<end-1;i++) {
+                lp = i;
+                int diff = counters[i+1] - counters[i];
+                if(diff * 10 >= max_diff)
+                    break;
+            }
+            scale = (hist_bins-1.0)/hp;
             offset = -lp/(hist_bins - 1.0);
+            
             mean = 0;
             int total = 0;
             for(int i=0;i<lp;i++) {
@@ -236,7 +244,7 @@ namespace ols {
                 total += counters[i];
             }
             mean = mean / total;
-            printf("stretch [%d,%d] scale=%f offset=%f mean=%f\n",lp,hp,scale,offset,mean);
+            BOOSTER_INFO("stacker") << "Scale " << scale << " offset=" << (-offset) << " relative cut =" << (-offset*scale) ;
         }
 
         void calc_wb(cv::Mat img,double scale[3])
@@ -526,11 +534,9 @@ namespace ols {
         int exp_multiplier_;
         cv::Mat manual_frame_;
         bool enable_stretch_ = true;
-        float low_per_= .1f;
-        float high_per_=99.99f;
-        
-        double gamma_limit_ = 3.0;
-        double mean_target_ = 0.25;
+        float low_cut_ = 0.0f;
+        float high_cut_ = 1.0f;
+        float target_gamma_ = 2.2f;
 
         //float low_per_= 0.05;
         //float high_per_=99.999f;

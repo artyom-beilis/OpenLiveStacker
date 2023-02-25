@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta charset="UTF-8">
     <title>OpenLiveStacker</title>
 </head>
 <style>
@@ -11,6 +12,8 @@
     a:active { color:red; }
     a:hover { color:red; }
     button { border-radius:2mm; height:10mm; font-size:5mm ; text-align:center; vertical-align: middle; background-color:black; color:red; border: 2px solid red }
+    .slider { width: 100%; }
+    .slider_elem { background-color: transparent; }
     .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
     .settings_background {
         background: url(/media/img/settings.png) no-repeat center center;
@@ -92,14 +95,21 @@ function parseDEC(svalue)
     return sig*(d + (60 * m + s) / 3600.0);
 }
 
-function restCall(method,url,request,on_response)
+function restCall(method,url,request,on_response,on_error = alert)
 {
     var xhr = new XMLHttpRequest()
     xhr.open(method,url,true)
     xhr.onload = function() {
-        var response = JSON.parse(xhr.responseText);
+        var response;
+        try {
+            response = JSON.parse(xhr.responseText);
+        }
+        catch(e) { 
+            on_error(e); 
+            return;
+        }
         if('status' in response && response.status == 'fail') {
-            alert(response.error);
+            on_error(response.error);
             return;
         }
         on_response(response)
@@ -391,6 +401,48 @@ function ctlStack(status)
     });
 }
 
+function setPPVal(name,val)
+{
+    document.getElementById('stack_stretch_' + name + '_disp').innerHTML = val.toFixed(2);
+}
+
+
+
+function setPPSlider(name,val)
+{
+    document.getElementById('stack_stretch_' + name).value = Math.round(val*100);
+    setPPVal(name,val);
+}
+
+function updatePPSliders(data)
+{
+    setPPSlider('low',data.cut);
+    setPPSlider('high',data.gain);
+    setPPSlider('gamma',data.gamma);
+    updatePP();
+}
+
+function setDefaultPPSliders(e=null)
+{
+    updatePPSliders({
+        gamma: 2.4,
+        cut : 0.0,
+        gain : 1.0
+    });
+}
+
+function updateAutoPP()
+{
+    var auto_pp = getBVal("auto_stretch");
+    if(auto_pp) {
+        document.getElementById('dynamic_parameters').style.display='none';
+        updatePP();
+        return;
+    }
+    document.getElementById('dynamic_parameters').style.display='inline';
+    restCall('get','/data/stretch.json',null,updatePPSliders,setDefaultPPSliders);
+}
+
 function updatePP()
 {
 
@@ -400,6 +452,9 @@ function updatePP()
         stretch_high:       getPVal('stretch_high'),
         stretch_gamma:      getPVal('stretch_gamma'),
     };
+    setPPVal('low',config.stretch_low);
+    setPPVal('high',config.stretch_high);
+    setPPVal('gamma',config.stretch_gamma);
     console.log(config)
     restCall('post','/api/stacker/stretch',config,(e)=>{
     });
@@ -538,11 +593,34 @@ window.onresize = onResize;
         <button class="incdec_but" onclick="showPP(false);">X</button>
     </span>
     <p>
-        Auto:<input id="stack_auto_stretch" checked type="checkbox" onchange='updatePP()' >
-        Low: <input type="range" min="0" max="100" value="0" class="slider" id="stack_stretch_low" onchange='updatePP()'>
-        High: <input type="range" min="0" max="100" value="0" class="slider" id="stack_stretch_high" onchange='updatePP()'>
-        Gamma: <input type="range" min="0" max="100" value="50" class="slider" id="stack_stretch_gamma" onchange='updatePP()'>
+        Auto:<input id="stack_auto_stretch" checked type="checkbox" onchange='updateAutoPP()' >
     </p>
+    <div id="dynamic_parameters" style='display:none'>
+      <table style='width:100%;'>
+        <colgroup>
+            <col span="1" style="width: 5%;">
+            <col span="1" style="width: 5%;">
+            <col span="1" style="width: 90%;">
+        </colgroup>
+        <tbody>
+        <tr>
+            <td class="slider_elem">L:</td>
+            <td class="slider_elem"><span id="stack_stretch_low_disp">0.00</span></td>
+            <td class="slider_elem"><input type="range" min="0" max="100" value="0" class="slider" id="stack_stretch_low" onchange='updatePP()'></td>
+        </tr>
+        <tr>
+            <td class="slider_elem">H:</td>
+            <td class="slider_elem"><span id="stack_stretch_high_disp">1.00</span></td>
+            <td class="slider_elem"><input type="range" min="100" max="1600" value="100" class="slider" id="stack_stretch_high" onchange='updatePP()'><td>
+        </tr>
+        <tr>
+            <td class="slider_elem">γ:</td>
+            <td class="slider_elem"><span id="stack_stretch_gamma_disp">2.40</span></td>
+            <td class="slider_elem"><input type="range" min="100" max="800" value="240" class="slider" id="stack_stretch_gamma" onchange='updatePP()'></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
 </div>
 <div class="config_div" id="config" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
     <span style="position:absolute; right:1mm; top:1mm">
