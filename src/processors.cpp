@@ -387,6 +387,7 @@ namespace ols {
                 stacker_.reset();
                 if(calibration_) {
                     cframe_ = cv::Mat(height_,width_,CV_32FC3);
+                    cframe_.setTo(0);
                     cframe_count_ = 0;
                 }
                 else {
