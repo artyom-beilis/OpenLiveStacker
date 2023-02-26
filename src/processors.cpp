@@ -267,7 +267,10 @@ namespace ols {
         void send_updated_image()
         {
             if(out_) {
-                out_->push(generate_output_frame(stacker_->get_stacked_image()));
+                if(stacker_->stacked_count() > 0)
+                    out_->push(generate_output_frame(stacker_->get_stacked_image()));
+                else
+                    out_->push(generate_dummy_frame());
             }
         }
 
