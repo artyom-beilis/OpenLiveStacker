@@ -389,7 +389,7 @@ function getBVal(name)
 
 function getPVal(name)
 {
-    return document.getElementById('stack_' + name).value * 0.01;
+    return document.getElementById('stack_' + name).value * 0.001;
 }
 
 function ctlStack(status)
@@ -403,14 +403,14 @@ function ctlStack(status)
 
 function setPPVal(name,val)
 {
-    document.getElementById('stack_stretch_' + name + '_disp').innerHTML = val.toFixed(2);
+    document.getElementById('stack_stretch_' + name + '_disp').innerHTML = val.toFixed(3);
 }
 
 
 
 function setPPSlider(name,val)
 {
-    document.getElementById('stack_stretch_' + name).value = Math.round(val*100);
+    document.getElementById('stack_stretch_' + name).value = Math.round(val*1000);
     setPPVal(name,val);
 }
 
@@ -605,18 +605,18 @@ window.onresize = onResize;
         <tbody>
         <tr>
             <td class="slider_elem">L:</td>
-            <td class="slider_elem"><span id="stack_stretch_low_disp">0.00</span></td>
-            <td class="slider_elem"><input type="range" min="0" max="100" value="0" class="slider" id="stack_stretch_low" onchange='updatePP()'></td>
+            <td class="slider_elem"><span id="stack_stretch_low_disp">0.000</span></td>
+            <td class="slider_elem"><input type="range" min="0" max="1000" value="0" class="slider" id="stack_stretch_low" onchange='updatePP()'></td>
         </tr>
         <tr>
             <td class="slider_elem">H:</td>
-            <td class="slider_elem"><span id="stack_stretch_high_disp">1.00</span></td>
-            <td class="slider_elem"><input type="range" min="100" max="1600" value="100" class="slider" id="stack_stretch_high" onchange='updatePP()'><td>
+            <td class="slider_elem"><span id="stack_stretch_high_disp">1.000</span></td>
+            <td class="slider_elem"><input type="range" min="1000" max="16000" value="1000" class="slider" id="stack_stretch_high" onchange='updatePP()'><td>
         </tr>
         <tr>
             <td class="slider_elem">γ:</td>
-            <td class="slider_elem"><span id="stack_stretch_gamma_disp">2.40</span></td>
-            <td class="slider_elem"><input type="range" min="100" max="800" value="240" class="slider" id="stack_stretch_gamma" onchange='updatePP()'></td>
+            <td class="slider_elem"><span id="stack_stretch_gamma_disp">2.400</span></td>
+            <td class="slider_elem"><input type="range" min="1000" max="8000" value="2400" class="slider" id="stack_stretch_gamma" onchange='updatePP()'></td>
         </tr>
         </tbody>
       </table>
