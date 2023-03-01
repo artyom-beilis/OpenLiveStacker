@@ -36,6 +36,8 @@
 
 var global_width = 0;
 var global_height = 0;
+var g_prev_high = -1;
+var g_prev_low = -1;
 
 function parseRA(svalue)
 {
@@ -419,6 +421,8 @@ function updatePPSliders(data)
     setPPSlider('low',data.cut);
     setPPSlider('high',data.gain);
     setPPSlider('gamma',data.gamma);
+    g_prev_low = data.cut;
+    g_prev_high = data.gain;
     updatePP();
 }
 
@@ -441,6 +445,27 @@ function updateAutoPP()
     }
     document.getElementById('dynamic_parameters').style.display='inline';
     restCall('get','/data/stretch.json',null,updatePPSliders,setDefaultPPSliders);
+}
+
+function updatePPLow()
+{
+    g_prev_low = getPVal('stretch_low');
+    g_prev_high = getPVal("stretch_high");
+    updatePP();
+}
+
+function updatePPHigh()
+{
+    var new_high = getPVal("stretch_high");
+    if(g_prev_low != -1 && g_prev_high != -1) {
+        var new_low = Math.min(Math.max(g_prev_low,0.8),g_prev_low * (new_high / g_prev_high));
+        setPPSlider('low',new_low);
+    }
+    else {
+        g_prev_high = new_high;
+        g_prev_low = getPVal("stretch_low");
+    }
+    updatePP();
 }
 
 function updatePP()
@@ -606,12 +631,12 @@ window.onresize = onResize;
         <tr>
             <td class="slider_elem">L:</td>
             <td class="slider_elem"><span id="stack_stretch_low_disp">0.000</span></td>
-            <td class="slider_elem"><input type="range" min="0" max="1000" value="0" class="slider" id="stack_stretch_low" onchange='updatePP()'></td>
+            <td class="slider_elem"><input type="range" min="0" max="1000" value="0" class="slider" id="stack_stretch_low" onchange='updatePPLow()'></td>
         </tr>
         <tr>
             <td class="slider_elem">H:</td>
             <td class="slider_elem"><span id="stack_stretch_high_disp">1.000</span></td>
-            <td class="slider_elem"><input type="range" min="1000" max="16000" value="1000" class="slider" id="stack_stretch_high" onchange='updatePP()'><td>
+            <td class="slider_elem"><input type="range" min="1000" max="16000" value="1000" class="slider" id="stack_stretch_high" onchange='updatePPHigh()'><td>
         </tr>
         <tr>
             <td class="slider_elem">γ:</td>
