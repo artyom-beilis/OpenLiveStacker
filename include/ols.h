@@ -21,7 +21,7 @@ namespace ols {
         std::string http_ip = "0.0.0.0";
         std::string document_root = "www-data";
 
-        void init(std::string driver);
+        void init(std::string driver,int external_option = -1);
         void run();
         void shutdown();
 

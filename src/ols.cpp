@@ -82,13 +82,14 @@ void OpenLiveStacker::start_stream(CamStreamFormat format)
     stream_active_ = true;
 }
 
-void OpenLiveStacker::init(std::string driver_name)
+void OpenLiveStacker::init(std::string driver_name,int external_option)
 {
     auto drivers = CameraDriver::drivers();
     auto driver_it = std::find(drivers.begin(),drivers.end(),driver_name);
     if(driver_it == drivers.end())
         throw CamError("No such driver " + driver_name);
-    driver_ = std::move(CameraDriver::get(driver_it - drivers.begin()));
+    int driver_id = driver_it - drivers.begin();
+    driver_ = std::move(CameraDriver::get(driver_id,external_option));
 
     cppcms::json::value config;
     config["service"]["api"]="http";

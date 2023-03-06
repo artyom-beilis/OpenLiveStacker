@@ -29,11 +29,11 @@ std::vector<std::string> CameraDriver::drivers()
     return driver_names;
 }
 
-std::unique_ptr<CameraDriver> CameraDriver::get(int id)
+std::unique_ptr<CameraDriver> CameraDriver::get(int id,int external_option)
 {
     if((unsigned)id >= driver_calls.size())
         throw CamError("Invalid driver id"); 
-    std::unique_ptr<CameraDriver> r(driver_calls.at(id)(-1));
+    std::unique_ptr<CameraDriver> r(driver_calls.at(id)(external_option));
     return r;
 }
 std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)

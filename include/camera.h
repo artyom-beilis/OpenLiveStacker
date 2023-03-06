@@ -140,7 +140,7 @@ namespace ols {
         /// list supported drivers
         static std::vector<std::string> drivers();
         /// get driver - by its order in the \a drivers result
-        static std::unique_ptr<CameraDriver> get(int id);
+        static std::unique_ptr<CameraDriver> get(int id,int external_option = -1);
 
         /// list all cameras connected and supported by this driver
         virtual std::vector<std::string> list_cameras() = 0;

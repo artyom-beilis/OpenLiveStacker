@@ -49,6 +49,18 @@ namespace ols {
     };
     class ASICamera : public Camera {
     public:
+        /// for Android
+        ASICamera(int id)
+        {
+            ASI_ERROR_CODE code = ASIGetCameraPropertyByID(id,&info_);
+            if(code != ASI_SUCCESS)
+                throw ASIError("Failed to access camera",code);
+            code = ASIInitCamera(info_.CameraID);
+            if(code) {
+                ASICloseCamera(info_.CameraID);
+                throw ASIError("Failed to init camera",code);
+            }
+        }
         ASICamera(ASI_CAMERA_INFO info) : info_(info)
         {
             stream_active_ = 0;
@@ -324,7 +336,35 @@ namespace ols {
  
 
 
+    class SingleASICameraDriver : public CameraDriver {
+    public:
+        SingleASICameraDriver(int id) : id_(id)
+        {
+            ASI_CAMERA_INFO info;
+            ASI_ERROR_CODE code = ASIGetCameraPropertyByID(id_,&info);
+            if(code != ASI_SUCCESS)
+                throw ASIError("Failed to access camera",code);
+            name_ = info.Name;
+        }
+        virtual std::vector<std::string> list_cameras() 
+        {
+            return {name_};
+        }
+        virtual std::unique_ptr<Camera> open_camera(int id) 
+        {
+            if(id!=0)
+                throw ASIError("No such camera " + std::to_string(id));
+            std::unique_ptr<Camera> cam(new ASICamera(id_));
+            return cam;
+        }
+    private:
+        int id_;
+        std::string name_;
+    };
+
+
     class ASICameraDriver : public CameraDriver {
+    public:
         virtual std::vector<std::string> list_cameras() 
         {
             int N = ASIGetNumOfConnectedCameras();
@@ -355,8 +395,16 @@ namespace ols {
 }
 
 extern "C" {
-    ols::CameraDriver *ols_get_asi_driver(int )
+    ols::CameraDriver *ols_get_asi_driver(int cam_id = -1)
     {
-        return new ols::ASICameraDriver();
+        try {
+            if(cam_id != -1)
+                return new ols::SingleASICameraDriver(cam_id);
+            else
+                return new ols::ASICameraDriver();
+        }
+        catch(std::exception const &) {
+            return nullptr;
+        }
     }
 }
