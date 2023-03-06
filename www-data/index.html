@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta charset="UTF-8">
     <title>OpenLiveStacker</title>
 </head>
 <style>
@@ -11,13 +12,25 @@
     a:active { color:red; }
     a:hover { color:red; }
     button { border-radius:2mm; height:10mm; font-size:5mm ; text-align:center; vertical-align: middle; background-color:black; color:red; border: 2px solid red }
+    .slider { width: 100%; }
+    .slider_elem { background-color: transparent; }
     .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
     .settings_background {
         background: url(/media/img/settings.png) no-repeat center center;
         background-size: 10mm 10mm;
     }
+    #thumb_stream_video {
+        padding:0;
+        margin:0;
+    }
     #live_stream_video {
         padding:0;
+        margin:0;
+    }
+    #thumb {
+        text-align:right;
+        width:100%
+        padding: 0;
         margin:0;
     }
     #video {
@@ -33,6 +46,11 @@
 
 var global_width = 0;
 var global_height = 0;
+var g_prev_high = -1;
+var g_prev_low = -1;
+var g_stacker_status = 'idle';
+var g_show_thumb_live = false;
+var g_stats = null;
 
 function parseRA(svalue)
 {
@@ -92,14 +110,21 @@ function parseDEC(svalue)
     return sig*(d + (60 * m + s) / 3600.0);
 }
 
-function restCall(method,url,request,on_response)
+function restCall(method,url,request,on_response,on_error = alert)
 {
     var xhr = new XMLHttpRequest()
     xhr.open(method,url,true)
     xhr.onload = function() {
-        var response = JSON.parse(xhr.responseText);
+        var response;
+        try {
+            response = JSON.parse(xhr.responseText);
+        }
+        catch(e) { 
+            on_error(e); 
+            return;
+        }
         if('status' in response && response.status == 'fail') {
-            alert(response.error);
+            on_error(response.error);
             return;
         }
         on_response(response)
@@ -151,15 +176,89 @@ function checkOpenStatus(st)
         global_height = st.height;
         loadFormats();
         loadControls();
+        showConfig(false);
         showLiveVideo();
-        restCall('get','/api/stacker/status',null,checkStackerStatus)
+        restCall('get','/api/stacker/status',null, (d)=> {
+            changeStackerStatus(d.status);
+        });
     }
 }
-function checkStackerStatus(st)
+
+function changeStackerStatus(new_status)
 {
-    if(st.status == 'idle')
-        return;
-    showStackedVideo(true);
+    var ui_ctl = {
+        stack: true,
+        pause: false,
+        resume: false,
+        save: false,
+        live: false,
+        pp: false,
+        stats: false
+    };
+    if(new_status == 'idle') {
+        if(g_stacker_status != 'idle') {
+            showLiveVideo();
+            showThumbLive(false);
+        }
+        ui_ctl.stack = true;
+        ui_ctl.pause = false;
+        ui_ctl.resume = false;
+        ui_ctl.save=false;
+        ui_ctl.pp=false;
+        ui_ctl.live = false;
+        ui_ctl.stats = false;
+    }
+    else if(new_status =='stacking') {
+        if(g_stacker_status == 'idle') {
+            showStackedVideo(true);
+        }
+        ui_ctl.stack = false;
+        ui_ctl.pause = true;
+        ui_ctl.resume = false;
+        ui_ctl.save = true;
+        ui_ctl.pp = true;
+        ui_ctl.live = true;
+        ui_ctl.stats = true;
+    }
+    else if(new_status == 'paused') {
+        if(g_stacker_status == 'idle') {
+            showStackedVideo(true);
+        }
+        ui_ctl.stack = false;
+        ui_ctl.pause = false;
+        ui_ctl.resume = true;
+        ui_ctl.save = true;
+        ui_ctl.pp = true;
+        ui_ctl.live = true;
+        ui_ctl.stats = true;
+    }
+    else {
+        alert('Internal error invalud status' + new_status);
+    }
+    for(var name in ui_ctl) {
+        var st = ui_ctl[name] ? 'inline' : 'none';
+        document.getElementById('stacking_ui_' + name).style.display = st;
+    }
+    if(ui_ctl.stats) {
+        if(!g_stats) {
+            g_stats = new EventSource("/api/updates");
+            g_stats.onmessage = (e) => {
+                updateStackerStats(e.data);
+            };
+        }
+    }
+    else {
+        if(g_stats) {
+            g_stats.close();
+            g_stats = null;
+        }
+    }
+    g_stacker_status = new_status;
+}
+
+function updateStackerStats(e) {
+    var stats = JSON.parse(e);
+    document.getElementById('stats_info').innerHTML = stats.stacked + '/' + stats.missed + '/' + stats.dropped;
 }
 
 function loadFormats()
@@ -202,14 +301,13 @@ function updateBoolControl(optid,value)
 function updateNumControl(optid)
 {
     var val = document.getElementById('control_opt_' + optid).value;
-    console.log("Value " + val)
     val = parseFloat(val);
     updateControl(optid,val);
     return false;
 }
 
 
-function prepareControns(ctls)
+function prepareControls(ctls)
 {
     var controls = document.getElementById('cam_controls');
     var controls_str = ''
@@ -237,12 +335,11 @@ function prepareControns(ctls)
         controls_str += '<tr>' + control_str + '</tr>\n';
     }
     controls.innerHTML = controls_str;
-    console.log(controls_str);
 }
 
 function loadControls()
 {
-    restCall('get','/api/camera/options',null,prepareControns);
+    restCall('get','/api/camera/options',null,prepareControls);
 }
 
 function calcImgSize()
@@ -262,13 +359,12 @@ function calcImgSize()
         img_H = W/w2h;
         p_top = (H - img_H) / 2;
     }
-    console.log(JSON.stringify({cw:W,ch:H,iw:global_width,ih:global_height,fw:img_W,fh:img_H}));
     return [img_W,img_H,p_left,p_top]
 }
 
-function updateCalibFrames(data)
+function updateCalibFramesById(data,elemid)
 {
-    var sel = document.getElementById('stack_darks');
+    var sel = document.getElementById(elemid);
     var selected = sel.value;
     for(var i=sel.length-1;i>=0;i--) {
         sel.options.remove(i);
@@ -295,6 +391,13 @@ function updateCalibFrames(data)
     sel.value = selected;
 }
 
+function updateCalibFrames(data)
+{
+    updateCalibFramesById(data,'stack_darks');
+    updateCalibFramesById(data,'stack_flats');
+    updateCalibFramesById(data,'stack_dark_flats');
+}
+
 function loadCalibFrames()
 {
     restCall('get','/data/calibration/index.json',null,updateCalibFrames);
@@ -315,6 +418,30 @@ function showStream(name)
     onResize(null);
 }
 
+function toggleThumbLive()
+{
+    showThumbLive(!g_show_thumb_live);
+}
+
+function showThumbLive(v)
+{
+    var thumb = document.getElementById('thumb');
+    var thumb_video = document.getElementById('thumb_video');
+    g_show_thumb_live = v;
+    var live_button = document.getElementById('stacking_ui_live');
+    if(v) {
+        thumb_video.innerHTML = `<img id="thumb_stream_video" alt="streaming video" src="/api/video/live" />`;
+        thumb.style.display = 'inline';
+        live_button.innerHTML = 'X';
+        onResize(null);
+    }
+    else {
+        thumb_video.innerHTML ='';
+        thumb.style.display = 'none';
+        live_button.innerHTML = 'L';
+    }
+}
+
 function showLiveVideo()
 {
     showStream('live');
@@ -324,10 +451,19 @@ function onResize(ev)
 {
     var video = document.getElementById('live_stream_video');
     var size = calcImgSize();
-    video.style.width = size[0] + 'px';
-    video.style.height = size[1] + 'px';
-    video.style.marginLeft = size[2] + 'px';
-    video.style.marginTop  = size[3] + 'px';
+    if(video) {
+        video.style.width = size[0] + 'px';
+        video.style.height = size[1] + 'px';
+        video.style.marginLeft = size[2] + 'px';
+        video.style.marginTop  = size[3] + 'px';
+    }
+    var thumb = document.getElementById('thumb_stream_video')
+    if(thumb) {
+        thumb.style.width = Math.round(size[0] / 4) + 'px';
+        thumb.style.height = Math.round(size[1] / 4) + 'px';
+        thumb.style.marginRight = '0px';
+        thumb.style.marginTop  = '0px';
+    }
 }
 
 function startStream()
@@ -337,6 +473,7 @@ function startStream()
         global_width = r.width;
         global_height = r.height;
         showLiveVideo();
+        changeStackerStatus('idle');
     });
     showConfig(false);
 }
@@ -349,10 +486,13 @@ function showStack(v)
 	document.getElementById('stack').style.display = v ? 'inline' : 'none';
 }
 
+function showPP(v)
+{
+	document.getElementById('pp_control').style.display = v ? 'inline' : 'none';
+}
 
 function showConfig(v)
 {
-    console.log('CONFIG ' + v)
 	document.getElementById('config').style.display = v ? 'inline' : 'none';
 }
 
@@ -366,12 +506,104 @@ function getBVal(name)
     return document.getElementById('stack_' + name).checked;
 }
 
+function getPVal(name)
+{
+    return document.getElementById('stack_' + name).value * 0.001;
+}
+
 function ctlStack(status)
 {
     restCall('post','/api/stacker/control',{operation:status},(s)=> {
         if(status == 'save') {
-            showStackedVideo(false);
+            changeStackerStatus('idle');
         }
+        else if(status == 'resume') {
+            changeStackerStatus('stacking');
+        }
+        else if(status =='pause') {
+            changeStackerStatus('paused');
+        }
+    });
+}
+
+function setPPVal(name,val)
+{
+    document.getElementById('stack_stretch_' + name + '_disp').innerHTML = val.toFixed(3);
+}
+
+
+
+function setPPSlider(name,val)
+{
+    document.getElementById('stack_stretch_' + name).value = Math.round(val*1000);
+    setPPVal(name,val);
+}
+
+function updatePPSliders(data)
+{
+    setPPSlider('low',data.cut);
+    setPPSlider('high',data.gain);
+    setPPSlider('gamma',data.gamma);
+    g_prev_low = data.cut;
+    g_prev_high = data.gain;
+    updatePP();
+}
+
+function setDefaultPPSliders(e=null)
+{
+    updatePPSliders({
+        gamma: 2.4,
+        cut : 0.0,
+        gain : 1.0
+    });
+}
+
+function updateAutoPP()
+{
+    var auto_pp = getBVal("auto_stretch");
+    if(auto_pp) {
+        document.getElementById('dynamic_parameters').style.display='none';
+        updatePP();
+        return;
+    }
+    document.getElementById('dynamic_parameters').style.display='inline';
+    restCall('get','/data/stretch.json',null,updatePPSliders,setDefaultPPSliders);
+}
+
+function updatePPLow()
+{
+    g_prev_low = getPVal('stretch_low');
+    g_prev_high = getPVal("stretch_high");
+    updatePP();
+}
+
+function updatePPHigh()
+{
+    var new_high = getPVal("stretch_high");
+    if(g_prev_low != -1 && g_prev_high != -1) {
+        var new_low = Math.min(Math.max(g_prev_low,0.8),g_prev_low * (new_high / g_prev_high));
+        setPPSlider('low',new_low);
+    }
+    else {
+        g_prev_high = new_high;
+        g_prev_low = getPVal("stretch_low");
+    }
+    updatePP();
+}
+
+function updatePP()
+{
+
+    var config={
+        auto_stretch:       getBVal("auto_stretch"),
+        stretch_low:        getPVal('stretch_low'),
+        stretch_high:       getPVal('stretch_high'),
+        stretch_gamma:      getPVal('stretch_gamma'),
+    };
+    setPPVal('low',config.stretch_low);
+    setPPVal('high',config.stretch_high);
+    setPPVal('gamma',config.stretch_gamma);
+    restCall('post','/api/stacker/stretch',config,(e)=>{
     });
 }
 
@@ -380,6 +612,14 @@ function startStack()
     var darks = getVal('darks');
     if(darks == 'N/A') {
         darks = null;
+    }
+    var flats = getVal('flats');
+    if(flats == 'N/A') {
+        flats = null;
+    }
+    var dark_flats = getVal('dark_flats');
+    if(dark_flats == 'N/A') {
+        dark_flats = null;
     }
     var ra=parseRA(getVal("ra"));
     var de=parseDEC(getVal("de"));
@@ -424,6 +664,9 @@ function startStack()
         field_derotation:   field_derotation,
         image_flip:         getBVal("image_flip"),
         auto_stretch:       getBVal("auto_stretch"),
+        stretch_low:        getPVal('stretch_low'),
+        stretch_high:       getPVal('stretch_high'),
+        stretch_gamma:      getPVal('stretch_gamma'),
         type:               calib ? "calibration" : "dso",
         location : {
             lat:            lat,
@@ -433,11 +676,12 @@ function startStack()
             ra:             ra,
             de:             de,
         },
-        darks : darks
+        darks : darks,
+        flats : flats,
+        dark_flats : dark_flats
     };
-    console.log(config)
     restCall('post','/api/stacker/start',config,(e)=>{
-        showStackedVideo(true);
+        changeStackerStatus('stacking');
         showStack(false);
     });
 }
@@ -461,14 +705,22 @@ window.onresize = onResize;
 
 
 </script> 
-<div id='video' style="position:absolute; left:0; top:0; z-index:-1"></div>
+<div id='video' style="position:absolute; left:0; top:0; z-index:-2"></div>
+<div id='thumb' style="display:none; position:absolute; right:0; top:0; z-index:-1;">
+    <span id="thumb_video"><span>
+</div>
+<div id='stacking_ui_stats' style="position:absolute; right:0; bottom:0; display:none;">
+    <span id="stats_info"></span>
+</div>
 <p id="open_camera"   style="display:inline" >Camera: <select id="camera_select"></select><button onclick="openCamera()">Open</button></p>
 <p id='std_controls' style="display:none;" >
     <button class="comp_but settings_background" onclick="showConfig(true);">&nbsp;</button>
-    <button class="comp_but" onclick="showStack(true);">S</button>
-    <button class="comp_but" onclick="ctlStack('pause');">&#x23F8;</button>
-    <button class="comp_but" onclick="ctlStack('resume');">&#x23F5;</button>
-    <button class="comp_but" onclick="ctlStack('save');" >&#x1F4BE;</button>
+    <button style="display:none" id="stacking_ui_stack" class="comp_but" onclick="showStack(true);">≡</button>
+    <button style="display:none" id="stacking_ui_pause" class="comp_but" onclick="ctlStack('pause');">&#x23F8;</button>
+    <button style="display:none" id="stacking_ui_resume" class="comp_but" onclick="ctlStack('resume');">&#x23F5;</button>
+    <button style="display:none" id="stacking_ui_save" class="comp_but" onclick="ctlStack('save');" >&#x23F9;</button>
+    <button style="display:none" id="stacking_ui_pp" class="comp_but" onclick="showPP(true);" >[-]</button>
+    <button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
 </p>
 <div class="config_div" id="stack" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
     <span style="position:absolute; right:1mm; top:1mm">
@@ -477,16 +729,51 @@ window.onresize = onResize;
     <table>
     <tr><td>Name</td><td><input id="stack_name" type="text" value="" ></td><td>&nbsp;</td></tr>
     <tr><td>Calibrate</td><td><input id="stack_calibration" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr><td>Save</td><td><input id="stack_save_data" type="checkbox" checked ></td><td>&nbsp;</td></tr>
+    <tr><td>Save</td><td><input id="stack_save_data" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr><td>Derotate</td><td><input id="stack_field_derotation" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr><td>Derotate Mirror</td><td><input id="stack_image_flip" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr><td>Auto Stretch</td><td><input id="stack_auto_stretch" checked type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr><td>Object ID</td><td><input oninput="updateRADE(this.value)" id="stack_object" type="text" value="" ></td><td>for example: M31, NGC457</td></tr>
     <tr><td>Target</td><td>RA:<input id="stack_ra" type="text" ></td><td>DE:<input id="stack_de" type="text" ></td></tr>
     <tr><td>Geolocation</td><td>Lat:<input id="stack_lat" type="text" ></td><td>Lon:<input id="stack_lon" type="text" ></td></tr>
     <tr><td>Darks</td><td><select id="stack_darks"></select></td><td>&nbsp;</td></tr>
+    <tr><td>Flats</td><td><select id="stack_flats"></select></td><td>&nbsp;</td></tr>
+    <tr><td>Dark Flats</td><td><select id="stack_dark_flats"></select></td><td>&nbsp;</td></tr>
     <tr><td><button onclick='startStack();'>Start</button></td><td>&nbsp;</td><td>&nbsp;</td></tr>
     </table>
+</div>
+<div class="config_div" id="pp_control" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background-color: transparent; border: 1px solid red ">
+    <span style="position:absolute; right:1mm; top:1mm">
+        <button class="incdec_but" onclick="showPP(false);">X</button>
+    </span>
+    <p>
+        Auto:<input id="stack_auto_stretch" checked type="checkbox" onchange='updateAutoPP()' >
+    </p>
+    <div id="dynamic_parameters" style='display:none'>
+      <table style='width:100%;'>
+        <colgroup>
+            <col span="1" style="width: 5%;">
+            <col span="1" style="width: 5%;">
+            <col span="1" style="width: 90%;">
+        </colgroup>
+        <tbody>
+        <tr>
+            <td class="slider_elem">L:</td>
+            <td class="slider_elem"><span id="stack_stretch_low_disp">0.000</span></td>
+            <td class="slider_elem"><input type="range" min="0" max="1000" value="0" class="slider" id="stack_stretch_low" onchange='updatePPLow()'></td>
+        </tr>
+        <tr>
+            <td class="slider_elem">H:</td>
+            <td class="slider_elem"><span id="stack_stretch_high_disp">1.000</span></td>
+            <td class="slider_elem"><input type="range" min="1000" max="16000" value="1000" class="slider" id="stack_stretch_high" onchange='updatePPHigh()'><td>
+        </tr>
+        <tr>
+            <td class="slider_elem">γ:</td>
+            <td class="slider_elem"><span id="stack_stretch_gamma_disp">2.400</span></td>
+            <td class="slider_elem"><input type="range" min="1000" max="8000" value="2400" class="slider" id="stack_stretch_gamma" onchange='updatePP()'></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
 </div>
 <div class="config_div" id="config" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
     <span style="position:absolute; right:1mm; top:1mm">

@@ -105,23 +105,26 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     config["http"]["script"]="/api";
     config["http"]["timeout"]=5;
     config["logging"]["stderr"] = true;
-    config["logging"]["level"] = "debug";
+    config["logging"]["level"] = "info";
 
     web_service_ = std::shared_ptr<cppcms::service>(new cppcms::service(config));
     
-    video_generator_app_ = new VideoGeneratorApp(*web_service_);
-    stacked_video_generator_app_ = new VideoGeneratorApp(*web_service_);
+    video_generator_app_ = new VideoGeneratorApp(*web_service_,"Real time video");
+    stacked_video_generator_app_ = new VideoGeneratorApp(*web_service_,"Stacked video");
+    stats_stream_app_ = new StackerStatsNotification(*web_service_);
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
     web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this),cppcms::mount_point("/camera((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(this,data_dir_,video_generator_queue_),
                                             cppcms::mount_point("/stacker((/.*)?)",1),
                                             cppcms::app::asynchronous);
+    web_service_->applications_pool().mount(stats_stream_app_,cppcms::mount_point("/updates",0));
 }
 
 void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
 {
     if(video_generator_queue_->items > 20) {
+        dropped_since_last_update_ ++;
         BOOSTER_WARNING("stacker") << "Processing is overloaded, dropping frame #" << (++dropped_);
         return;
     }
@@ -132,12 +135,15 @@ void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
     frame->bayer = cf.bayer;
     frame->timestamp = cf.unix_timestamp;
     frame->source_frame = std::shared_ptr<VideoFrame>(new VideoFrame(cf.data,cf.data_size));
+    frame->dropped = dropped_since_last_update_;
+    dropped_since_last_update_ = 0;
     video_generator_queue_->push(frame);
 }
 void OpenLiveStacker::run()
 {
     video_display_queue_->call_on_push(video_generator_app_->get_callback());
     stack_display_queue_->call_on_push(stacked_video_generator_app_->get_callback());
+    stacker_stats_queue_->call_on_push(stats_stream_app_->get_callback());
 
     video_generator_thread_ = std::move(start_generator(video_generator_queue_,
                                                         preprocessor_queue_,
@@ -146,7 +152,7 @@ void OpenLiveStacker::run()
 
     debug_save_thread_ = std::move(start_debug_saver(debug_save_queue_,debug_dir_));
     preprocessor_thread_ = std::move(start_preprocessor(preprocessor_queue_,stacker_queue_));
-    stacker_thread_ = std::move(start_stacker(stacker_queue_,stack_display_queue_));
+    stacker_thread_ = std::move(start_stacker(stacker_queue_,stack_display_queue_,stacker_stats_queue_,data_dir_));
     web_service_->run();
     stop();
     

@@ -36,7 +36,6 @@ Calibration index:
     [
         {"id" : string // idenfification of frame
          "path" : string// path to file relative to calibration
-         "type" : "darks"/"flats"/"bias" // type of calibration frame
          "camera" : string //camera name
          "settings" : settings // camera settings see /api/camera/ID/option/all
          "date": string // local date and time of calibration frame generation
@@ -184,11 +183,11 @@ Stacking controls
 
     POST /api/stacker/stretch
         {
-            "autostretch" : bool // true or false, works even if paused
+            "auto_stretch" : bool // true or false, works even if paused
             // if false set these for manual correction
-            "low" : float 0..1 - remove low level. default 0.
-            "high" : float 0..1 - remove high range, default 1.0
-            "gamma" : // gamma correction, default 2.2
+            "stretch_low" : float 0..1 - remove low level. default 0.5
+            "stretch_high" : float 0..1 - remove high range, default 0.5
+            "stretch_gamma" : // gamma correction powr 0..1
         }
         return { "status" : "ok"/"fail", "msg" : STRING" }
 

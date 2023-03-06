@@ -57,6 +57,7 @@ namespace ols {
         stream_yuv2,
         stream_mjpeg,
         stream_rgb24,
+        stream_rgb48,
         stream_raw8,
         stream_raw16,
         stream_mono8,

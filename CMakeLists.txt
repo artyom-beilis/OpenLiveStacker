@@ -41,7 +41,12 @@ add_library(ols SHARED
     src/tiffmat.cpp
     src/processors.cpp
     src/util.cpp
+    src/server_sent_events.cpp
     )
+
+add_library(ols_driver_sim SHARED src/sim_camera.cpp)
+target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
+
 target_link_libraries(ols dl tiff cppcms booster ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
 add_executable(test_camera test/test_camera.cpp)
 add_executable(ols_cmd test/ols_cmd.cpp)

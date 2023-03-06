@@ -22,7 +22,7 @@ namespace ols {
         void run()
         {
             std::thread t1 = start_preprocessor(input_queue_,stacker_queue_);
-            std::thread t2 = start_stacker(stacker_queue_,queue_pointer_type());
+            std::thread t2 = start_stacker(stacker_queue_,nullptr,nullptr,output_dir_);
             std::shared_ptr<StackerControl> ctl(new StackerControl(cfg_));
             std::cerr << cfg_.width << " " << cfg_.height << std::endl;
             input_queue_->push(ctl);
@@ -109,10 +109,12 @@ namespace ols {
             cfg.lon = v.get<double>("lon");
             cfg.source_gamma = v.get<double>("source_gamma");
             cfg.darks_path = v.get<std::string>("darks");
+            cfg.flats_path = v.get<std::string>("flats","");
+            cfg.dark_flats_path = v.get<std::string>("dark_flats","");
             cfg.auto_stretch = v.get<bool>("auto_stretch");
-            cfg.strech_low = v.get<double>("strech_low");
-            cfg.strech_high = v.get<double>("strech_high");
-            cfg.strech_gamma = v.get<double>("strech_gamma");
+            cfg.stretch_low = v.get<double>("stretch_low");
+            cfg.stretch_high = v.get<double>("stretch_high");
+            cfg.stretch_gamma = v.get<double>("stretch_gamma");
 
             if(!cfg.calibration)
                 cfg.output_path =  output_dir_ + "/" + cfg.name;

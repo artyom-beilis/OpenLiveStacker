@@ -4,6 +4,7 @@
 #include "sync_queue.h"
 #include "video_frame.h"
 #include "camera.h"
+#include "common_data.h"
 
 namespace ols {
     struct QueueData {
@@ -18,6 +19,13 @@ namespace ols {
         virtual ~ShutDownData() {}
     };
 
+    struct StatsData : public QueueData {
+        int stacked = 0;
+        int missed = 0;
+        int dropped = 0;
+        virtual ~StatsData() {}
+    };
+
     struct CameraFrame : public QueueData {
         CamStreamFormat format;
         CamBayerType bayer = bayer_na;
@@ -26,6 +34,8 @@ namespace ols {
         std::shared_ptr<VideoFrame> jpeg_frame;
         cv::Mat frame;
         cv::Mat processed_frame;
+        StretchInfo stretch;
+        int dropped = 0;
     };
 
     struct StackerControl : public QueueData {
@@ -53,8 +63,10 @@ namespace ols {
         double source_gamma = 1.0; /// to linear space gamma
 
         std::string darks_path; /// if darks applied darks frame
+        std::string flats_path;
+        std::string dark_flats_path;
         
         bool auto_stretch = true; /// stretch parameters
-        double strech_low=0,strech_high=1,strech_gamma=2.2;
+        double stretch_low=0.5,stretch_high=0.5,stretch_gamma=0.5;
     };
 }

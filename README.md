@@ -3,7 +3,7 @@
 ## Status
 
 - Early, alpha, runs on Linux, Android integration soon
-- Works with UVC Cameras
+- Works with UVC and ASI ZWO Cameras
 
 ## Roadmap
 
@@ -11,11 +11,12 @@
     - Implemented: Linux
     - In near future: Raspberry PI, Android, maybe windows
 - Camera
-    - Implemented: UVC Based like webcam, sv105
+    - Implemented
+        - UVC Based like webcam, sv105
+        - ASI ZWO support - initial 
     - Future extected drivers:
         - Watch directoy for files (universal integration with ekos)
         - Android camera
-        - ASI ZWO SDK (mostly for android and Linux likely as well)
         - INDI Library (for wide range of cameras)
 - Switch pure JS UI to better looking one
 - Integrate as Android App
@@ -29,6 +30,7 @@
 - cppcms 2.0 beta
 - OpenCV >= 3.2 core, imgproc, imgcodecs
 - C++11 enabled compiler
+- ASI ZWO SDK (optional) for ASI support
 
 Just run
 
