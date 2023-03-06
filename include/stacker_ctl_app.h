@@ -9,6 +9,8 @@
 #include <cppcms/url_dispatcher.h>
 #include <cppcms/service.h>
 #include <booster/log.h>
+
+#include "server_sent_events.h"
 #include "util.h"
 namespace ols {
     class StackerControlApp : public ControlAppBase {
@@ -129,6 +131,47 @@ namespace ols {
         std::string calibration_path_;
         queue_pointer_type queue_;
         std::string status_ = "idle";
+    };
+
+    class StackerStatsNotification: public cppcms::application {
+    public:
+        StackerStatsNotification(cppcms::service &srv):
+            cppcms::application(srv)
+        {
+            stream_ = sse::state_stream::create(srv.get_io_service());
+        }
+        void main(std::string /*url*/)
+        {
+            stream_->accept(release_context());
+        }
+        std::function<void(data_pointer_type)> get_callback()
+        {
+            booster::intrusive_ptr<StackerStatsNotification> self = this;
+            return [=](data_pointer_type p) {
+                std::shared_ptr<StatsData> data = std::dynamic_pointer_cast<StatsData>(p);
+                if(data) {
+                    self->stats_handler(data);
+                }
+            };
+        }
+        // thread safe method
+        void stats_handler(std::shared_ptr<StatsData> stats)
+        {
+            service().post([=](){
+                update_stats(stats);
+            });
+        }
+        void update_stats(std::shared_ptr<StatsData> data)
+        {
+            cppcms::json::value stats;
+            stats["stacked"] = data->stacked;
+            stats["missed"] = data->missed;
+            std::ostringstream ss;
+            ss << stats;
+            stream_->update(ss.str());
+        }
+    private:
+        std::shared_ptr<sse::state_stream> stream_;
     };
 };
 

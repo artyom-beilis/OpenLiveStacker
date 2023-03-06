@@ -85,6 +85,11 @@ namespace ols {
             }
         }
 
+
+        int total_count()
+        {
+            return total_count_;
+        }
         int stacked_count()
         {
             return fully_stacked_count_;
@@ -145,6 +150,7 @@ namespace ols {
         
         bool stack_image(cv::Mat frame,bool restart_position = false)
         {
+            total_count_ ++;
             if(exp_multiplier_ != 1) {
                 if(manual_exposure_counter_ == 0)
                     manual_frame_ = frame;
@@ -517,6 +523,7 @@ namespace ols {
 #endif        
 
         int frames_;
+        int total_count_ = 0;
         bool has_darks_;
         cv::Rect fully_stacked_area_;
         int fully_stacked_count_ = 0;

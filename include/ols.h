@@ -9,6 +9,7 @@
 
 namespace ols {
 
+    class StackerStatsNotification;
 
     class OpenLiveStacker : public CameraInterface {
     public:
@@ -56,6 +57,7 @@ namespace ols {
         queue_pointer_type stacker_queue_            = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type stack_display_queue_      = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type debug_save_queue_         = std::shared_ptr<queue_type>(new queue_type());
+        queue_pointer_type stacker_stats_queue_      = std::shared_ptr<queue_type>(new queue_type());
         
         std::recursive_mutex camera_lock_;
         std::unique_ptr<Camera> camera_;
@@ -70,6 +72,7 @@ namespace ols {
 
         booster::intrusive_ptr<VideoGeneratorApp> video_generator_app_;
         booster::intrusive_ptr<VideoGeneratorApp> stacked_video_generator_app_;
+        booster::intrusive_ptr<StackerStatsNotification> stats_stream_app_;
         
         std::thread video_generator_thread_;
         std::thread debug_save_thread_;

@@ -19,6 +19,11 @@ namespace ols {
         virtual ~ShutDownData() {}
     };
 
+    struct StatsData : public QueueData {
+        int stacked = 0;
+        int missed = 0;
+        virtual ~StatsData() {}
+    };
 
     struct CameraFrame : public QueueData {
         CamStreamFormat format;

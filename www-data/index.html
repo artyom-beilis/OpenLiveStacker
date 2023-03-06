@@ -50,6 +50,7 @@ var g_prev_high = -1;
 var g_prev_low = -1;
 var g_stacker_status = 'idle';
 var g_show_thumb_live = false;
+var g_stats = null;
 
 function parseRA(svalue)
 {
@@ -191,7 +192,8 @@ function changeStackerStatus(new_status)
         resume: false,
         save: false,
         live: false,
-        pp: false
+        pp: false,
+        stats: false
     };
     if(new_status == 'idle') {
         if(g_stacker_status != 'idle') {
@@ -204,6 +206,7 @@ function changeStackerStatus(new_status)
         ui_ctl.save=false;
         ui_ctl.pp=false;
         ui_ctl.live = false;
+        ui_ctl.stats = false;
     }
     else if(new_status =='stacking') {
         if(g_stacker_status == 'idle') {
@@ -215,6 +218,7 @@ function changeStackerStatus(new_status)
         ui_ctl.save = true;
         ui_ctl.pp = true;
         ui_ctl.live = true;
+        ui_ctl.stats = true;
     }
     else if(new_status == 'paused') {
         if(g_stacker_status == 'idle') {
@@ -226,6 +230,7 @@ function changeStackerStatus(new_status)
         ui_ctl.save = true;
         ui_ctl.pp = true;
         ui_ctl.live = true;
+        ui_ctl.stats = true;
     }
     else {
         alert('Internal error invalud status' + new_status);
@@ -234,9 +239,27 @@ function changeStackerStatus(new_status)
         var st = ui_ctl[name] ? 'inline' : 'none';
         document.getElementById('stacking_ui_' + name).style.display = st;
     }
+    if(ui_ctl.stats) {
+        if(!g_stats) {
+            g_stats = new EventSource("/api/updates");
+            g_stats.onmessage = (e) => {
+                updateStackerStats(e.data);
+            };
+        }
+    }
+    else {
+        if(g_stats) {
+            g_stats.close();
+            g_stats = null;
+        }
+    }
     g_stacker_status = new_status;
 }
 
+function updateStackerStats(e) {
+    var stats = JSON.parse(e);
+    document.getElementById('stats_info').innerHTML = stats.stacked + '/' + stats.missed;
+}
 
 function loadFormats()
 {
@@ -685,6 +708,9 @@ window.onresize = onResize;
 <div id='video' style="position:absolute; left:0; top:0; z-index:-2"></div>
 <div id='thumb' style="display:none; position:absolute; right:0; top:0; z-index:-1;">
     <span id="thumb_video"><span>
+</div>
+<div id='stacking_ui_stats' style="position:absolute; right:0; bottom:0; display:none;">
+    <span id="stats_info"></span>
 </div>
 <p id="open_camera"   style="display:inline" >Camera: <select id="camera_select"></select><button onclick="openCamera()">Open</button></p>
 <p id='std_controls' style="display:none;" >

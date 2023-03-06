@@ -41,6 +41,7 @@ add_library(ols SHARED
     src/tiffmat.cpp
     src/processors.cpp
     src/util.cpp
+    src/server_sent_events.cpp
     )
 
 add_library(ols_driver_sim SHARED src/sim_camera.cpp)

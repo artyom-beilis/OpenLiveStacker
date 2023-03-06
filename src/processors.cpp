@@ -178,9 +178,10 @@ namespace ols {
     
     class StackerProcessor {
     public:
-        StackerProcessor(queue_pointer_type in,queue_pointer_type out,std::string data_dir) :
+        StackerProcessor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,std::string data_dir) :
             in_(in),
             out_(out),
+            stats_(stats),
             data_dir_(data_dir)
         {
         }
@@ -322,11 +323,13 @@ namespace ols {
         std::shared_ptr<CameraFrame> handle_video(std::shared_ptr<CameraFrame> video)
         {
             std::shared_ptr<CameraFrame> res;
+            std::shared_ptr<StatsData> stats(new StatsData());
 		    auto start = std::chrono::high_resolution_clock::now();
             try {
                 if(calibration_) {
                     cframe_ +=  video->processed_frame;
                     cframe_count_ ++;
+                    stats->stacked = cframe_count_;
                     res = video;
                     auto end = std::chrono::high_resolution_clock::now();
                     double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
@@ -351,7 +354,11 @@ namespace ols {
                         double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
                         BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms";
                     }
+                    stats->stacked = stacker_->stacked_count();
+                    stats->missed  = stacker_->total_count() - stats->stacked;
                 }
+                if(stats_)
+                    stats_->push(stats);
             }
             catch(std::exception const &e) {
                 BOOSTER_ERROR("stacker") << "Stacking Failed:" << e.what();
@@ -421,6 +428,10 @@ namespace ols {
                 }
                 if(out_)
                     out_->push(generate_dummy_frame());
+                if(stats_) {
+                    std::shared_ptr<StatsData> stats(new StatsData());
+                    stats_->push(stats);
+                }
                 break;
             case StackerControl::ctl_pause:
                 restart_ = true;
@@ -452,7 +463,7 @@ namespace ols {
             }
         }
     private:
-        queue_pointer_type in_,out_;
+        queue_pointer_type in_,out_,stats_;
         std::string data_dir_;
         int width_,height_;
         bool calibration_=false;
@@ -463,9 +474,9 @@ namespace ols {
         bool restart_;
     };
 
-    std::thread start_stacker(queue_pointer_type in,queue_pointer_type out,std::string data_dir)
+    std::thread start_stacker(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,std::string data_dir)
     {
-        std::shared_ptr<StackerProcessor> p(new StackerProcessor(in,out,data_dir));
+        std::shared_ptr<StackerProcessor> p(new StackerProcessor(in,out,stats,data_dir));
         return std::thread([=]() { p->run(); });
     }
 
