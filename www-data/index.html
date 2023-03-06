@@ -38,6 +38,7 @@ var global_width = 0;
 var global_height = 0;
 var g_prev_high = -1;
 var g_prev_low = -1;
+var g_stacker_status = 'idle';
 
 function parseRA(svalue)
 {
@@ -163,16 +164,63 @@ function checkOpenStatus(st)
         global_height = st.height;
         loadFormats();
         loadControls();
+        showConfig(false);
         showLiveVideo();
-        restCall('get','/api/stacker/status',null,checkStackerStatus)
+        restCall('get','/api/stacker/status',null, (d)=> {
+            changeStackerStatus(d.status);
+        });
     }
 }
-function checkStackerStatus(st)
+
+function changeStackerStatus(new_status)
 {
-    if(st.status == 'idle')
-        return;
-    showStackedVideo(true);
+    var ui_ctl = {
+        stack: true,
+        pause: false,
+        resume: false,
+        save: false,
+        pp: false
+    };
+    if(new_status == 'idle') {
+        if(g_stacker_status != 'idle') {
+            showLiveVideo();
+        }
+        ui_ctl.stack = true;
+        ui_ctl.pause = false;
+        ui_ctl.resume = false;
+        ui_ctl.save=false;
+        ui_ctl.pp=false;
+    }
+    else if(new_status =='stacking') {
+        if(g_stacker_status == 'idle') {
+            showStackedVideo(true);
+        }
+        ui_ctl.stack = false;
+        ui_ctl.pause = true;
+        ui_ctl.resume = false;
+        ui_ctl.save = true;
+        ui_ctl.pp = true;
+    }
+    else if(new_status == 'paused') {
+        if(g_stacker_status == 'idle') {
+            showStackedVideo(true);
+        }
+        ui_ctl.stack = false;
+        ui_ctl.pause = false;
+        ui_ctl.resume = true;
+        ui_ctl.save = true;
+        ui_ctl.pp = true;
+    }
+    else {
+        alert('Internal error invalud status' + new_status);
+    }
+    for(var name in ui_ctl) {
+        var st = ui_ctl[name] ? 'inline' : 'none';
+        document.getElementById('stacking_ui_' + name).style.display = st;
+    }
+    g_stacker_status = new_status;
 }
+
 
 function loadFormats()
 {
@@ -214,14 +262,13 @@ function updateBoolControl(optid,value)
 function updateNumControl(optid)
 {
     var val = document.getElementById('control_opt_' + optid).value;
-    console.log("Value " + val)
     val = parseFloat(val);
     updateControl(optid,val);
     return false;
 }
 
 
-function prepareControns(ctls)
+function prepareControls(ctls)
 {
     var controls = document.getElementById('cam_controls');
     var controls_str = ''
@@ -249,12 +296,11 @@ function prepareControns(ctls)
         controls_str += '<tr>' + control_str + '</tr>\n';
     }
     controls.innerHTML = controls_str;
-    console.log(controls_str);
 }
 
 function loadControls()
 {
-    restCall('get','/api/camera/options',null,prepareControns);
+    restCall('get','/api/camera/options',null,prepareControls);
 }
 
 function calcImgSize()
@@ -274,7 +320,6 @@ function calcImgSize()
         img_H = W/w2h;
         p_top = (H - img_H) / 2;
     }
-    console.log(JSON.stringify({cw:W,ch:H,iw:global_width,ih:global_height,fw:img_W,fh:img_H}));
     return [img_W,img_H,p_left,p_top]
 }
 
@@ -356,6 +401,7 @@ function startStream()
         global_width = r.width;
         global_height = r.height;
         showLiveVideo();
+        changeStackerStatus('idle');
     });
     showConfig(false);
 }
@@ -375,7 +421,6 @@ function showPP(v)
 
 function showConfig(v)
 {
-    console.log('CONFIG ' + v)
 	document.getElementById('config').style.display = v ? 'inline' : 'none';
 }
 
@@ -398,7 +443,13 @@ function ctlStack(status)
 {
     restCall('post','/api/stacker/control',{operation:status},(s)=> {
         if(status == 'save') {
-            showStackedVideo(false);
+            changeStackerStatus('idle');
+        }
+        else if(status == 'resume') {
+            changeStackerStatus('stacking');
+        }
+        else if(status =='pause') {
+            changeStackerStatus('paused');
         }
     });
 }
@@ -480,7 +531,6 @@ function updatePP()
     setPPVal('low',config.stretch_low);
     setPPVal('high',config.stretch_high);
     setPPVal('gamma',config.stretch_gamma);
-    console.log(config)
     restCall('post','/api/stacker/stretch',config,(e)=>{
     });
 }
@@ -558,9 +608,8 @@ function startStack()
         flats : flats,
         dark_flats : dark_flats
     };
-    console.log(config)
     restCall('post','/api/stacker/start',config,(e)=>{
-        showStackedVideo(true);
+        changeStackerStatus('stacking');
         showStack(false);
     });
 }
@@ -588,11 +637,11 @@ window.onresize = onResize;
 <p id="open_camera"   style="display:inline" >Camera: <select id="camera_select"></select><button onclick="openCamera()">Open</button></p>
 <p id='std_controls' style="display:none;" >
     <button class="comp_but settings_background" onclick="showConfig(true);">&nbsp;</button>
-    <button class="comp_but" onclick="showStack(true);">S</button>
-    <button class="comp_but" onclick="ctlStack('pause');">&#x23F8;</button>
-    <button class="comp_but" onclick="ctlStack('resume');">&#x23F5;</button>
-    <button class="comp_but" onclick="ctlStack('save');" >&#x1F4BE;</button>
-    <button class="comp_but" onclick="showPP(true);" >P</button>
+    <button style="display:none" id="stacking_ui_stack" class="comp_but" onclick="showStack(true);">≡</button>
+    <button style="display:none" id="stacking_ui_pause" class="comp_but" onclick="ctlStack('pause');">&#x23F8;</button>
+    <button style="display:none" id="stacking_ui_resume" class="comp_but" onclick="ctlStack('resume');">&#x23F5;</button>
+    <button style="display:none" id="stacking_ui_save" class="comp_but" onclick="ctlStack('save');" >&#x23F9;</button>
+    <button style="display:none" id="stacking_ui_pp" class="comp_but" onclick="showPP(true);" >[-]</button>
 </p>
 <div class="config_div" id="stack" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
     <span style="position:absolute; right:1mm; top:1mm">
