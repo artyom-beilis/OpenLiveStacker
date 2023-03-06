@@ -66,6 +66,7 @@ namespace ols {
         CamStreamFormat current_format_;
 
         int dropped_ = 0;
+        int dropped_since_last_update_ = 0;
 
         std::string data_dir_;
         std::string debug_dir_;

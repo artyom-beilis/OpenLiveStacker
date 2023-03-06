@@ -123,6 +123,7 @@ void OpenLiveStacker::init(std::string driver_name)
 void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
 {
     if(video_generator_queue_->items > 20) {
+        dropped_since_last_update_ ++;
         BOOSTER_WARNING("stacker") << "Processing is overloaded, dropping frame #" << (++dropped_);
         return;
     }
@@ -133,6 +134,8 @@ void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
     frame->bayer = cf.bayer;
     frame->timestamp = cf.unix_timestamp;
     frame->source_frame = std::shared_ptr<VideoFrame>(new VideoFrame(cf.data,cf.data_size));
+    frame->dropped = dropped_since_last_update_;
+    dropped_since_last_update_ = 0;
     video_generator_queue_->push(frame);
 }
 void OpenLiveStacker::run()

@@ -326,6 +326,8 @@ namespace ols {
             std::shared_ptr<StatsData> stats(new StatsData());
 		    auto start = std::chrono::high_resolution_clock::now();
             try {
+                dropped_count_ += video->dropped;
+                stats->dropped = dropped_count_;
                 if(calibration_) {
                     cframe_ +=  video->processed_frame;
                     cframe_count_ ++;
@@ -415,6 +417,7 @@ namespace ols {
                 calibration_ = ctl->calibration;
                 output_path_ = ctl->output_path;
                 name_ = ctl->name;
+                dropped_count_ = 0;
                 stacker_.reset();
                 if(calibration_) {
                     cframe_ = cv::Mat(height_,width_,CV_32FC3);
@@ -470,6 +473,7 @@ namespace ols {
         std::string output_path_,name_;
         cv::Mat cframe_;
         int cframe_count_;
+        int dropped_count_ = 0;
         std::unique_ptr<Stacker> stacker_;
         bool restart_;
     };

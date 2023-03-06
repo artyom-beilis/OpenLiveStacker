@@ -258,7 +258,7 @@ function changeStackerStatus(new_status)
 
 function updateStackerStats(e) {
     var stats = JSON.parse(e);
-    document.getElementById('stats_info').innerHTML = stats.stacked + '/' + stats.missed;
+    document.getElementById('stats_info').innerHTML = stats.stacked + '/' + stats.missed + '/' + stats.dropped;
 }
 
 function loadFormats()

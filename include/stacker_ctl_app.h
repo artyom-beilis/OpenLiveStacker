@@ -166,6 +166,7 @@ namespace ols {
             cppcms::json::value stats;
             stats["stacked"] = data->stacked;
             stats["missed"] = data->missed;
+            stats["dropped"] = data->dropped;
             std::ostringstream ss;
             ss << stats;
             stream_->update(ss.str());

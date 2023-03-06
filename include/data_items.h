@@ -22,6 +22,7 @@ namespace ols {
     struct StatsData : public QueueData {
         int stacked = 0;
         int missed = 0;
+        int dropped = 0;
         virtual ~StatsData() {}
     };
 
@@ -34,6 +35,7 @@ namespace ols {
         cv::Mat frame;
         cv::Mat processed_frame;
         StretchInfo stretch;
+        int dropped = 0;
     };
 
     struct StackerControl : public QueueData {
