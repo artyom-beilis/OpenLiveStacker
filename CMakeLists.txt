@@ -8,11 +8,28 @@ option(OPENCV_ROOT "Path to OpenCV Library" "")
 find_library(ASI_CAMERA_LIB ASICamera2)
 find_path(ASI_CAMERA_HDR ASICamera2.h)
 
+find_library(LIBTIFF tiff)
+find_library(LIBCPPCMS cppcms)
+find_library(LIBBOOSTER booster)
+find_library(LIBUVC uvc)
+
+set(OLS_EXTRA )
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
+    set(OLS_EXTRA src/android_main.cpp)
+    set(ANDROID_BUILD ON)
+    add_definitions(-DANDROID_SUPPORT)
+    find_library(LIBUSB usb1.0)
+else()
+    set(ANDROID_BUILD OFF)
+endif()
+
+
 if(OPENCV_ROOT)
-    find_library(OPENCV_CORE        opencv_core      HINTS ${OPENCV_ROOT}/lib/ NO_DEFAULT_PATH)
-    find_library(OPENCV_IMGPROC     opencv_imgproc   HINTS ${OPENCV_ROOT}/lib/ NO_DEFAULT_PATH)
-    find_library(OPENCV_IMGCODECS   opencv_imgcodecs HINTS ${OPENCV_ROOT}/lib/ NO_DEFAULT_PATH)
-    find_path(OPENCV_INC opencv2/core.hpp HINTS ${OPENCV_ROOT}/include/opencv4;${OPENCV_ROOT}/include NO_DEFAULT_PATH )
+    message("Searching lib in ${OPENCV_ROOT}")
+    find_library(OPENCV_CORE        opencv_core      PATHS ${OPENCV_ROOT}/lib/ NO_DEFAULT_PATH)
+    find_library(OPENCV_IMGPROC     opencv_imgproc   PATHS ${OPENCV_ROOT}/lib/ NO_DEFAULT_PATH)
+    find_library(OPENCV_IMGCODECS   opencv_imgcodecs PATHS ${OPENCV_ROOT}/lib/ NO_DEFAULT_PATH)
+    find_path(OPENCV_INC opencv2/core.hpp PATHS ${OPENCV_ROOT}/include/opencv4;${OPENCV_ROOT}/include NO_DEFAULT_PATH )
 else()
     find_library(OPENCV_CORE        opencv_core      )
     find_library(OPENCV_IMGPROC     opencv_imgproc   )
@@ -22,17 +39,19 @@ endif()
 
 include_directories(${OPENCV_INC})
 
-add_library(ols_driver_uvc SHARED src/uvc_camera.cpp)
-target_link_libraries(ols_driver_uvc uvc)
 
 if(ASI_CAMERA_HDR AND ASI_CAMERA_LIB)
     include_directories(${ASI_CAMERA_HDR})
     add_library(ols_driver_asi SHARED src/asi_camera.cpp)
     target_link_libraries(ols_driver_asi ${ASI_CAMERA_LIB})
+    install(TARGETS ols_driver_asi
+            LIBRARY DESTINATION lib
+    )
     message("- Building ASI Driver")
 else()
     message("- No ASI SDK header/lib found")
 endif()
+
 
 add_library(ols SHARED 
     src/camera.cpp 
@@ -44,16 +63,34 @@ add_library(ols SHARED
     src/server_sent_events.cpp
     )
 
-add_library(ols_driver_sim SHARED src/sim_camera.cpp)
-target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
+target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
 
-target_link_libraries(ols dl tiff cppcms booster ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
-add_executable(test_camera test/test_camera.cpp)
-add_executable(ols_cmd test/ols_cmd.cpp)
-add_executable(offline_ols test/offline_sim.cpp)
-target_link_libraries(test_camera ols)
-target_link_libraries(ols_cmd ols)
-target_link_libraries(offline_ols ols)
+add_library(ols_driver_uvc SHARED src/uvc_camera.cpp)
+target_link_libraries(ols_driver_uvc ols ${LIBUVC})
+if(ANDROID_BUILD)
+    target_link_libraries(ols_driver_uvc ${LIBUSB})
+endif()
+install(TARGETS ols ols_driver_uvc
+            RUNTIME DESTINATION bin
+            LIBRARY DESTINATION lib
+)
+
+if(NOT ANDROID_BUILD)
+    add_library(ols_driver_sim SHARED src/sim_camera.cpp)
+    target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
+
+    add_executable(test_camera test/test_camera.cpp)
+    add_executable(ols_cmd test/ols_cmd.cpp)
+    add_executable(offline_ols test/offline_sim.cpp)
+    target_link_libraries(test_camera ols)
+    target_link_libraries(ols_cmd ols)
+    target_link_libraries(offline_ols ols)
+    install(TARGETS ols_driver_sim ols_cmd offline_ols
+            RUNTIME DESTINATION bin
+            LIBRARY DESTINATION lib
+    )
+endif()
+
 add_custom_command(TARGET ols POST_BUILD
     COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/make_db.py ${CMAKE_CURRENT_SOURCE_DIR}/www-data/media/js/jsdb.js
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

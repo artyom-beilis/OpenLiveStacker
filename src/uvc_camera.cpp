@@ -449,7 +449,7 @@ namespace ols {
         std::vector<int> name_to_device_;
     };
 #ifdef ANDROID_SUPPORT
-    class AndroidUVCCameraDriver {
+    class AndroidUVCCameraDriver  : public CameraDriver{
     public:
         static bool usb_option_set;
         AndroidUVCCameraDriver(int fd) 
@@ -457,7 +457,7 @@ namespace ols {
             if(!usb_option_set) {
                 int r = libusb_set_option(NULL,LIBUSB_OPTION_NO_DEVICE_DISCOVERY, NULL);
                 if(r < 0)
-i                   throw UVCError("Failed to set no discovery option");
+                    throw UVCError("Failed to set no discovery option");
                 usb_option_set=true;
             }
             uvc_error_t res = uvc_init(&ctx_,nullptr);
@@ -479,8 +479,10 @@ i                   throw UVCError("Failed to set no discovery option");
         {
             if(id != 0)
                 throw UVCError("Invalid device number");
-            uvc_device_handle_t devh = nullptr;
-            uvc_error_t res = uvc_wrap(fd_,ctx_,&devh_);
+            uvc_device_handle_t *devh = nullptr;
+            uvc_error_t res = uvc_wrap(fd_,ctx_,&devh);
+            if(res < 0)
+                throw UVCError("Failed to wrap fd",res);
             std::unique_ptr<Camera> camera(new UVCCamera(devh,"camera_0"));
             return camera;
         }
@@ -488,7 +490,7 @@ i                   throw UVCError("Failed to set no discovery option");
     private:
 
         int fd_;
-        uvc_context_t ctx_;
+        uvc_context_t *ctx_;
     };
 
     bool AndroidUVCCameraDriver::usb_option_set;
