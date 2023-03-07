@@ -6,11 +6,21 @@
     <title>OpenLiveStacker</title>
 </head>
 <style>
+    html {
+        overflow: scroll;
+        overflow-x: hidden;
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none;
+    }
+    ::-webkit-scrollbar {
+        width: 0;
+    }
     body, td { font-size: 5mm ; color:red ; font-family: sans; background-color:black }
     a:link {color: red;}
     a:visited { color: red; }
     a:active { color:red; }
     a:hover { color:red; }
+    img { padding:0; margin:0; }
     button { border-radius:2mm; height:10mm; font-size:5mm ; text-align:center; vertical-align: middle; background-color:black; color:red; border: 2px solid red }
     .slider { width: 100%; }
     .slider_elem { background-color: transparent; }
@@ -40,8 +50,8 @@
         margin:0;
     }
 </style>
-<body>
 <script src="/media/js/jsdb.js"></script>
+<body>
 <script>
 
 var global_width = 0;
@@ -697,6 +707,16 @@ function updateRADE(name)
     document.getElementById('stack_de').value = coord[1];
 }
 
+function toggleFS(fs)
+{
+    if(fs) {
+        document.documentElement.requestFullscreen({navigationUI:'hide'});
+    }
+    else {
+        document.exitFullscreen();
+    }
+}
+
 window.onload = (event) => {
   run();
 };
@@ -780,6 +800,7 @@ window.onresize = onResize;
         <button class="incdec_but" onclick="showConfig(false);">X</button>
     </span>
     <p>Format: <select id="stream_format"></select><button onclick="startStream()" >Stream</button></p>
+    <p><label for="FS_checked">Full screen</label><input id="FS_checked" type="checkbox" onchange="toggleFS(this.checked)" ></p>
     <table>
     <thead>
         <tr>
