@@ -25,6 +25,10 @@
     .slider { width: 100%; }
     .slider_elem { background-color: transparent; }
     .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
+    .stretch_background {
+        background: url(/media/img/stretch.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
     .settings_background {
         background: url(/media/img/settings.png) no-repeat center center;
         background-size: 10mm 10mm;
@@ -170,6 +174,16 @@ function listCameras(cameras)
         sel.add(option)
     }
     restCall("get","/api/camera/status",null,checkOpenStatus);
+}
+
+function updateStackSelect()
+{
+    var type = getVal('type');
+    var elements = document.getElementsByClassName('dso_config');
+    var new_style = type == 'dso' ? '' : 'none';
+    for(var i=0;i<elements.length;i++) {
+        elements[i].style.display = new_style;
+    }
 }
 
 function checkOpenStatus(st)
@@ -650,7 +664,8 @@ function startStack()
     var name = getVal('name').trim();
     var obj = getVal('object').trim();
 
-    var calib = getBVal("calibration");
+    var type = getVal('type');
+    var calib = type != 'dso';
     if(!calib) {
         if(name == '')
             name = obj;
@@ -677,7 +692,7 @@ function startStack()
         stretch_low:        getPVal('stretch_low'),
         stretch_high:       getPVal('stretch_high'),
         stretch_gamma:      getPVal('stretch_gamma'),
-        type:               calib ? "calibration" : "dso",
+        type:               type,
         location : {
             lat:            lat,
             lon:            lon,
@@ -739,7 +754,7 @@ window.onresize = onResize;
     <button style="display:none" id="stacking_ui_pause" class="comp_but" onclick="ctlStack('pause');">&#x23F8;</button>
     <button style="display:none" id="stacking_ui_resume" class="comp_but" onclick="ctlStack('resume');">&#x23F5;</button>
     <button style="display:none" id="stacking_ui_save" class="comp_but" onclick="ctlStack('save');" >&#x23F9;</button>
-    <button style="display:none" id="stacking_ui_pp" class="comp_but" onclick="showPP(true);" >[-]</button>
+    <button style="display:none" id="stacking_ui_pp" class="comp_but stretch_background" onclick="showPP(true);" >&nbsp;</button>
     <button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
 </p>
 <div class="config_div" id="stack" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
@@ -748,17 +763,25 @@ window.onresize = onResize;
     </span>
     <table>
     <tr><td>Name</td><td><input id="stack_name" type="text" value="" ></td><td>&nbsp;</td></tr>
-    <tr><td>Calibrate</td><td><input id="stack_calibration" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr><td>Save</td><td><input id="stack_save_data" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr><td>Derotate</td><td><input id="stack_field_derotation" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr><td>Derotate Mirror</td><td><input id="stack_image_flip" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr><td>Object ID</td><td><input oninput="updateRADE(this.value)" id="stack_object" type="text" value="" ></td><td>for example: M31, NGC457</td></tr>
-    <tr><td>Target</td><td>RA:<input id="stack_ra" type="text" ></td><td>DE:<input id="stack_de" type="text" ></td></tr>
-    <tr><td>Geolocation</td><td>Lat:<input id="stack_lat" type="text" ></td><td>Lon:<input id="stack_lon" type="text" ></td></tr>
-    <tr><td>Darks</td><td><select id="stack_darks"></select></td><td>&nbsp;</td></tr>
-    <tr><td>Flats</td><td><select id="stack_flats"></select></td><td>&nbsp;</td></tr>
-    <tr><td>Dark Flats</td><td><select id="stack_dark_flats"></select></td><td>&nbsp;</td></tr>
-    <tr><td><button onclick='startStack();'>Start</button></td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr>
+        <td>Stacking</td>
+        <td>
+        <select id="stack_type" onchange='updateStackSelect()'>
+           <option value="dso" selected>Deep Space Object</option>
+           <option value="calibration">Calibration Frame</option> 
+        </select>
+        <td>&nbsp;</td>
+    </tr>
+    <tr class="dso_config stack_opt" ><td>Derotate</td><td><input id="stack_field_derotation" type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr class="dso_config stack_opt" ><td>Derotate Mirror</td><td><input id="stack_image_flip" type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr class="dso_config stack_opt" ><td>Object ID</td><td><input oninput="updateRADE(this.value)" id="stack_object" type="text" value="" ></td><td>for example: M31, NGC457</td></tr>
+    <tr class="dso_config stack_opt" ><td>Target</td><td>RA:<input id="stack_ra" type="text" ></td><td>DE:<input id="stack_de" type="text" ></td></tr>
+    <tr class="dso_config stack_opt" ><td>Geolocation</td><td>Lat:<input id="stack_lat" type="text" ></td><td>Lon:<input id="stack_lon" type="text" ></td></tr>
+    <tr class="dso_config stack_opt" ><td>Darks</td><td><select id="stack_darks"></select></td><td>&nbsp;</td></tr>
+    <tr class="dso_config stack_opt" ><td>Flats</td><td><select id="stack_flats"></select></td><td>&nbsp;</td></tr>
+    <tr class="dso_config stack_opt" ><td>Dark Flats</td><td><select id="stack_dark_flats"></select></td><td>&nbsp;</td></tr>
+    <tr class="stack_opt" ><td>Save Debug</td><td><input id="stack_save_data" type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr class="stack_opt" ><td><button onclick='startStack();'>Start</button></td><td>&nbsp;</td><td>&nbsp;</td></tr>
     </table>
 </div>
 <div class="config_div" id="pp_control" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background-color: transparent; border: 1px solid red ">
