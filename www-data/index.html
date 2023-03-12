@@ -3,6 +3,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta charset="UTF-8">
+    <link rel="icon" type="image/x-icon" href="/media/img/facicon.png" >
     <title>OpenLiveStacker</title>
 </head>
 <style>
@@ -27,6 +28,18 @@
     .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
     .stretch_background {
         background: url(/media/img/stretch.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
+    .pause_background {
+        background: url(/media/img/pause.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
+    .resume_background {
+        background: url(/media/img/resume.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
+    .save_background {
+        background: url(/media/img/save.png) no-repeat center center;
         background-size: 10mm 10mm;
     }
     .settings_background {
@@ -751,9 +764,9 @@ window.onresize = onResize;
 <p id='std_controls' style="display:none;" >
     <button class="comp_but settings_background" onclick="showConfig(true);">&nbsp;</button>
     <button style="display:none" id="stacking_ui_stack" class="comp_but" onclick="showStack(true);">≡</button>
-    <button style="display:none" id="stacking_ui_pause" class="comp_but" onclick="ctlStack('pause');">&#x23F8;</button>
-    <button style="display:none" id="stacking_ui_resume" class="comp_but" onclick="ctlStack('resume');">&#x23F5;</button>
-    <button style="display:none" id="stacking_ui_save" class="comp_but" onclick="ctlStack('save');" >&#x23F9;</button>
+    <button style="display:none" id="stacking_ui_pause" class="comp_but pause_background" onclick="ctlStack('pause');">&nbsp;</button>
+    <button style="display:none" id="stacking_ui_resume" class="comp_but resume_background" onclick="ctlStack('resume');">&nbsp;</button>
+    <button style="display:none" id="stacking_ui_save" class="comp_but save_background" onclick="ctlStack('save');" >&nbsp;</button>
     <button style="display:none" id="stacking_ui_pp" class="comp_but stretch_background" onclick="showPP(true);" >&nbsp;</button>
     <button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
 </p>
