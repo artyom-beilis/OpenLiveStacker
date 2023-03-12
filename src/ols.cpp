@@ -8,6 +8,7 @@
 #include "stacker_ctl_app.h"
 #include "processors.h"
 
+
 namespace ols {
 OpenLiveStacker::OpenLiveStacker(std::string data_dir)
 {
@@ -96,8 +97,12 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     config["service"]["port"]=http_port;
     config["service"]["ip"] = http_ip;
     config["service"]["worker_threads"] = 3;
+#ifdef ANDROID_SUPPORT
+    config["service"]["disable_global_exit_handling"] = true;
+#else
     // change for service
     config["service"]["disable_global_exit_handling"] = false;
+#endif    
     config["file_server"]["enable"]=true;
     config["file_server"]["document_root"]=document_root;
     config["file_server"]["alias"][0]["url"] = "/data";

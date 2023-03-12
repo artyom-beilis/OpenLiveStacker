@@ -137,7 +137,7 @@ namespace ols {
     /// Base class for driver to implement
     class CameraDriver {
     public:
-        static void load_driver(std::string const &name,std::string base_path="");
+        static void load_driver(std::string const &name,std::string base_path="",char const *option = nullptr);
         /// list supported drivers
         static std::vector<std::string> drivers();
         /// get driver - by its order in the \a drivers result

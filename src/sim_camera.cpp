@@ -24,6 +24,7 @@ namespace ols {
     public:
         SIMCamera(std::string const &dir) : dir_(dir)
         {
+            stream_active_ = 0;
             load_frames();
         }
 
@@ -224,7 +225,7 @@ namespace ols {
         virtual CamParam get_parameter(CamOptionId id,bool /*current_only = false*/) 
         {
             if(id != opt_exp)
-                throw SIMError("Unimplemented");
+                throw SIMError("Unimplemented: " + cam_option_id_to_name(id));
             CamParam r;
             memset(&r,0,sizeof(r));
             r.option = opt_exp;
@@ -266,6 +267,7 @@ namespace ols {
 
 
     class SIMCameraDriver : public CameraDriver {
+    public:
         virtual std::vector<std::string> list_cameras() 
         {
             return std::vector<std::string>{"sim"};
@@ -274,17 +276,24 @@ namespace ols {
         {
             if(id!=0)
                 throw SIMError("No such camera " + std::to_string(id));
-            std::string dir = "./sim";
+            std::string dir = data_dir;
             char *dir_override = getenv("OLS_SIM_DIR");
             if(dir_override)
                 dir = dir_override;
             std::unique_ptr<Camera> cam(new SIMCamera(dir));
             return cam;
         }
+        static std::string data_dir;
     };
+    std::string SIMCameraDriver::data_dir = "./sim";
 }
 
 extern "C" {
+    int ols_set_sim_driver_config(char const *str)
+    {
+        ols::SIMCameraDriver::data_dir = str;
+        return 0;
+    }
     ols::CameraDriver *ols_get_sim_driver(int )
     {
         return new ols::SIMCameraDriver();

@@ -18,7 +18,16 @@ int main(int argc,char **argv)
         if(argc >= 3)
             path = argv[2];
 
-        ols::CameraDriver::load_driver(driver,path);
+        char const *driver_opt_ptr = nullptr;
+        std::string driver_opt;
+        size_t pos;
+        if((pos=driver.find(':'))!=std::string::npos) {
+            driver_opt = driver.substr(pos+1);
+            driver_opt_ptr = driver_opt.c_str();
+            driver=driver.substr(0,pos);
+        }
+
+        ols::CameraDriver::load_driver(driver,path,driver_opt_ptr);
         ols::OpenLiveStacker stacker;
         stacker.init(driver);
         stacker.run();

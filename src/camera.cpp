@@ -1,18 +1,22 @@
 #include "camera.h"
 #include <dlfcn.h>
+#include <algorithm>
 
 extern "C" typedef ols::CameraDriver *(*cam_generator_ptr_type)(int);
+extern "C" typedef int (*cam_config_ptr_type)(char const *);
 
 namespace ols {
 
 static std::vector<std::string> driver_names;
 static std::vector<cam_generator_ptr_type> driver_calls;
 
-void CameraDriver::load_driver(std::string const &name,std::string base_path)
+void CameraDriver::load_driver(std::string const &name,std::string base_path,char const *opt)
 {
+    if(std::find(driver_names.begin(),driver_names.end(),name) != driver_names.end())
+        return;
     if(!base_path.empty())
         base_path += "/";
-    void *h = dlopen((base_path + "libols_driver_" + name + ".so").c_str(),RTLD_LAZY);
+    void *h = dlopen((base_path + "libols_driver_" + name + ".so").c_str(),RTLD_LAZY | RTLD_GLOBAL);
     if(!h)
         throw CamError("Failed to load driver " + name);
     void *func = dlsym(h,("ols_get_" + name + "_driver").c_str());
@@ -20,6 +24,17 @@ void CameraDriver::load_driver(std::string const &name,std::string base_path)
         dlclose(h);
         throw CamError("Failed to find driver entry for " + name);
     }
+    if(opt) {
+        void *opt_func = dlsym(h,("ols_set_" + name + "_driver_config").c_str());
+        if(!opt_func) {
+            dlclose(h);
+            throw CamError("Failed to find driver config entry for " + name);
+        }
+        cam_config_ptr_type config = reinterpret_cast<cam_config_ptr_type>(opt_func);
+        if(config(opt)!=0)
+            throw CamError("Failed to config driver for " + name);
+    }
+
     driver_calls.insert(driver_calls.begin(),reinterpret_cast<cam_generator_ptr_type>(func));
     driver_names.insert(driver_names.begin(),name);
 }

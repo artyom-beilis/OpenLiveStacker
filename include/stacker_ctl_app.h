@@ -87,6 +87,7 @@ namespace ols {
             else {
                 cmd->output_path = calibration_path_;
             }
+            BOOSTER_INFO("OLS") << "Getting gamma if needed";
             try {
                 if(format.format == stream_mjpeg || format.format == stream_yuv2) { 
                     std::unique_lock<std::recursive_mutex> guard(cam_->lock());
@@ -95,7 +96,7 @@ namespace ols {
                 else
                     cmd->source_gamma = 1.0;
             }
-            catch(CamError const &) {
+            catch(std::exception const &) {
                 cmd->source_gamma = 1.0;
             }
             cmd->lat = content_.get("location.lat",cmd->lat);

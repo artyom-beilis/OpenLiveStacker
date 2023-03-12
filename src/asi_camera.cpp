@@ -52,6 +52,7 @@ namespace ols {
         /// for Android
         ASICamera(int id)
         {
+            stream_active_ = 0;
             ASI_ERROR_CODE code = ASIGetCameraPropertyByID(id,&info_);
             if(code != ASI_SUCCESS)
                 throw ASIError("Failed to access camera",code);

@@ -3,6 +3,7 @@ project(OpenLiveStacker)
 
 include_directories(include)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2 -g")
+set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -Wl,--export-dynamic")
 option(OPENCV_ROOT "Path to OpenCV Library" "")
 
 find_library(ASI_CAMERA_LIB ASICamera2)
@@ -61,23 +62,29 @@ add_library(ols SHARED
     src/processors.cpp
     src/util.cpp
     src/server_sent_events.cpp
+    ${OLS_EXTRA}
     )
 
 target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
+if(ANDROID_BUILD)
+    target_link_libraries(ols log)
+endif()
 
 add_library(ols_driver_uvc SHARED src/uvc_camera.cpp)
 target_link_libraries(ols_driver_uvc ols ${LIBUVC})
 if(ANDROID_BUILD)
     target_link_libraries(ols_driver_uvc ${LIBUSB})
 endif()
-install(TARGETS ols ols_driver_uvc
+
+add_library(ols_driver_sim SHARED src/sim_camera.cpp)
+target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
+
+install(TARGETS ols ols_driver_uvc ols_driver_sim
             RUNTIME DESTINATION bin
             LIBRARY DESTINATION lib
 )
 
 if(NOT ANDROID_BUILD)
-    add_library(ols_driver_sim SHARED src/sim_camera.cpp)
-    target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
 
     add_executable(test_camera test/test_camera.cpp)
     add_executable(ols_cmd test/ols_cmd.cpp)
