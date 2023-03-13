@@ -70,16 +70,24 @@ if(ANDROID_BUILD)
     target_link_libraries(ols log)
 endif()
 
-add_library(ols_driver_uvc SHARED src/uvc_camera.cpp)
-target_link_libraries(ols_driver_uvc ols ${LIBUVC})
-if(ANDROID_BUILD)
-    target_link_libraries(ols_driver_uvc ${LIBUSB})
+if(LIBUVC)
+    add_library(ols_driver_uvc SHARED src/uvc_camera.cpp)
+    target_link_libraries(ols_driver_uvc  ${LIBUVC})    
+    if(ANDROID_BUILD)   
+        target_link_libraries(ols_driver_uvc ${LIBUSB})
+    endif()
+    message("- Building UVC Driver")
+    install(TARGETS ols_driver_uvc
+            LIBRARY DESTINATION lib
+    )
+else()
+    message("- No libuvc, skipping UVC Driver")
 endif()
 
 add_library(ols_driver_sim SHARED src/sim_camera.cpp)
 target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
 
-install(TARGETS ols ols_driver_uvc ols_driver_sim
+install(TARGETS ols ols_driver_sim
             RUNTIME DESTINATION bin
             LIBRARY DESTINATION lib
 )
