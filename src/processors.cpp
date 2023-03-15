@@ -10,10 +10,12 @@
 #include <iomanip>
 #include <chrono>
 #include "util.h"
+#include "simd_ops.h"
 
 namespace ols {
     class PreProcessor {
     public:
+        constexpr static int gamma_table_size = 128;
         PreProcessor(queue_pointer_type in,queue_pointer_type out) :
             in_(in),out_(out)
         {
@@ -29,8 +31,12 @@ namespace ols {
                 }
                 auto video_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
                 if(video_ptr) {
+		            auto start = std::chrono::high_resolution_clock::now();
                     if(handle_video(video_ptr))
                         out_->push(data_ptr);
+		            auto done = std::chrono::high_resolution_clock::now();
+                    double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(done-start).count();
+                    BOOSTER_INFO("stacker") << "Preprocessing took " << (time*1000) << "ms";
                     continue;
                 }
                 auto config_ptr = std::dynamic_pointer_cast<StackerControl>(data_ptr);
@@ -40,22 +46,141 @@ namespace ols {
                 out_->push(data_ptr);
             }
         }
+        void darks_and_flats(cv::Mat &frame)
+        {
+            float *p=(float*)frame.data;
+            float *f=(float*)flats_.data;
+            float *d=(float*)darks_.data;
+            int N = frame.rows*frame.cols*3;
+            int i=0;
+#ifdef V_SIMD   
+            v_f32 zero = v_setall_f32(0.0f);
+            int limit = N/4*4;
+            for(;i<limit;i+=4,p+=4,d+=4,f+=4) {
+                v_f32 v=v_max_f32(zero,v_sub_f32(v_load_f32(p),v_load_f32(d)));
+                v=v_mul_f32(v,v_load_f32(f));
+                v_store_f32(p,v);
+            }
+#endif            
+            for(;i<N;i++) {
+                float v=std::max(0.0f,*p - *d);
+                v*= *f;
+                *p = v;
+                p++,d++,f++;
+            }
+        }
+
+        void darks_only(cv::Mat &frame)
+        {
+            float *p=(float*)frame.data;
+            float *d=(float*)darks_.data;
+            int N = frame.rows*frame.cols*3;
+            int i=0;
+#ifdef V_SIMD   
+            v_f32 zero = v_setall_f32(0.0f);
+            int limit = N/4*4;
+            for(;i<limit;i+=4,p+=4,d+=4) {
+                v_f32 v=v_max_f32(zero,v_sub_f32(v_load_f32(p),v_load_f32(d)));
+                v_store_f32(p,v);
+            }
+#endif            
+            for(;i<N;i++) {
+                float v=std::max(0.0f,*p - *d);
+                *p = v;
+                p++,d++;
+            }
+        }
+
+        void apply_gamma(cv::Mat &frame)
+        {
+            float t_factor = 1.0f/(gamma_table_size-1);
+            if(gamma_table_current_gamma_ == -1.0f || gamma_table_current_gamma_ != gamma_) {
+                for(int i=0;i<gamma_table_size;i++) {
+                    gamma_table_[i] = i * t_factor;
+                }
+                gamma_table_[gamma_table_size] = 1.0f;
+                cv::Mat tmp(1,gamma_table_size,CV_32FC1,gamma_table_);
+                cv::pow(tmp,gamma_,tmp);
+                gamma_table_current_gamma_ = gamma_;
+            }
+
+            float *p = (float*)frame.data;
+            int N = frame.rows*frame.cols*3;
+            int i=0;
+#ifdef V_SIMD
+            using namespace ols;
+            v_f32 one  = v_setall_f32(1.0f);
+            v_f32 mmin = v_setall_f32(gamma_table_size-1.0f);
+
+            int limit = N / 4 * 4;
+
+            for(i=0;i<limit;i+=4,p+=4) {
+                v_f32 v = v_load_f32(p);
+                v_f32 vf = v_mul_f32(v,mmin);
+                v_f32 findx = v_floor_f32(vf);
+                v_s32 indx = v_min_s32(v_setall_s32(gamma_table_size-1),v_max_s32(v_setall_s32(0),v_cvt_f32_s32(findx)));
+                v_f32 w1 = v_sub_f32(vf,findx);
+                v_f32 w0 = v_sub_f32(one,w1);
+
+#if 1        
+                int indexes[4];
+                float p0[4],p1[4];
+                v_store_s32(indexes,indx);
+
+                p0[0] = gamma_table_[indexes[0]];
+                p1[0] = gamma_table_[indexes[0]+1];
+                p0[1] = gamma_table_[indexes[1]];
+                p1[1] = gamma_table_[indexes[1]+1];
+                p0[2] = gamma_table_[indexes[2]];
+                p1[2] = gamma_table_[indexes[2]+1];
+                p0[3] = gamma_table_[indexes[3]];
+                p1[3] = gamma_table_[indexes[3]+1];
+
+                v = v_add_f32(v_mul_f32(w0,v_load_f32(p0)),v_mul_f32(w1,v_load_f32(p1)));
+#else   
+                // for future gather 
+                v_f32 p0 = _mm_i32gather_ps(gamma_table_,indx,4);
+                v_f32 p1 = _mm_i32gather_ps(gamma_table_,_mm_add_epi32(indx,v_setall_s32(1)),4);
+                v = v_add_f32(v_mul_f32(w0,p0),v_mul_f32(w1,p1));
+#endif                
+
+                v_store_f32(p,v);
+            }
+#endif
+            for(;i<N;i++,p++) {
+                float v = *p;
+                float vf = v*(gamma_table_size-1);
+                int indx = std::max(0,std::min(gamma_table_size-1,int(vf)));
+                float w1 = vf-indx;
+                float w0 = 1.0f - w1;
+                v = gamma_table_[indx]*w0 + gamma_table_[indx+1]*w1;
+                *p = v;
+            }
+        }
+
         bool handle_video(std::shared_ptr<CameraFrame> video)
         {
             if(video->frame.rows != height_ || video->frame.cols != width_) {
                 BOOSTER_ERROR("stacker") << "Invalid mat frame size, expecting " << height_ << "x" << width_ << " got " << video->frame.rows<< "x"<<video->frame.cols;
                 return false;
             }
-            video->frame.convertTo(video->processed_frame,CV_32FC3,1/(255.0));
+            video->frame.convertTo(video->processed_frame,CV_32FC3,1.0/video->frame_dr);
             if(calibration_)
                 return true;
-            if(gamma_ != 1.0)
-                cv::pow(video->processed_frame,gamma_,video->processed_frame);
-            if(apply_darks_) {
-                video->processed_frame = cv::max(0,video->processed_frame - darks_);
+            if(gamma_ != 1.0) {
+                //cv::pow(video->processed_frame,gamma_,video->processed_frame);
+                apply_gamma(video->processed_frame);
             }
-            if(apply_flats_) {
-                video->processed_frame = video->processed_frame.mul(flats_);
+            if(apply_darks_ && apply_flats_) {
+                darks_and_flats(video->processed_frame);
+            }
+            else {
+                if(apply_darks_) {
+                    darks_only(video->processed_frame);
+                }
+                if(apply_flats_) {
+                    video->processed_frame = video->processed_frame.mul(flats_);
+                }
             }
             if(derotator_) {
                 if(first_frame_ts_ == 0)
@@ -161,6 +286,8 @@ namespace ols {
         int width_,height_;
         bool calibration_;
         float gamma_;
+        float gamma_table_[gamma_table_size+1];
+        float gamma_table_current_gamma_ = -1;
         std::unique_ptr<Derotator> derotator_;
         double first_frame_ts_;
         bool derotate_mirror_;
@@ -342,13 +469,16 @@ namespace ols {
                         restart_ = false;
 		                auto p1 = std::chrono::high_resolution_clock::now();
                         double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p1-start).count();
-                        double gtime = 0;
+                        double gtime = 0,jtime = 0;
                         if(out_) {
-                            res = generate_output_frame(stacker_->get_stacked_image());
+                            auto img = stacker_->get_stacked_image();
                             auto p2 = std::chrono::high_resolution_clock::now();
+                            res = generate_output_frame(img);
+                            auto p3 = std::chrono::high_resolution_clock::now();
                             gtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p2-p1).count();
+                            jtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p3-p2).count();
                         }
-                        BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms, generation " << (1e3*gtime) << " ms";
+                        BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms, generation " << (1e3*gtime) << " ms, jpeg took=" << (1e3*jtime);
                     }
                     else {
                         BOOSTER_INFO("stacker") << "Failed to stack frame";

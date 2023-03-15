@@ -3,6 +3,7 @@
 #include <opencv2/imgproc.hpp>
 #include <booster/log.h>
 #include "common_data.h"
+#include "simd_ops.h"
 namespace ols {
 
     struct Stacker {
@@ -29,13 +30,26 @@ namespace ols {
             fully_stacked_count_ = 0;
             if(roi_size == -1) {
                 window_size_ = std::min(height,width);
-                #if 0
+                #if 1
+                int minSize = 8;
                 for(int i=0;i<16;i++) {
                     if((1<<i)<=window_size_ && (1<<(i+1)) > window_size_) {
-                        window_size_ = 1<<i;
+                        minSize = 1<<i;
                         break;
                     }
                 }
+                while(minSize < window_size_) {
+                    int new_size;
+                    if((new_size = cv::getOptimalDFTSize(minSize+1)) <= window_size_) {
+                        printf("%d -> %d\n",minSize,new_size);
+                        minSize = new_size;
+                    }
+                    else {
+                        break;
+                    }
+                }
+                BOOSTER_INFO("stacker") << "Optimal size " << minSize << " for window " << window_size_;
+                window_size_ = minSize;
                 #endif
             }
             else {
@@ -107,14 +121,189 @@ namespace ols {
             return res;
         }
 
+        static double tdiff(std::chrono::time_point<std::chrono::high_resolution_clock> const &a,
+                            std::chrono::time_point<std::chrono::high_resolution_clock> const &b)
+        {
+            double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(b-a).count();
+            return time * 1000;
+        }
+
+        float sum_rgb_line(float *p,int N,float line_sums[3])
+        {
+            float v[3]={};
+            float maxv=0;
+            int i=0;
+#ifdef V_SIMD
+            union {
+                v_f32 v[3];
+                float s[12];
+            } sums;
+            union {
+                v_f32 v;
+                float s[4];
+            } maxs;
+            sums.v[0] = v_setall_f32(0.0f);
+            sums.v[1] = v_setall_f32(0.0f);
+            sums.v[2] = v_setall_f32(0.0f);
+            maxs.v    = v_setall_f32(0.0f);
+
+            int limit = N/12*12;
+            v_f32 val;
+            for(;i<limit;i+=12,p+=12) {
+                val = v_load_f32(p+0);
+                maxs.v = v_max_f32(maxs.v,val);
+                sums.v[0] = v_add_f32(sums.v[0],val);
+
+                val = v_load_f32(p+4);
+                maxs.v = v_max_f32(maxs.v,val);
+                sums.v[1] = v_add_f32(sums.v[1],val);
+
+                val = v_load_f32(p+8);
+                maxs.v = v_max_f32(maxs.v,val);
+                sums.v[2] = v_add_f32(sums.v[2],val);
+            }
+            float *s = sums.s;
+            v[0] = s[0] + s[3] + s[6] + s[ 9];
+            v[1] = s[1] + s[4] + s[7] + s[10];
+            v[2] = s[2] + s[5] + s[8] + s[11];
+            maxv = std::max(std::max(maxs.v[0],maxs.v[1]),std::max(maxs.v[2],maxs.v[3]));
+#endif      
+            for(;i<N;i+=3) {
+                float c1=*p++;
+                float c2=*p++;
+                float c3=*p++;
+                maxv = std::max(std::max(maxv,c1),std::max(c2,c3));
+
+                v[0]+=c1;
+                v[1]+=c2;
+                v[2]+=c3;
+            }
+            for(int c=0;c<3;c++) {
+                line_sums[c]+=v[c];
+            }
+            return maxv;
+        }
+
+        void scale_and_clip(cv::Mat &m,float f1,float f2,float f3)
+        {
+            float *p = (float *)m.data;
+            int N = m.rows*m.cols*3;
+            int i=0;
+#ifdef V_SIMD
+            float w[12]={f1,f2,f3,f1, f2,f3,f1,f2, f3,f1,f2,f3};
+            v_f32 w0 = v_load_f32(w+0);
+            v_f32 w4 = v_load_f32(w+4);
+            v_f32 w8 = v_load_f32(w+8);
+            v_f32 zero = v_setall_f32(0.0f);
+            v_f32 one  = v_setall_f32(1.0f);
+            int limit = N/12*12;
+            for(;i<limit;i+=12,p+=12) {
+                v_store_f32(p+0,v_max_f32(zero,v_min_f32(one,v_mul_f32(v_load_f32(p+0),w0))));
+                v_store_f32(p+4,v_max_f32(zero,v_min_f32(one,v_mul_f32(v_load_f32(p+4),w4))));
+                v_store_f32(p+8,v_max_f32(zero,v_min_f32(one,v_mul_f32(v_load_f32(p+8),w8))));
+            }
+#endif            
+            for(;i<N;i+=3,p+=3) {
+                p[0] = std::max(0.0f,std::min(1.0f,p[0] * f1));
+                p[1] = std::max(0.0f,std::min(1.0f,p[1] * f2));
+                p[2] = std::max(0.0f,std::min(1.0f,p[2] * f3));
+            }
+        }
+
+        void offset_scale_and_clip(cv::Mat &m,float offset,float scale)
+        {
+            float *p = (float *)m.data;
+            int N = m.rows*m.cols*3;
+            int i=0;
+#ifdef V_SIMD
+            v_f32 zero = v_setall_f32(0.0f);
+            v_f32 one  = v_setall_f32(1.0f);
+            for(;i<(N / 4) * 4;i+=4,p+=4) {
+                v_f32 v = v_load_f32(p);
+                v = v_max_f32(zero,v_min_f32(one,v_mul_f32(v_setall_f32(scale),v_add_f32(v,v_setall_f32(offset)))));
+                v_store_f32(p,v);
+            }
+#endif            
+            for(;i<N;i++,p++) {
+                float v = *p;
+                v = std::max(0.0f,std::min(1.0f,(v+offset)*scale));
+                *p = v;
+            }
+        }
+        void offset_scale_and_clip_gamma(cv::Mat &m,float offset,float scale,float gamma)
+        {
+            float *p = (float *)m.data;
+            int N = m.rows*m.cols*3;
+            float invg= 1.0f/gamma;
+            constexpr int M=128;
+            float table[M+1];
+            table[0]=0.0;
+            table[M-1]=1.0f;
+            table[M]=1.0f;
+            float factor = 1.0f/(M-1);
+            for(int i=1;i<M-1;i++)
+                table[i]=i*factor;
+            cv::Mat t(1,M+1,CV_32FC1,table);
+            cv::pow(t,invg,t);
+            int i=0;
+#ifdef V_SIMD
+            v_f32 zero = v_setall_f32(0.0f);
+            v_f32 one  = v_setall_f32(1.0f);
+            v_f32 mmin = v_setall_f32(M-1.0f);
+
+            int limit = N / 4 * 4;
+            
+            for(i=0;i<limit;i+=4,p+=4) {
+                v_f32 v = v_load_f32(p);
+                v = v_max_f32(zero,v_min_f32(one,v_mul_f32(v_setall_f32(scale),v_add_f32(v,v_setall_f32(offset)))));
+                v_f32 vf = v_mul_f32(v,mmin);
+                v_f32 findx = v_floor_f32(vf);
+                v_s32 indx = v_min_s32(v_setall_s32(M-1),v_max_s32(v_setall_s32(0),v_cvt_f32_s32(findx)));
+                v_f32 w1 = v_sub_f32(vf,findx);
+                v_f32 w0 = v_sub_f32(one,w1);
+                int indexes[4];
+                float p0[4],p1[4];
+                v_store_s32(indexes,indx);
+
+                p0[0] = table[indexes[0]];
+                p1[0] = table[indexes[0]+1];
+                p0[1] = table[indexes[1]];
+                p1[1] = table[indexes[1]+1];
+                p0[2] = table[indexes[2]];
+                p1[2] = table[indexes[2]+1];
+                p0[3] = table[indexes[3]];
+                p1[3] = table[indexes[3]+1];
+
+                v = v_add_f32(v_mul_f32(w0,v_load_f32(p0)),v_mul_f32(w1,v_load_f32(p1)));
+
+                v_store_f32(p,v);
+            }
+#endif
+            for(;i<N;i++,p++) {
+                float v = *p;
+                v = std::min(1.0f,std::max(0.0f,(v+offset)*scale));
+                float vf = v*(M-1);
+                int indx = std::max(0,std::min(M-1,int(vf)));
+                float w1 = vf-indx;
+                float w0 = 1.0f - w1;
+                v = table[indx]*w0 + table[indx+1]*w1;
+                *p = v;
+            }
+        }
+
         std::pair<cv::Mat,StretchInfo> get_stacked_image()
         {
+            typedef  std::chrono::time_point<std::chrono::high_resolution_clock> tp;
+            tp raw  = std::chrono::high_resolution_clock::now();
             cv::Mat tmp = get_raw_stacked_image();
             
-            double scale[3];
+            tp start = std::chrono::high_resolution_clock::now();
+            float scale[3];
             calc_wb(tmp(fully_stacked_area_),scale);
-            tmp = tmp.mul(cv::Scalar(scale[0],scale[1],scale[2]));
-            tmp = cv::max(0,cv::min(1,tmp));
+            
+            tp wb_coeff = std::chrono::high_resolution_clock::now();
+            scale_and_clip(tmp,scale[0],scale[1],scale[2]);
+            tp wb_apply = std::chrono::high_resolution_clock::now();
             double gscale=1.0;
             double goffset = 0.0;
             double mean = 0.5;
@@ -130,17 +319,18 @@ namespace ols {
                 gscale = high_cut_;
                 goffset = -low_cut_ / gscale;
             }
-            tmp += cv::Scalar::all(goffset);
-            tmp = tmp.mul(cv::Scalar::all(gscale));
-            tmp = cv::max(0,cv::min(1,tmp));
-
-            double linear_point = 0.008;
-            double linear_gain = std::pow(linear_point,1/gamma_correction) / linear_point;
-            if(gamma_correction > 1.0) {
-                cv::Mat linear_part = tmp.mul(cv::Scalar::all(linear_gain));
-                cv::pow(tmp,1/gamma_correction,tmp);
-                tmp = cv::min(linear_part,tmp);
+            tp calc_stretch = std::chrono::high_resolution_clock::now();
+            if(gamma_correction == 1.0) {
+                offset_scale_and_clip(tmp,goffset,gscale);
             }
+            else {
+                offset_scale_and_clip_gamma(tmp,goffset,gscale,gamma_correction);
+            }
+            tp apply_stretch =  std::chrono::high_resolution_clock::now();
+
+            BOOSTER_INFO("stacker") << "get img=" << tdiff(raw,start) << "ms calc wb=" << tdiff(start,wb_coeff) <<"ms apply wb=" << tdiff(wb_coeff,wb_apply) << "ms calc stretch" << tdiff(wb_apply,calc_stretch) 
+                << "ms stretch="<<tdiff(calc_stretch,apply_stretch) << "ms";
+
             StretchInfo stretch;
             stretch.gamma = gamma_correction;
             stretch.gain = gscale;
@@ -253,49 +443,22 @@ namespace ols {
             BOOSTER_INFO("stacker") << "Scale " << scale << " offset=" << (-offset) << " relative cut =" << (-offset*scale) ;
         }
 
-        void calc_wb(cv::Mat img,double scale[3])
+        void calc_wb(cv::Mat img,float scale[3])
         {
-            cv::Mat tmp=img.clone();
-            float *p = (float*)tmp.data;
-            int N = tmp.rows*tmp.cols;
-            double maxV,minV;
-            cv::minMaxLoc(tmp,&minV,&maxV);
-#if 0
-            static constexpr int bins_count = 1<<12;
-            float a = bins_count / (maxV - minV);
-            float b = -minV;
-            int bins[bins_count][3]={};
-            for(int i=0;i<N;i++) {
-                for(int c=0;c<3;c++) {
-                    float V = *p++;
-                    int binNo = std::max(0.0f,std::min(float(bins_count-1),(V+b)*a));
-                    bins[binNo][c] ++;
-                }
-            }
-            for(int c=0;c<3;c++) {
-                int s=0;
-                int i=0;
-                for(i=0;i<bins_count;i++) {
-                    if(s*2 >= N)
-                        break;
-                    s+= bins[i][c];
-                }
-                printf("Median of %d: %d\n",c,i);
-                scale[c] = i;
-            }
-#elif 0
-            scale[0]=scale[1]=scale[2] = 1;
-#else
+            float *base = (float*)img.data;
+            int stride = img.step1(0);
+            int rows = img.rows;
+            int cols = img.cols;
+            float maxV = 0;
             scale[0]=scale[1]=scale[2] = 0;
-            for(int i=0;i<N;i++) {
-                for(int c=0;c<3;c++) {
-                    scale[c] += *p++;
-                }
+            for(int r=0;r<rows;r++) {
+                float *p = base + stride*r;
+                float line_max = sum_rgb_line(p,cols*3,scale);
+                maxV = std::max(maxV,line_max);
             }
-#endif                        
             // normalize once again
-            double smax = std::max(scale[0],std::max(scale[1],scale[2]));
-            double smin = std::min(scale[0],std::min(scale[1],scale[2]));
+            float smax = std::max(scale[0],std::max(scale[1],scale[2]));
+            float smin = std::min(scale[0],std::min(scale[1],scale[2]));
             if(smin > 0) {
                 for(int i=0;i<3;i++)
                     scale[i] = smax / scale[i];
@@ -304,7 +467,7 @@ namespace ols {
                 for(int i=0;i<3;i++)
                     scale[i] = 1.0;
             }
-            printf("WB [%f,%f,%f]\n",scale[0],scale[1],scale[2]);
+            BOOSTER_INFO("stacker") << "WB " << scale[0]<<"," << scale[1] << "," << scale[2];
             for(int i=0;i<3;i++)
                 scale[i] /= maxV;
         }

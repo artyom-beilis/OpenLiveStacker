@@ -20,14 +20,13 @@ namespace ols {
         void handle_jpeg_stack(std::shared_ptr<CameraFrame> frame,cv::Mat rgb,bool copy)
         {
             std::vector<unsigned char> buf;
-            
+
             cv::Mat normalized;
-            if(rgb.elemSize1() == 2)
-                rgb.convertTo(normalized,CV_8UC3,(1.0/255.0));
-            else if(rgb.elemSize1() == 4)
-                rgb.convertTo(normalized,CV_8UC3,(1.0/16777215.0));
-            else
+            double factor = 255.0 / frame->frame_dr;
+            if(frame->frame_dr == 255 && rgb.elemSize1() == 1)
                 normalized = rgb;
+            else
+                rgb.convertTo(normalized,CV_8UC3,factor);
 
             cv::imencode(".jpeg",normalized,buf);
 
@@ -80,6 +79,7 @@ namespace ols {
                         cv::Mat buffer(1,len,CV_8UC1,frame->jpeg_frame->data());
                         try {
                             frame->frame = cv::imdecode(buffer,cv::IMREAD_UNCHANGED);
+                            frame->frame_dr = 255;
                         }
                         catch(std::exception const &e) {
                             BOOSTER_ERROR("stacker") << "Failed to extract jpeg";
@@ -93,18 +93,21 @@ namespace ols {
                     cv::Mat yuv2(frame->format.height,frame->format.width,CV_8UC2,frame->source_frame->data());
                     cv::Mat rgb;
                     cv::cvtColor(yuv2,rgb,cv::COLOR_YUV2BGR_YUYV);
+                    frame->frame_dr = 255;
                     handle_jpeg_stack(frame,rgb,false);
                 }
                 break;
             case stream_rgb24:
                 {
                     cv::Mat rgb(frame->format.height,frame->format.width,CV_8UC3,frame->source_frame->data());
+                    frame->frame_dr = 255;
                     handle_jpeg_stack(frame,rgb,true);
                 }
                 break;
             case stream_rgb48:
                 {
                     cv::Mat rgb(frame->format.height,frame->format.width,CV_16UC3,frame->source_frame->data());
+                    frame->frame_dr = 65535;
                     handle_jpeg_stack(frame,rgb,false);
                 }
                 break;
@@ -121,6 +124,7 @@ namespace ols {
                     default:
                         BOOSTER_ERROR("stacker") << "Invalid bayer patter";
                     }
+                    frame->frame_dr = (bpp==1 ? 255 : 65535);
                     handle_jpeg_stack(frame,rgb,false);
                 }
                 break;
@@ -131,6 +135,7 @@ namespace ols {
                     cv::Mat mono(frame->format.height,frame->format.width,(bpp==1 ? CV_8UC1 : CV_16UC1),frame->source_frame->data());
                     cv::Mat rgb;
                     cv::cvtColor(mono,rgb,cv::COLOR_GRAY2BGR); 
+                    frame->frame_dr = (bpp==1 ? 255 : 65535);
                     handle_jpeg_stack(frame,rgb,false);
                 }
                 break;

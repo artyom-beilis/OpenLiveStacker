@@ -218,37 +218,59 @@ namespace ols {
         /// list of camera controls that the camera supports
         virtual std::vector<CamOptionId> supported_options()
         {
-            std::vector<CamOptionId> opts = {opt_exp};
+            std::vector<CamOptionId> opts = {opt_exp,opt_gamma};
             return opts;
         }
         /// get camera control
         virtual CamParam get_parameter(CamOptionId id,bool /*current_only = false*/) 
         {
-            if(id != opt_exp)
-                throw SIMError("Unimplemented: " + cam_option_id_to_name(id));
             CamParam r;
             memset(&r,0,sizeof(r));
-            r.option = opt_exp;
-            r.type = type_msec;
-            r.min_val = 10;
-            r.max_val = 10000;
-            r.def_val = 1000;
-            r.cur_val = exposure_;
-            r.step_size = 1;
+            r.option = id;
+            switch(id) {
+            case opt_exp:
+                r.type = type_msec;
+                r.min_val = 10;
+                r.max_val = 10000;
+                r.def_val = 1000;
+                r.cur_val = exposure_;
+                r.step_size = 1;
+                break;
+            case opt_gamma:
+                r.type = type_number;
+                r.min_val = 0.75;
+                r.max_val = 3.0;
+                r.def_val = 1.0;
+                r.cur_val = gamma_;
+                r.step_size = 0.01;
+                break;
+            default:
+                throw SIMError("Unimplemented: " + cam_option_id_to_name(id));
+            }
             return r;
         }
         /// set camera control
         virtual void set_parameter(CamOptionId id,double value)
         {
-            if(id!=opt_exp)
-                throw SIMError("Unimplemented");
-            if(value < 10 || value > 10000)
-                throw SIMError("Invalid range");
-            exposure_ = value;
+            switch(id) {
+            case opt_exp:
+                if(value < 10 || value > 10000)
+                    throw SIMError("Invalid range");
+                exposure_ = value;
+                break;
+            case opt_gamma:
+                if(value < 0.75 || value > 3.0)
+                    throw SIMError("Invalid range");
+                gamma_ = value;
+                break;
+            default:
+                throw SIMError("Unimplemented" +  cam_option_id_to_name(id));
+            }
         }
     private:
         std::string dir_;
         int exposure_ = 1000;
+        double gamma_ = 1.0;
         CamStreamType stream_ = stream_mjpeg;
         bool is_jpeg_ = true;
         int width_,height_;

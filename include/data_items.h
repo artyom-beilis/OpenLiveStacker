@@ -33,6 +33,7 @@ namespace ols {
         std::shared_ptr<VideoFrame> source_frame;
         std::shared_ptr<VideoFrame> jpeg_frame;
         cv::Mat frame;
+        int frame_dr = 255;
         cv::Mat processed_frame;
         StretchInfo stretch;
         int dropped = 0;
