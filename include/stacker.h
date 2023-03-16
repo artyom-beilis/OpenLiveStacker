@@ -565,20 +565,12 @@ namespace ols {
 
         cv::Point2f get_dx_dy(cv::Mat dft)
         {
-            cv::Mat res,shift;
+            cv::Mat shift;
             cv::Mat dspec;
-#if 0
-            cv::mulSpectrums(fft_roi_,dft,res,0,true);
-#if 0 //CV_VERSION_MAJOR >= 4 && CV_VERSION_MINOR >= 5
-            cv::divSpectrums(res,cv::abs(res),dspec,0);
-#else
-            cv::Mat absval = cv::max(cv::Scalar::all(1e-38),cv::abs(res));
-            cv::divide(res,absval,dspec);
-#endif
-#else
+            
             calcPC(fft_roi_,dft,dspec);
-#endif         
             cv::idft(dspec,shift,cv::DFT_REAL_OUTPUT);
+
             cv::Point pos;
             cv::minMaxLoc(shift,nullptr,nullptr,nullptr,&pos);
             if(enable_subpixel_registration)
