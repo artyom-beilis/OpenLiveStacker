@@ -7,6 +7,11 @@
 
 #include "simd_utils.h"
 
+//#define DEBUG
+#ifdef DEBUG
+#include <opencv2/imgcodecs.hpp>
+#endif
+
 
 namespace ols {
 
@@ -88,7 +93,7 @@ namespace ols {
             if(window_size_ == 0)
                 return;
             fft_kern_ = cv::Mat(window_size_,window_size_,CV_32FC2);
-            int rad = (window_size_/4);
+            int rad = (window_size_/8);
             for(int r=0;r<window_size_;r++) {
                 for(int c=0;c<window_size_;c++) {
                     int dy = fft_pos(r);
@@ -570,6 +575,17 @@ namespace ols {
             
             calcPC(fft_roi_,dft,dspec);
             cv::idft(dspec,shift,cv::DFT_REAL_OUTPUT);
+#ifdef DEBUG
+            {
+                double minv,maxv;
+                cv::minMaxLoc(shift,&minv,&maxv);
+                cv::Mat tmp;
+                cv::Mat scaled = ((shift - minv)/((maxv-minv)*255));
+                scaled.convertTo(tmp,CV_8UC1);
+                static int n=1;
+                cv::imwrite("/tmp/map_" + std::to_string(n++) + "_b.png",tmp);
+            }
+#endif        
 
             cv::Point pos;
             cv::minMaxLoc(shift,nullptr,nullptr,nullptr,&pos);
@@ -591,6 +607,7 @@ namespace ols {
             }
 #ifdef DEBUG
             {
+                cv::mulSpectrums(dft,fft_kern_,dft,0);
                 cv::idft(dft,gray,cv::DFT_REAL_OUTPUT);
                 double minv,maxv;
                 cv::minMaxLoc(gray,&minv,&maxv);
@@ -598,7 +615,7 @@ namespace ols {
                 cv::Mat tmp;
                 gray.convertTo(tmp,CV_8UC1);
                 static int n=1;
-                imwritergb(std::to_string(n++) + "_b.png",tmp);
+                cv::imwrite("/tmp/blurred_" + std::to_string(n++) + "_b.png",tmp);
             }
 #endif        
             return dft;
