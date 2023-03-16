@@ -1,6 +1,7 @@
 #pragma once
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core/hal/intrin.hpp>
 #include <booster/log.h>
 #include "common_data.h"
 #include "simd_ops.h"
@@ -554,17 +555,67 @@ namespace ols {
             float dr = max3p(vals[0][1],vals[1][1],vals[2][1]);
             return cv::Point2f(c+dc,r+dr);
         }
+        
+        void calcPC(cv::Mat &A,cv::Mat &B,cv::Mat &spec)
+        {
+            float *a = (float *)(A.data);
+            float *b = (float *)(B.data);
+            spec.create(A.rows,A.cols,CV_32FC2); // complext
+            float *s = (float *)(spec.data);
+            int N = A.rows*A.cols;
+            int i=0;
+#if 1            
+            int limit=N/4*4;
+            for(;i<limit;i+=4,a+=8,b+=8,s+=8) {
+                cv::v_float32x4 a_re,a_im,b_re,b_im;
+                v_load_deinterleave(a,a_re,a_im);
+                v_load_deinterleave(b,b_re,b_im);
+
+                // mul conj
+                cv::v_float32x4 res_re = a_re*b_re + a_im*b_im;
+                cv::v_float32x4 res_im = a_im*b_re - a_re*b_im;
+
+                // abs
+                cv::v_float32x4 res_abs = cv::v_sqrt(res_re*res_re + res_im*res_im);
+
+                // div by abs
+                res_abs = cv::v_max(cv::v_setall_f32(1e-38f),res_abs);
+                res_re /= res_abs;
+                res_im /= res_abs;
+
+                cv::v_store_interleave(s,res_re,res_im);
+            }
+#endif                
+            for(;i<N;i++) {
+                float a_re = *a++;
+                float a_im = *a++;
+                float b_re = *b++;
+                float b_im = *b++;
+                b_im = -b_im; // conj
+                auto ac=std::complex<float>(a_re,a_im);
+                auto bc=std::complex<float>(b_re,b_im);
+                auto res = ac*bc;
+                float abs_val = std::max(1e-38f,std::abs(res));
+                *s++ = res.real() / abs_val;
+                *s++ = res.imag() / abs_val;
+            }
+        }
+
         cv::Point2f get_dx_dy(cv::Mat dft)
         {
             cv::Mat res,shift;
-            cv::mulSpectrums(fft_roi_,dft,res,0,true);
             cv::Mat dspec;
+#if 0
+            cv::mulSpectrums(fft_roi_,dft,res,0,true);
 #if 0 //CV_VERSION_MAJOR >= 4 && CV_VERSION_MINOR >= 5
             cv::divSpectrums(res,cv::abs(res),dspec,0);
 #else
             cv::Mat absval = cv::max(cv::Scalar::all(1e-38),cv::abs(res));
             cv::divide(res,absval,dspec);
-#endif            
+#endif
+#else
+            calcPC(fft_roi_,dft,dspec);
+#endif         
             cv::idft(dspec,shift,cv::DFT_REAL_OUTPUT);
             cv::Point pos;
             cv::minMaxLoc(shift,nullptr,nullptr,nullptr,&pos);
