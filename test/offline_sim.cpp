@@ -19,10 +19,15 @@ namespace ols {
             load_config();
         }
 
-        void run()
+        void run(bool run_pp)
         {
+            queue_pointer_type out;
+            if(run_pp) {
+                out = std::shared_ptr<queue_type>(new queue_type());
+                out->call_on_push([](std::shared_ptr<QueueData> ){});
+            }
             std::thread t1 = start_preprocessor(input_queue_,stacker_queue_);
-            std::thread t2 = start_stacker(stacker_queue_,nullptr,nullptr,output_dir_);
+            std::thread t2 = start_stacker(stacker_queue_,out,nullptr,output_dir_);
             std::shared_ptr<StackerControl> ctl(new StackerControl(cfg_));
             std::cerr << cfg_.width << " " << cfg_.height << std::endl;
             input_queue_->push(ctl);
@@ -140,15 +145,35 @@ namespace ols {
 
 int main(int argc,char **argv)
 {
+    bool run_pp = false;
+    int threads = -1;
+    while(argc >= 2 && argv[1][0]=='-' && argv[1][1] != 0) {
+        char code = argv[1][1];
+        switch(code) {
+        case 'p':
+            run_pp = true;
+            break;
+        case 't':
+            threads = atoi(argv[1]+2);
+            break;
+        default:
+            fprintf(stderr,"Invalid parameter %c",code);
+            return 1;
+        }
+        argc--;
+        argv++;
+    }
     if(argc !=3) {
-        std::cerr << "Usage debug_dir output_dir " << std::endl;
+        std::cerr << "Usage [-p] [-tN] debug_dir output_dir " << std::endl;
         return 1;
     }
     try {
+        if(threads != -1)
+            cv::setNumThreads(threads);
         booster::log::logger::instance().set_default_level(booster::log::debug);
         booster::log::logger::instance().add_sink(std::make_shared<booster::log::sinks::standard_error>());
         ols::Simulator sim(argv[1],argv[2]);
-        sim.run();
+        sim.run(run_pp);
     }
     catch(std::exception const &e) {
         std::cerr << e.what() << std::endl;
