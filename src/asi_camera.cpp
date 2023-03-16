@@ -271,7 +271,7 @@ namespace ols {
         {
             auto p = ops_map_.find(id);
             if(p==ops_map_.end())
-                throw ASIError("Unimplemented");
+                throw ASIError("Option " +  cam_option_id_to_name(id));
             auto cap = p->second;
             CamParam r;
             memset(&r,0,sizeof(r));

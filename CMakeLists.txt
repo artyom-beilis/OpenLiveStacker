@@ -59,7 +59,7 @@ include_directories(${OPENCV_INC})
 if(ASI_CAMERA_HDR AND ASI_CAMERA_LIB)
     include_directories(${ASI_CAMERA_HDR})
     add_library(ols_driver_asi SHARED src/asi_camera.cpp)
-    target_link_libraries(ols_driver_asi ${ASI_CAMERA_LIB})
+    target_link_libraries(ols_driver_asi ols ${ASI_CAMERA_LIB})
     install(TARGETS ols_driver_asi
             LIBRARY DESTINATION lib
     )

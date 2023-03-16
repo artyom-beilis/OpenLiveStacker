@@ -7,6 +7,10 @@ extern "C" typedef int (*cam_config_ptr_type)(char const *);
 
 namespace ols {
 
+CamError::CamError(std::string const &msg) : std::runtime_error(msg)
+{
+}
+
 static std::vector<std::string> driver_names;
 static std::vector<cam_generator_ptr_type> driver_calls;
 

@@ -10,7 +10,7 @@ namespace ols {
 
     class CamError : public std::runtime_error {
     public:
-        CamError(std::string const &msg) : std::runtime_error(msg) {}
+        CamError(std::string const &msg);
     };
 
     enum CamOptionId {
