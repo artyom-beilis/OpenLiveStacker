@@ -42,6 +42,7 @@ extern "C" {
             booster::log::logger::instance().add_sink(logger);
             ols::CameraDriver::load_driver(driver,driver_dir,driver_config);
             BOOSTER_INFO("ols") <<"Driver loaded" << driver;
+            ols::OpenLiveStacker::disableCVThreads();
             g_stacker.reset(new ols::OpenLiveStacker(data_path));
             g_stacker->http_port = http_port;
             g_stacker->http_ip = http_ip;

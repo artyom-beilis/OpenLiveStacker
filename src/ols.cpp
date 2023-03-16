@@ -57,6 +57,12 @@ Camera &OpenLiveStacker::cam()
         throw CamError("Camera is not open");
     return *camera_;
 }
+
+void OpenLiveStacker::disableCVThreads()
+{
+    cv::setNumThreads(0);
+}
+
 void OpenLiveStacker::close_camera()
 {
     guard g(camera_lock_);

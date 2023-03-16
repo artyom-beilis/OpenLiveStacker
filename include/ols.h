@@ -18,6 +18,8 @@ namespace ols {
         OpenLiveStacker(std::string data_dir = "./data");
         ~OpenLiveStacker();
 
+        static void disableCVThreads();
+
         int http_port = 8080;
         std::string http_ip = "0.0.0.0";
         std::string document_root = "www-data";
