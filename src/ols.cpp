@@ -109,8 +109,12 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     config["file_server"]["alias"][0]["path"] = data_dir_;
     config["http"]["script"]="/api";
     config["http"]["timeout"]=5;
+#ifndef ANDROID_SUPPORT
     config["logging"]["stderr"] = true;
+#endif    
     config["logging"]["level"] = "info";
+    config["logging"]["file"]["name"] = debug_dir_ + "/log.txt";
+    config["logging"]["file"]["max_files"] = 10;
 
     web_service_ = std::shared_ptr<cppcms::service>(new cppcms::service(config));
     
