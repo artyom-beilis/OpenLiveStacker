@@ -34,9 +34,10 @@ namespace ols {
                 auto video_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
                 if(video_ptr) {
 		            auto start = std::chrono::high_resolution_clock::now();
-                    if(handle_video(video_ptr))
-                        out_->push(data_ptr);
+                    bool status = handle_video(video_ptr);
 		            auto done = std::chrono::high_resolution_clock::now();
+                    if(status)
+                        out_->push(data_ptr);
                     double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(done-start).count();
                     BOOSTER_INFO("stacker") << "Preprocessing took " << (time*1000) << "ms";
                     continue;
