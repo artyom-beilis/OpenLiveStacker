@@ -323,12 +323,12 @@ namespace ols {
             bool added = true;
             if(frames_ == 0) {
                 add_image(frame,cv::Point2f(0,0));
-                fft_roi_ = calc_fft(frame);
+                fft_roi_ = calc_fft(frame,true);
                 frames_ = 1;
                 reset_step(cv::Point2f(0,0));
             }
             else {
-                cv::Mat fft_frame = calc_fft(frame);
+                cv::Mat fft_frame = calc_fft(frame,false);
                 cv::Point2f shift = get_dx_dy(fft_frame);
                 BOOSTER_INFO("stacker") <<"Registration at "<< frames_ <<":" << shift << std::endl;
                 if(restart_position) {
@@ -526,7 +526,7 @@ namespace ols {
             float *s = (float *)(spec.data);
             int N = A.rows*A.cols;
             int i=0;
-#if 1            
+#ifdef USE_CV_SIMD            
             int limit=N/4*4;
             for(;i<limit;i+=4,a+=8,b+=8,s+=8) {
                 cv::v_float32x4 a_re,a_im,b_re,b_im;
@@ -587,14 +587,16 @@ namespace ols {
                 return cv::Point2f(fft_pos(pos.x),fft_pos(pos.y));
         }
 
-        cv::Mat calc_fft(cv::Mat frame)
+        cv::Mat calc_fft(cv::Mat frame,bool first_frame)
         {
             cv::Mat rgb[3],gray,dft;
             cv::Mat roi = cv::Mat(frame,cv::Rect(dx_,dy_,window_size_,window_size_));
             cv::split(roi,rgb);
             rgb[1].convertTo(gray,CV_32FC1);
             cv::dft(gray,dft,cv::DFT_COMPLEX_OUTPUT);
-            cv::mulSpectrums(dft,fft_kern_,dft,0);
+            if(first_frame) {
+                cv::mulSpectrums(dft,fft_kern_,dft,0);
+            }
 #ifdef DEBUG
             {
                 cv::idft(dft,gray,cv::DFT_REAL_OUTPUT);
