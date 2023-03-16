@@ -4,7 +4,10 @@
 #include <opencv2/core/hal/intrin.hpp>
 #include <booster/log.h>
 #include "common_data.h"
-#include "simd_ops.h"
+
+#include "simd_utils.h"
+
+
 namespace ols {
 
     struct Stacker {
@@ -42,7 +45,6 @@ namespace ols {
                 while(minSize < window_size_) {
                     int new_size;
                     if((new_size = cv::getOptimalDFTSize(minSize+1)) <= window_size_) {
-                        printf("%d -> %d\n",minSize,new_size);
                         minSize = new_size;
                     }
                     else {
@@ -134,40 +136,27 @@ namespace ols {
             float v[3]={};
             float maxv=0;
             int i=0;
-#ifdef V_SIMD
-            union {
-                v_f32 v[3];
-                float s[12];
-            } sums;
-            union {
-                v_f32 v;
-                float s[4];
-            } maxs;
-            sums.v[0] = v_setall_f32(0.0f);
-            sums.v[1] = v_setall_f32(0.0f);
-            sums.v[2] = v_setall_f32(0.0f);
-            maxs.v    = v_setall_f32(0.0f);
+#ifdef USE_CV_SIMD
+            cv::v_float32x4 s[3];
+            s[0] = cv::v_setzero_f32();
+            s[1] = cv::v_setzero_f32();
+            s[2] = cv::v_setzero_f32();
 
             int limit = N/12*12;
-            v_f32 val;
+            cv::v_float32x4 val;
             for(;i<limit;i+=12,p+=12) {
-                val = v_load_f32(p+0);
-                maxs.v = v_max_f32(maxs.v,val);
-                sums.v[0] = v_add_f32(sums.v[0],val);
+                cv::v_float32x4 c[3];
+                cv::v_load_deinterleave(p,c[0],c[1],c[2]);
+                s[0]+=c[0];
+                s[1]+=c[1];
+                s[2]+=c[2];
 
-                val = v_load_f32(p+4);
-                maxs.v = v_max_f32(maxs.v,val);
-                sums.v[1] = v_add_f32(sums.v[1],val);
-
-                val = v_load_f32(p+8);
-                maxs.v = v_max_f32(maxs.v,val);
-                sums.v[2] = v_add_f32(sums.v[2],val);
+                auto max_rgb = cv::v_reduce_max(cv::v_max(cv::v_max(c[0],c[1]),c[2]));
+                maxv = std::max(maxv,max_rgb);
             }
-            float *s = sums.s;
-            v[0] = s[0] + s[3] + s[6] + s[ 9];
-            v[1] = s[1] + s[4] + s[7] + s[10];
-            v[2] = s[2] + s[5] + s[8] + s[11];
-            maxv = std::max(std::max(maxs.v[0],maxs.v[1]),std::max(maxs.v[2],maxs.v[3]));
+            v[0] = cv::v_reduce_sum(s[0]);
+            v[1] = cv::v_reduce_sum(s[1]);
+            v[2] = cv::v_reduce_sum(s[2]);
 #endif      
             for(;i<N;i+=3) {
                 float c1=*p++;
@@ -190,18 +179,18 @@ namespace ols {
             float *p = (float *)m.data;
             int N = m.rows*m.cols*3;
             int i=0;
-#ifdef V_SIMD
+#ifdef USE_CV_SIMD
             float w[12]={f1,f2,f3,f1, f2,f3,f1,f2, f3,f1,f2,f3};
-            v_f32 w0 = v_load_f32(w+0);
-            v_f32 w4 = v_load_f32(w+4);
-            v_f32 w8 = v_load_f32(w+8);
-            v_f32 zero = v_setall_f32(0.0f);
-            v_f32 one  = v_setall_f32(1.0f);
+            cv::v_float32x4 w0 = cv::v_load(w+0);
+            cv::v_float32x4 w4 = cv::v_load(w+4);
+            cv::v_float32x4 w8 = cv::v_load(w+8);
+            cv::v_float32x4 zero = cv::v_setzero_f32();
+            cv::v_float32x4 one  = cv::v_setall_f32(1.0f);
             int limit = N/12*12;
             for(;i<limit;i+=12,p+=12) {
-                v_store_f32(p+0,v_max_f32(zero,v_min_f32(one,v_mul_f32(v_load_f32(p+0),w0))));
-                v_store_f32(p+4,v_max_f32(zero,v_min_f32(one,v_mul_f32(v_load_f32(p+4),w4))));
-                v_store_f32(p+8,v_max_f32(zero,v_min_f32(one,v_mul_f32(v_load_f32(p+8),w8))));
+                cv::v_store(p+0,cv::v_max(zero,cv::v_min(one,cv::v_load(p+0)*w0)));
+                cv::v_store(p+4,cv::v_max(zero,cv::v_min(one,cv::v_load(p+4)*w4)));
+                cv::v_store(p+8,cv::v_max(zero,cv::v_min(one,cv::v_load(p+8)*w8)));
             }
 #endif            
             for(;i<N;i+=3,p+=3) {
@@ -216,13 +205,15 @@ namespace ols {
             float *p = (float *)m.data;
             int N = m.rows*m.cols*3;
             int i=0;
-#ifdef V_SIMD
-            v_f32 zero = v_setall_f32(0.0f);
-            v_f32 one  = v_setall_f32(1.0f);
+#ifdef USE_CV_SIMD
+            cv::v_float32x4 zero = cv::v_setzero_f32();
+            cv::v_float32x4 one  = cv::v_setall_f32(1.0f);
+            cv::v_float32x4 vscale = cv::v_setall_f32(scale);
+            cv::v_float32x4 voffset = cv::v_setall_f32(offset);
             for(;i<(N / 4) * 4;i+=4,p+=4) {
-                v_f32 v = v_load_f32(p);
-                v = v_max_f32(zero,v_min_f32(one,v_mul_f32(v_setall_f32(scale),v_add_f32(v,v_setall_f32(offset)))));
-                v_store_f32(p,v);
+                cv::v_float32x4 v = cv::v_load(p);
+                v = cv::v_max(zero,cv::v_min(one,(v+voffset)*vscale));
+                cv::v_store(p,v);
             }
 #endif            
             for(;i<N;i++,p++) {
@@ -238,56 +229,27 @@ namespace ols {
             float invg= 1.0f/gamma;
             constexpr int M=128;
             float table[M+1];
-            table[0]=0.0;
-            table[M-1]=1.0f;
-            table[M]=1.0f;
-            float factor = 1.0f/(M-1);
-            for(int i=1;i<M-1;i++)
-                table[i]=i*factor;
-            cv::Mat t(1,M+1,CV_32FC1,table);
-            cv::pow(t,invg,t);
+            prepare_power_curve(M,table,invg);
             int i=0;
-#ifdef V_SIMD
-            v_f32 zero = v_setall_f32(0.0f);
-            v_f32 one  = v_setall_f32(1.0f);
-            v_f32 mmin = v_setall_f32(M-1.0f);
-
+#ifdef USE_CV_SIMD
             int limit = N / 4 * 4;
             
+            cv::v_float32x4 one = cv::v_setall_f32(1.0f);
+            cv::v_float32x4 zero = cv::v_setzero_f32();
+            cv::v_float32x4 voffset = cv::v_setall_f32(offset);
+            cv::v_float32x4 vscale = cv::v_setall_f32(scale);
+
             for(i=0;i<limit;i+=4,p+=4) {
-                v_f32 v = v_load_f32(p);
-                v = v_max_f32(zero,v_min_f32(one,v_mul_f32(v_setall_f32(scale),v_add_f32(v,v_setall_f32(offset)))));
-                v_f32 vf = v_mul_f32(v,mmin);
-                v_f32 findx = v_floor_f32(vf);
-                v_s32 indx = v_min_s32(v_setall_s32(M-1),v_max_s32(v_setall_s32(0),v_cvt_f32_s32(findx)));
-                v_f32 w1 = v_sub_f32(vf,findx);
-                v_f32 w0 = v_sub_f32(one,w1);
-                int indexes[4];
-                float p0[4],p1[4];
-                v_store_s32(indexes,indx);
-
-                p0[0] = table[indexes[0]];
-                p1[0] = table[indexes[0]+1];
-                p0[1] = table[indexes[1]];
-                p1[1] = table[indexes[1]+1];
-                p0[2] = table[indexes[2]];
-                p1[2] = table[indexes[2]+1];
-                p0[3] = table[indexes[3]];
-                p1[3] = table[indexes[3]+1];
-
-                v = v_add_f32(v_mul_f32(w0,v_load_f32(p0)),v_mul_f32(w1,v_load_f32(p1)));
-
-                v_store_f32(p,v);
+                cv::v_float32x4 v = cv::v_load(p);
+                v = cv::v_min(one,cv::v_max(zero,(v+voffset) * vscale));
+                curve_simd(v,M,table);
+                cv::v_store(p,v);
             }
 #endif
             for(;i<N;i++,p++) {
                 float v = *p;
                 v = std::min(1.0f,std::max(0.0f,(v+offset)*scale));
-                float vf = v*(M-1);
-                int indx = std::max(0,std::min(M-1,int(vf)));
-                float w1 = vf-indx;
-                float w0 = 1.0f - w1;
-                v = table[indx]*w0 + table[indx+1]*w1;
+                v = curve_one(v,M,table); 
                 *p = v;
             }
         }

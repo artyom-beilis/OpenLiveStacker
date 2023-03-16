@@ -6,11 +6,13 @@
 #include "processors.h"
 #include <cppcms/json.h>
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/core/hal/intrin.hpp>
 #include <fstream>
 #include <iomanip>
 #include <chrono>
 #include "util.h"
-#include "simd_ops.h"
+
+#include "simd_utils.h"
 
 namespace ols {
     class PreProcessor {
@@ -53,13 +55,13 @@ namespace ols {
             float *d=(float*)darks_.data;
             int N = frame.rows*frame.cols*3;
             int i=0;
-#ifdef V_SIMD   
-            v_f32 zero = v_setall_f32(0.0f);
+#ifdef USE_CV_SIMD
+            cv::v_float32x4 zero = cv::v_setall_f32(0.0f);
             int limit = N/4*4;
             for(;i<limit;i+=4,p+=4,d+=4,f+=4) {
-                v_f32 v=v_max_f32(zero,v_sub_f32(v_load_f32(p),v_load_f32(d)));
-                v=v_mul_f32(v,v_load_f32(f));
-                v_store_f32(p,v);
+                cv::v_float32x4 v=cv::v_max(zero,cv::v_load(p) - cv::v_load(d));
+                v *= cv::v_load(f);
+                cv::v_store(p,v);
             }
 #endif            
             for(;i<N;i++) {
@@ -76,12 +78,12 @@ namespace ols {
             float *d=(float*)darks_.data;
             int N = frame.rows*frame.cols*3;
             int i=0;
-#ifdef V_SIMD   
-            v_f32 zero = v_setall_f32(0.0f);
+#ifdef USE_CV_SIMD 
+            cv::v_float32x4 zero = cv::v_setzero_f32();
             int limit = N/4*4;
             for(;i<limit;i+=4,p+=4,d+=4) {
-                v_f32 v=v_max_f32(zero,v_sub_f32(v_load_f32(p),v_load_f32(d)));
-                v_store_f32(p,v);
+                auto v=cv::v_max(zero,cv::v_load(p) - cv::v_load(d));
+                cv::v_store(p,v);
             }
 #endif            
             for(;i<N;i++) {
@@ -91,69 +93,34 @@ namespace ols {
             }
         }
 
-        void apply_gamma(cv::Mat &frame)
+        void prepare_gamma()
         {
-            float t_factor = 1.0f/(gamma_table_size-1);
             if(gamma_table_current_gamma_ == -1.0f || gamma_table_current_gamma_ != gamma_) {
-                for(int i=0;i<gamma_table_size;i++) {
-                    gamma_table_[i] = i * t_factor;
-                }
-                gamma_table_[gamma_table_size] = 1.0f;
-                cv::Mat tmp(1,gamma_table_size,CV_32FC1,gamma_table_);
-                cv::pow(tmp,gamma_,tmp);
+                prepare_power_curve(gamma_table_size,gamma_table_,gamma_);
                 gamma_table_current_gamma_ = gamma_;
             }
+        }
+
+        void apply_gamma(cv::Mat &frame)
+        {
+            prepare_gamma();
 
             float *p = (float*)frame.data;
             int N = frame.rows*frame.cols*3;
             int i=0;
-#ifdef V_SIMD
-            using namespace ols;
-            v_f32 one  = v_setall_f32(1.0f);
-            v_f32 mmin = v_setall_f32(gamma_table_size-1.0f);
+#ifdef USE_CV_SIMD
 
             int limit = N / 4 * 4;
 
             for(i=0;i<limit;i+=4,p+=4) {
-                v_f32 v = v_load_f32(p);
-                v_f32 vf = v_mul_f32(v,mmin);
-                v_f32 findx = v_floor_f32(vf);
-                v_s32 indx = v_min_s32(v_setall_s32(gamma_table_size-1),v_max_s32(v_setall_s32(0),v_cvt_f32_s32(findx)));
-                v_f32 w1 = v_sub_f32(vf,findx);
-                v_f32 w0 = v_sub_f32(one,w1);
-
-#if 1        
-                int indexes[4];
-                float p0[4],p1[4];
-                v_store_s32(indexes,indx);
-
-                p0[0] = gamma_table_[indexes[0]];
-                p1[0] = gamma_table_[indexes[0]+1];
-                p0[1] = gamma_table_[indexes[1]];
-                p1[1] = gamma_table_[indexes[1]+1];
-                p0[2] = gamma_table_[indexes[2]];
-                p1[2] = gamma_table_[indexes[2]+1];
-                p0[3] = gamma_table_[indexes[3]];
-                p1[3] = gamma_table_[indexes[3]+1];
-
-                v = v_add_f32(v_mul_f32(w0,v_load_f32(p0)),v_mul_f32(w1,v_load_f32(p1)));
-#else   
-                // for future gather 
-                v_f32 p0 = _mm_i32gather_ps(gamma_table_,indx,4);
-                v_f32 p1 = _mm_i32gather_ps(gamma_table_,_mm_add_epi32(indx,v_setall_s32(1)),4);
-                v = v_add_f32(v_mul_f32(w0,p0),v_mul_f32(w1,p1));
-#endif                
-
-                v_store_f32(p,v);
+                cv::v_float32x4 v = cv::v_load(p);
+                curve_simd(v,gamma_table_size,gamma_table_);
+                cv::v_store(p,v);
             }
 #endif
             for(;i<N;i++,p++) {
                 float v = *p;
-                float vf = v*(gamma_table_size-1);
-                int indx = std::max(0,std::min(gamma_table_size-1,int(vf)));
-                float w1 = vf-indx;
-                float w0 = 1.0f - w1;
-                v = gamma_table_[indx]*w0 + gamma_table_[indx+1]*w1;
+                v = curve_one(v,gamma_table_size,gamma_table_);
                 *p = v;
             }
         }
