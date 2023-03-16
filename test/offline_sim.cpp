@@ -74,12 +74,18 @@ namespace ols {
                     }
                     std::string path = file_name(frame_id,ext);
                     cv::Mat img;
-                    if(ext == "tiff")
+                    int dr;
+                    if(ext == "tiff") {
                         img = load_tiff(path);
-                    else
+                        dr = (1ll << (8*img.elemSize1())) - 1;
+                    }
+                    else {
                         img = cv::imread(path);
+                        dr = 255;
+                    }
                     std::shared_ptr<CameraFrame> frame(new CameraFrame);
                     frame->frame = img;
+                    frame->frame_dr = dr;
                     frame->timestamp = timestamp;
                     BOOSTER_INFO("stacker") << "Loaded image " << (path) << " " << img.rows<<"x"<<img.cols << std::endl;
                     input_queue_->push(frame);
