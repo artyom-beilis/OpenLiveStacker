@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <thread>
+#include <algorithm>
 
 namespace ols {
     class ASIError : public CamError {
@@ -97,9 +98,18 @@ namespace ols {
         virtual std::vector<CamStreamFormat> formats(CamErrorCode &)
         {
             std::vector<CamStreamFormat> res;
+            std::vector<ASI_IMG_TYPE> video_formats;
             for(unsigned i=0;info_.SupportedVideoFormat[i] != ASI_IMG_END && i<sizeof(info_.SupportedVideoFormat)/sizeof(info_.SupportedVideoFormat[0]);i++) {
+                video_formats.push_back(info_.SupportedVideoFormat[i]);
+            }
+            std::stable_sort(video_formats.begin(),video_formats.end(),[](ASI_IMG_TYPE a,ASI_IMG_TYPE b) {
+                int ind_a = a == ASI_IMG_RAW16 ? 0 : 1;
+                int ind_b = b == ASI_IMG_RAW16 ? 0 : 1;
+                return ind_a<ind_b;
+            });
+            for(auto video_format: video_formats) {
                 CamStreamFormat fmt;
-                switch(info_.SupportedVideoFormat[i]) {
+                switch(video_format) {
                 case ASI_IMG_RAW8:
                     fmt.format = info_.IsColorCam ? stream_raw8 : stream_mono8;
                     break;
@@ -115,10 +125,15 @@ namespace ols {
                 default:
                     continue;
                 }
-                fmt.width = info_.MaxWidth;
-                fmt.height = info_.MaxHeight;
                 fmt.framerate = -1;
-                res.push_back(fmt);
+                for(unsigned j=0;info_.SupportedBins[j]!=0 && j < sizeof(info_.SupportedBins)/sizeof(info_.SupportedBins[0]);j++) {
+                    int bin = info_.SupportedBins[j];
+                    if(info_.MaxWidth % bin == 0 && info_.MaxHeight % bin == 0) {
+                        fmt.width = info_.MaxWidth / bin;
+                        fmt.height = info_.MaxHeight / bin;
+                        res.push_back(fmt);
+                    }
+                }
             }
             return res;
         }
@@ -192,7 +207,21 @@ namespace ols {
                 default:
                     throw ASIError("Invalid format");
                 }
-                ASI_ERROR_CODE code  = ASISetROIFormat(info_.CameraID, format.width, format.height, 1, img_type);
+                int bin_w = info_.MaxWidth / format.width;
+                int bin_h = info_.MaxHeight / format.height;
+                if(bin_w != bin_h || bin_w < 1 || info_.MaxWidth % bin_w != 0 || info_.MaxWidth % bin_h !=0)
+                    throw ASIError("Invalid frame dimensions");
+                int bin = 0;
+                for(auto supported_bin : info_.SupportedBins) {
+                    if(supported_bin == bin_w || supported_bin == 0) {
+                        bin = supported_bin;
+                        break;
+                    }
+                }
+                if(bin <=0)
+                    throw ASIError("Unsupported image binning " + std::to_string(bin_w));
+
+                ASI_ERROR_CODE code  = ASISetROIFormat(info_.CameraID, format.width, format.height, bin, img_type);
                 if(code != ASI_SUCCESS) {
                     std::ostringstream ss;
                     ss << "Failed to set ROI of " << format.width << "x" << format.height;
