@@ -53,6 +53,8 @@ std::unique_ptr<CameraDriver> CameraDriver::get(int id,int external_option)
     if((unsigned)id >= driver_calls.size())
         throw CamError("Invalid driver id"); 
     std::unique_ptr<CameraDriver> r(driver_calls.at(id)(external_option));
+    if(!r)
+        throw CamError("Failed to load camera " + std::to_string(id));
     return r;
 }
 std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)

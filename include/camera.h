@@ -8,9 +8,37 @@
 
 namespace ols {
 
+
     class CamError : public std::runtime_error {
     public:
         CamError(std::string const &msg);
+    };
+
+    class CamErrorCode {
+    public:
+        CamErrorCode() : status_(false), message_("ok") {}
+        CamErrorCode(std::string const &msg) :status_(true), message_(msg) {}
+        CamErrorCode(std::exception const &e) : status_(true), message_(e.what())
+        {
+        }
+        CamErrorCode(CamErrorCode const &) = default;
+        CamErrorCode &operator=(CamErrorCode const &) = default;
+        explicit operator bool() const
+        {
+            return status_;
+        }
+        std::string const &message() const
+        {
+            return message_;
+        }
+        void check()
+        {
+            if(status_)
+                throw CamError(message_);
+        }
+    private:
+        bool status_;
+        std::string message_;
     };
 
     enum CamOptionId {
@@ -105,6 +133,14 @@ namespace ols {
     ///
     /// Generic Camera interface - to be implemented for new camera driver
     ///
+    /// Note we are using CamErrorCode instead of throwing C++ acception because 
+    /// bloody Android NDK does not handle exceptions accross dynamically loaded
+    /// shared object boundaries...
+    ///
+    /// So falling back to C--/C with classes methods :(
+    ///
+    /// it is not me... it is Android :-/
+    ///
     class Camera {
     public:
         Camera() {}
@@ -114,22 +150,27 @@ namespace ols {
         void operator = (Camera &&) = delete;
         
         /// Camera name
-        virtual std::string name() = 0;
+        virtual std::string name(CamErrorCode &e) = 0;
         /// Return list of suppored video formats
-        virtual std::vector<CamStreamFormat> formats() = 0;
+        virtual std::vector<CamStreamFormat> formats(CamErrorCode &e) = 0;
 
         /// Start a video stream with provided callback 
-        virtual void start_stream(CamStreamFormat format,frame_callback_type callback) = 0;
+        virtual void start_stream(CamStreamFormat format,frame_callback_type callback,CamErrorCode &e) = 0;
 
         /// stop the stream - once function ends callback will not be called any more
-        virtual void stop_stream() = 0;
+        virtual void stop_stream(CamErrorCode &e) = 0;
 
         /// list of camera controls that the camera supports
-        virtual std::vector<CamOptionId> supported_options() = 0;
+        virtual std::vector<CamOptionId> supported_options(CamErrorCode &e) = 0;
         /// get camera control
-        virtual CamParam get_parameter(CamOptionId id,bool current_only = false) = 0;
+        CamParam get_parameter(CamOptionId id,CamErrorCode &e) 
+        {
+            return get_parameter(id,false,e);
+        }
+        virtual CamParam get_parameter(CamOptionId id,bool current_only,CamErrorCode &e) = 0;
         /// set camera control
-        virtual void set_parameter(CamOptionId id,double value) = 0;
+        virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e) = 0;
+
         virtual ~Camera() {}
     };
 
@@ -141,13 +182,13 @@ namespace ols {
         /// list supported drivers
         static std::vector<std::string> drivers();
         /// get driver - by its order in the \a drivers result
-        static std::unique_ptr<CameraDriver> get(int id,int external_option = -1);
+        static std::unique_ptr<CameraDriver> get(int id,int external_option);
 
         /// list all cameras connected and supported by this driver
-        virtual std::vector<std::string> list_cameras() = 0;
+        virtual std::vector<std::string> list_cameras(CamErrorCode &e) = 0;
 
         /// get camera object for camera according to the index in list_cameras
-        virtual std::unique_ptr<Camera> open_camera(int id) = 0;
+        virtual std::unique_ptr<Camera> open_camera(int id,CamErrorCode &e) = 0;
 
         virtual ~CameraDriver() {}
     };

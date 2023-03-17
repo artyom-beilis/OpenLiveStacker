@@ -87,16 +87,14 @@ namespace ols {
             else {
                 cmd->output_path = calibration_path_;
             }
-            BOOSTER_INFO("stacker") << "Get gamma from camera";
             {
+                CamErrorCode e;
                 std::unique_lock<std::recursive_mutex> guard(cam_->lock());
-                auto opts = cam_->cam().supported_options();
-                if(std::find(opts.begin(),opts.end(),opt_gamma) != opts.end())
-                    cmd->source_gamma = cam_->cam().get_parameter(opt_gamma,true).cur_val;
-                else
+                cmd->source_gamma = cam_->cam().get_parameter(opt_gamma,true,e).cur_val;
+                if(e)
                     cmd->source_gamma = 1.0;
             }
-            BOOSTER_INFO("stacker") << "Using camera gamma = " << cmd->source_gamma; 
+                
             cmd->lat = content_.get("location.lat",cmd->lat);
             cmd->lon = content_.get("location.lon",cmd->lon);
             cmd->ra = content_.get("target.ra",cmd->ra);

@@ -42,13 +42,18 @@ namespace ols {
                 uvc_stop_streaming(devh_);
             uvc_close(devh_);
         }
-        virtual std::string name()
+        virtual std::string name(CamErrorCode &)
         {
             return name_;
         }
-        virtual std::vector<CamStreamFormat> formats() 
+        virtual std::vector<CamStreamFormat> formats(CamErrorCode &e) 
         {
-            read_formats();
+            try {
+                read_formats();
+            }
+            catch(std::exception const &err) {
+                e = CamErrorCode(err);
+            }
             return formats_;
         }
         void set_error(CamFrame &frm,char const *msg)
@@ -98,64 +103,77 @@ namespace ols {
             }
 
         }
-        virtual void start_stream(CamStreamFormat fmt,frame_callback_type cb) 
+        virtual void start_stream(CamStreamFormat fmt,frame_callback_type cb,CamErrorCode &e) 
         {
-            if(stream_active_)
-                stop_stream();
-
-            int index = -1;
-            for(size_t i=0;i<formats_.size();i++) {
-                CamStreamFormat &ref_fmt = formats_[i];
-                if(ref_fmt.width == fmt.width 
-                   && ref_fmt.height == fmt.height
-                   && ref_fmt.format == fmt.format
-                   && (fmt.framerate < 0 || ref_fmt.framerate == fmt.framerate))
-                {
-                    index = i;
-                    break;
+            try {
+                if(stream_active_) {
+                    stop_stream(e);
+                    if(e)
+                        return;
                 }
-            }
-            if(index == -1)
-                throw UVCError("No apropriate stream format for camera");
 
-            int tries = 0;
-            uvc_error_t res;
-            while(tries < 5) {
-                res = uvc_get_stream_ctrl_format_size(devh_,
-                        &ctrl_,
-                        (fmt.format == stream_yuv2 ? UVC_FRAME_FORMAT_YUYV : UVC_FRAME_FORMAT_MJPEG),
-                        fmt.width,fmt.height,
-                        formats_[index].framerate);
-                if(res == 0)
-                    break;
-                tries ++;
-            }
-            if(res < 0) {
-                throw UVCError("Failed to create stram control",res);
-            }
-            {
-                std::unique_lock<std::mutex> guard(lock_);
-                callback_ = cb;
-            }
+                int index = -1;
+                for(size_t i=0;i<formats_.size();i++) {
+                    CamStreamFormat &ref_fmt = formats_[i];
+                    if(ref_fmt.width == fmt.width 
+                       && ref_fmt.height == fmt.height
+                       && ref_fmt.format == fmt.format
+                       && (fmt.framerate < 0 || ref_fmt.framerate == fmt.framerate))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+                if(index == -1)
+                    throw UVCError("No apropriate stream format for camera");
 
-            res = uvc_start_streaming(devh_,&ctrl_,ols_uvccamera_callback,this,0);
-            if(res < 0) {
-                throw UVCError("Failed to start stream : " + std::to_string(res),res);
+                int tries = 0;
+                uvc_error_t res;
+                while(tries < 5) {
+                    res = uvc_get_stream_ctrl_format_size(devh_,
+                            &ctrl_,
+                            (fmt.format == stream_yuv2 ? UVC_FRAME_FORMAT_YUYV : UVC_FRAME_FORMAT_MJPEG),
+                            fmt.width,fmt.height,
+                            formats_[index].framerate);
+                    if(res == 0)
+                        break;
+                    tries ++;
+                }
+                if(res < 0) {
+                    throw UVCError("Failed to create stram control",res);
+                }
+                {
+                    std::unique_lock<std::mutex> guard(lock_);
+                    callback_ = cb;
+                }
+
+                res = uvc_start_streaming(devh_,&ctrl_,ols_uvccamera_callback,this,0);
+                if(res < 0) {
+                    throw UVCError("Failed to start stream : " + std::to_string(res),res);
+                }
+                stream_active_ = true;
             }
-            stream_active_ = true;
+            catch(std::exception const &err) {
+                e = CamErrorCode(err);
+            }
         }
-        virtual void stop_stream() 
+        virtual void stop_stream(CamErrorCode &e) 
         {
-            if(!stream_active_)
-                return;
-            {
-                std::unique_lock<std::mutex> guard(lock_);
-                callback_ = nullptr;
+            try {
+                if(!stream_active_)
+                    return;
+                {
+                    std::unique_lock<std::mutex> guard(lock_);
+                    callback_ = nullptr;
+                }
+                uvc_stop_streaming(devh_);
+                stream_active_ = false;
             }
-            uvc_stop_streaming(devh_);
-            stream_active_ = false;
+            catch(std::exception const &err) {
+                e = CamErrorCode(err);
+            }
         }
-        virtual std::vector<CamOptionId> supported_options() 
+        virtual std::vector<CamOptionId> supported_options(CamErrorCode &) 
         {
             std::vector<CamOptionId> controls;
             uvc_input_terminal_t const *ct = uvc_get_camera_terminal(devh_);
@@ -207,134 +225,144 @@ namespace ols {
             r.step_size = vals[3]*scale;
             r.max_val   = vals[4]*scale;
         }
-        virtual CamParam get_parameter(CamOptionId op_id,bool current_only = false)
+        virtual CamParam get_parameter(CamOptionId op_id,bool current_only,CamErrorCode &e)
         {
             CamParam r;
             memset(&r,0,sizeof(r));
             r.option = op_id;
-            switch(op_id) {
-            case opt_auto_exp:
-                {
-                    r.type = type_bool;
-                    uint8_t cur,def = 0;
-                    uvc_error_t res = uvc_get_ae_mode(devh_,&cur,UVC_GET_CUR);
-                    if(res < 0)
-                        throw UVCError("AE query failed",res);
-                    if(!current_only) {
-                        uvc_error_t res = uvc_get_ae_mode(devh_,&def,UVC_GET_DEF);
+            try {
+                switch(op_id) {
+                case opt_auto_exp:
+                    {
+                        r.type = type_bool;
+                        uint8_t cur,def = 0;
+                        uvc_error_t res = uvc_get_ae_mode(devh_,&cur,UVC_GET_CUR);
                         if(res < 0)
                             throw UVCError("AE query failed",res);
+                        if(!current_only) {
+                            uvc_error_t res = uvc_get_ae_mode(devh_,&def,UVC_GET_DEF);
+                            if(res < 0)
+                                throw UVCError("AE query failed",res);
+                        }
+                        
+                        r.step_size = r.max_val =  1;
+                        r.min_val = 0;
+                        r.cur_val = cur == 2 || cur == 8;
+                        r.def_val = def == 2 || def == 8;
                     }
-                    
-                    r.step_size = r.max_val =  1;
-                    r.min_val = 0;
-                    r.cur_val = cur == 2 || cur == 8;
-                    r.def_val = def == 2 || def == 8;
-                }
-                break;
-            case opt_auto_wb:
-                {
-                    r.type = type_bool;
-                    uint8_t cur,def = 0;
-                    uvc_error_t res = uvc_get_white_balance_temperature_auto(devh_,&cur,UVC_GET_CUR);
-                    if(res < 0) {
-                        res = uvc_get_white_balance_component_auto(devh_,&cur,UVC_GET_CUR);
-                        if(res < 0)
-                            throw UVCError("WB query failed",res);
-                    }
-                    if(!current_only) {
-                        uvc_error_t res = uvc_get_white_balance_temperature_auto(devh_,&def,UVC_GET_DEF);
+                    break;
+                case opt_auto_wb:
+                    {
+                        r.type = type_bool;
+                        uint8_t cur,def = 0;
+                        uvc_error_t res = uvc_get_white_balance_temperature_auto(devh_,&cur,UVC_GET_CUR);
                         if(res < 0) {
-                            res = uvc_get_white_balance_component_auto(devh_,&def,UVC_GET_DEF);
+                            res = uvc_get_white_balance_component_auto(devh_,&cur,UVC_GET_CUR);
                             if(res < 0)
                                 throw UVCError("WB query failed",res);
                         }
+                        if(!current_only) {
+                            uvc_error_t res = uvc_get_white_balance_temperature_auto(devh_,&def,UVC_GET_DEF);
+                            if(res < 0) {
+                                res = uvc_get_white_balance_component_auto(devh_,&def,UVC_GET_DEF);
+                                if(res < 0)
+                                    throw UVCError("WB query failed",res);
+                            }
+                        }
+                        
+                        r.step_size = r.max_val =  1;
+                        r.min_val = 0;
+                        r.cur_val = cur != 0;
+                        r.def_val = def != 0;
                     }
-                    
-                    r.step_size = r.max_val =  1;
-                    r.min_val = 0;
-                    r.cur_val = cur != 0;
-                    r.def_val = def != 0;
+                    break;
+                case opt_exp:
+                    r.type = type_msec;
+                    update_parameters<uint32_t>(r,uvc_get_exposure_abs,0.1,current_only);
+                    break;
+                case opt_wb:
+                    r.type = type_kelvin;
+                    update_parameters<uint16_t>(r,uvc_get_white_balance_temperature,1.0,current_only);
+                    break;
+                case opt_gamma:
+                    r.type = type_number;
+                    update_parameters<uint16_t>(r,uvc_get_gamma,1e-2,current_only);
+                    break;
+                case opt_gain:
+                    r.type = type_number;
+                    update_parameters<uint16_t>(r,uvc_get_gain,1,current_only);
+                    break;
+                case opt_brightness:
+                    r.type = type_number;
+                    update_parameters<int16_t>(r,uvc_get_brightness,1,current_only);
+                    break;
+                case opt_contrast:
+                    r.type = type_number;
+                    update_parameters<uint16_t>(r,uvc_get_contrast,1,current_only);
+                    break;
+                default:
+                    throw UVCError("Option not supported" + cam_option_id_to_name(op_id));
                 }
-                break;
-            case opt_exp:
-                r.type = type_msec;
-                update_parameters<uint32_t>(r,uvc_get_exposure_abs,0.1,current_only);
-                break;
-            case opt_wb:
-                r.type = type_kelvin;
-                update_parameters<uint16_t>(r,uvc_get_white_balance_temperature,1.0,current_only);
-                break;
-            case opt_gamma:
-                r.type = type_number;
-                update_parameters<uint16_t>(r,uvc_get_gamma,1e-2,current_only);
-                break;
-            case opt_gain:
-                r.type = type_number;
-                update_parameters<uint16_t>(r,uvc_get_gain,1,current_only);
-                break;
-            case opt_brightness:
-                r.type = type_number;
-                update_parameters<int16_t>(r,uvc_get_brightness,1,current_only);
-                break;
-            case opt_contrast:
-                r.type = type_number;
-                update_parameters<uint16_t>(r,uvc_get_contrast,1,current_only);
-                break;
-            default:
-                throw UVCError("Option not supported" + cam_option_id_to_name(op_id));
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
             }
             return r;
         }
-        virtual void set_parameter(CamOptionId opt_id,double value)
+        virtual void set_parameter(CamOptionId opt_id,double value,CamErrorCode &e)
         {
-            uvc_error_t res;
-            switch(opt_id) {
-            case opt_auto_exp:
-                if(value != 0){
-                    res = uvc_set_ae_mode(devh_,2);
-                    if(res < 0) {
-                        res = uvc_set_ae_mode(devh_,8);
-                    }
-                }
-                else {
-                    res = uvc_set_ae_mode(devh_,0);
-                    if(res < 0) {
-                        res = uvc_set_ae_mode(devh_,4);
+            try {
+                uvc_error_t res;
+                switch(opt_id) {
+                case opt_auto_exp:
+                    if(value != 0){
+                        res = uvc_set_ae_mode(devh_,2);
                         if(res < 0) {
-                            res = uvc_set_ae_mode(devh_,1);
+                            res = uvc_set_ae_mode(devh_,8);
                         }
                     }
+                    else {
+                        res = uvc_set_ae_mode(devh_,0);
+                        if(res < 0) {
+                            res = uvc_set_ae_mode(devh_,4);
+                            if(res < 0) {
+                                res = uvc_set_ae_mode(devh_,1);
+                            }
+                        }
+                    }
+                    break;
+                case opt_auto_wb:
+                    res = uvc_set_white_balance_temperature_auto(devh_,value ? 1 : 0);
+                    if(res < 0)
+                        res = uvc_set_white_balance_component_auto(devh_,value ? 1:0);
+                    break;
+                case opt_exp:
+                    res = uvc_set_exposure_abs(devh_,value*10);
+                    break;
+                case opt_wb:
+                    res = uvc_set_white_balance_temperature(devh_,value);
+                    break;
+                case opt_gain:
+                    res = uvc_set_gain(devh_,value);
+                    break;
+                case opt_gamma:
+                    res = uvc_set_gamma(devh_,value*100); 
+                    break;
+                case opt_brightness:
+                    res = uvc_set_brightness(devh_,value);
+                    break;
+                case opt_contrast:
+                    res = uvc_set_contrast(devh_,value);
+                    break;
+                default:
+                    throw UVCError("Option not supported" + cam_option_id_to_name(opt_id));
                 }
-                break;
-            case opt_auto_wb:
-                res = uvc_set_white_balance_temperature_auto(devh_,value ? 1 : 0);
-                if(res < 0)
-                    res = uvc_set_white_balance_component_auto(devh_,value ? 1:0);
-                break;
-            case opt_exp:
-                res = uvc_set_exposure_abs(devh_,value*10);
-                break;
-            case opt_wb:
-                res = uvc_set_white_balance_temperature(devh_,value);
-                break;
-            case opt_gain:
-                res = uvc_set_gain(devh_,value);
-                break;
-            case opt_gamma:
-                res = uvc_set_gamma(devh_,value*100); 
-                break;
-            case opt_brightness:
-                res = uvc_set_brightness(devh_,value);
-                break;
-            case opt_contrast:
-                res = uvc_set_contrast(devh_,value);
-                break;
-            default:
-                throw UVCError("Option not supported" + cam_option_id_to_name(opt_id));
+                if(res < 0) {
+                    throw UVCError("Failed to set option" + cam_option_id_to_name(opt_id),res);
+                }
             }
-            if(res < 0) {
-                throw UVCError("Failed to set option" + cam_option_id_to_name(opt_id),res);
+            catch(std::exception const &err) {
+                e = CamErrorCode(err);
             }
         }
 
@@ -393,9 +421,14 @@ namespace ols {
                 throw UVCError("Failed to init libuvc",res);
         }
 
-        virtual std::vector<std::string> list_cameras() 
+        virtual std::vector<std::string> list_cameras(CamErrorCode &e) 
         {
-            load_device_list();
+            try {
+                load_device_list();
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
+            }
             return names_;
         }
         ~UVCCameraDriver()
@@ -405,14 +438,20 @@ namespace ols {
                 uvc_free_device_list(device_list_,1);
         }
 
-        std::unique_ptr<Camera> open_camera(int id)
+        std::unique_ptr<Camera> open_camera(int id,CamErrorCode &e)
         {
-            load_device_list();
-            if(id < 0 || size_t(id) >= name_to_device_.size()) {
-                throw UVCError("No device with index #" + std::to_string(id));
+            try {
+                load_device_list();
+                if(id < 0 || size_t(id) >= name_to_device_.size()) {
+                    throw UVCError("No device with index #" + std::to_string(id));
+                }
+                std::unique_ptr<Camera> camera(new UVCCamera(device_list_[name_to_device_[id]],names_[id]));
+                return camera;
             }
-            std::unique_ptr<Camera> camera(new UVCCamera(device_list_[name_to_device_[id]],names_[id]));
-            return camera;
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
+                return std::unique_ptr<Camera>();
+            }
         }
 
     private:
@@ -475,16 +514,22 @@ namespace ols {
             uvc_exit(ctx_);
         }
 
-        std::unique_ptr<Camera> open_camera(int id)
+        std::unique_ptr<Camera> open_camera(int id,CamErrorCode &e)
         {
-            if(id != 0)
-                throw UVCError("Invalid device number");
-            uvc_device_handle_t *devh = nullptr;
-            uvc_error_t res = uvc_wrap(fd_,ctx_,&devh);
-            if(res < 0)
-                throw UVCError("Failed to wrap fd",res);
-            std::unique_ptr<Camera> camera(new UVCCamera(devh,"camera_0"));
-            return camera;
+            try {
+                if(id != 0)
+                    throw UVCError("Invalid device number");
+                uvc_device_handle_t *devh = nullptr;
+                uvc_error_t res = uvc_wrap(fd_,ctx_,&devh);
+                if(res < 0)
+                    throw UVCError("Failed to wrap fd",res);
+                std::unique_ptr<Camera> camera(new UVCCamera(devh,"camera_0"));
+                return camera;
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
+                return std::unique_ptr<Camera>();
+            }
         }
 
     private:

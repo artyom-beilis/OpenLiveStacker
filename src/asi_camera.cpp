@@ -77,10 +77,11 @@ namespace ols {
         virtual ~ASICamera()
         {
             try {
-                stop_stream();
-            }
-            catch(std::exception const &e) {
-                fprintf(stderr,"Failed to close stream %s\n",e.what());
+                CamErrorCode e;
+                stop_stream(e);
+                if(e) {
+                    fprintf(stderr,"Failed to close stream %s\n",e.message().c_str());
+                }
             }
             catch(...) {
                 fprintf(stderr,"Failed to close stream\n");
@@ -88,12 +89,12 @@ namespace ols {
             ASICloseCamera(info_.CameraID);
         }
         /// Camera name
-        virtual std::string name() 
+        virtual std::string name(CamErrorCode &) 
         {
             return info_.Name;
         }
         /// Return list of suppored video formats
-        virtual std::vector<CamStreamFormat> formats()
+        virtual std::vector<CamStreamFormat> formats(CamErrorCode &)
         {
             std::vector<CamStreamFormat> res;
             for(unsigned i=0;info_.SupportedVideoFormat[i] != ASI_IMG_END && i<sizeof(info_.SupportedVideoFormat)/sizeof(info_.SupportedVideoFormat[0]);i++) {
@@ -160,169 +161,199 @@ namespace ols {
         }
 
         /// Start a video stream with provided callback 
-        virtual void start_stream(CamStreamFormat format,frame_callback_type callback) 
+        virtual void start_stream(CamStreamFormat format,frame_callback_type callback,CamErrorCode &e) 
         {
-            if(stream_active_ != 0)
-                stop_stream();
-            ASI_IMG_TYPE img_type;
-            int bpp=-1;
-            switch(format.format) {
-            case stream_rgb24:
-                img_type = ASI_IMG_RGB24;
-                bpp=3;
-                break;
-            case stream_raw16:
-            case stream_mono16:
-                img_type = ASI_IMG_RAW16;
-                bpp=2;
-                break;
-            case stream_raw8:
-                img_type = ASI_IMG_RAW8;
-                bpp=1;
-                break;
-            case stream_mono8:
-                img_type = ASI_IMG_Y8;
-                bpp=1;
-                break;
-            default:
-                throw ASIError("Invalid format");
-            }
-            ASI_ERROR_CODE code  = ASISetROIFormat(info_.CameraID, format.width, format.height, 1, img_type);
-            if(code != ASI_SUCCESS) {
-                std::ostringstream ss;
-                ss << "Failed to set ROI of " << format.width << "x" << format.height;
-                throw ASIError(ss.str(),code);
-            }
-            code = ASIStartVideoCapture(info_.CameraID);
-            if(code != ASI_SUCCESS)
-                throw ASIError("Failed to start video",code);
-            {
-                std::unique_lock<std::mutex> guard(lock_);
-                callback_ = callback;
-            }
-                
-            stream_active_ = 1;
-            thread_ = std::move(std::thread([=]() {
-                std::vector<unsigned char> buf(format.width*format.height*bpp);
-                while(true) {
-                    ASI_ERROR_CODE status = ASIGetVideoData(info_.CameraID,buf.data(),buf.size(),500); 
-                    if(status == ASI_SUCCESS) {
-                        handle_frame(format,buf);
-                    }
-                    else if(status == ASI_ERROR_TIMEOUT) {
-                        if(stream_active_ == 0)
-                            break;
-                        continue;
-                    }
-                    else {
-                        break;
-                    }
+            try {
+                if(stream_active_ != 0) {
+                    stop_stream(e);
+                    if(e)
+                        return;
                 }
-            }));
+                ASI_IMG_TYPE img_type;
+                int bpp=-1;
+                switch(format.format) {
+                case stream_rgb24:
+                    img_type = ASI_IMG_RGB24;
+                    bpp=3;
+                    break;
+                case stream_raw16:
+                case stream_mono16:
+                    img_type = ASI_IMG_RAW16;
+                    bpp=2;
+                    break;
+                case stream_raw8:
+                    img_type = ASI_IMG_RAW8;
+                    bpp=1;
+                    break;
+                case stream_mono8:
+                    img_type = ASI_IMG_Y8;
+                    bpp=1;
+                    break;
+                default:
+                    throw ASIError("Invalid format");
+                }
+                ASI_ERROR_CODE code  = ASISetROIFormat(info_.CameraID, format.width, format.height, 1, img_type);
+                if(code != ASI_SUCCESS) {
+                    std::ostringstream ss;
+                    ss << "Failed to set ROI of " << format.width << "x" << format.height;
+                    throw ASIError(ss.str(),code);
+                }
+                code = ASIStartVideoCapture(info_.CameraID);
+                if(code != ASI_SUCCESS)
+                    throw ASIError("Failed to start video",code);
+                {
+                    std::unique_lock<std::mutex> guard(lock_);
+                    callback_ = callback;
+                }
+                    
+                stream_active_ = 1;
+                thread_ = std::move(std::thread([=]() {
+                    std::vector<unsigned char> buf(format.width*format.height*bpp);
+                    while(true) {
+                        ASI_ERROR_CODE status = ASIGetVideoData(info_.CameraID,buf.data(),buf.size(),500); 
+                        if(status == ASI_SUCCESS) {
+                            handle_frame(format,buf);
+                        }
+                        else if(status == ASI_ERROR_TIMEOUT) {
+                            if(stream_active_ == 0)
+                                break;
+                            continue;
+                        }
+                        else {
+                            break;
+                        }
+                    }
+                }));
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
+            }
+            
         }
 
         /// stop the stream - once function ends callback will not be called any more
-        virtual void stop_stream()
+        virtual void stop_stream(CamErrorCode &e)
         {
-            if(stream_active_ == 0)
-                return;
-            {
-                std::unique_lock<std::mutex> guard(lock_);
-                callback_ = nullptr;
+            try {
+                if(stream_active_ == 0)
+                    return;
+                {
+                    std::unique_lock<std::mutex> guard(lock_);
+                    callback_ = nullptr;
+                }
+                ASI_ERROR_CODE code = ASIStopVideoCapture(info_.CameraID);
+                if(code != ASI_SUCCESS)
+                    throw ASIError("Failed to stop stream",code);
+                stream_active_=0;
+                thread_.join();
             }
-            ASI_ERROR_CODE code = ASIStopVideoCapture(info_.CameraID);
-            if(code != ASI_SUCCESS)
-                throw ASIError("Failed to stop stream",code);
-            stream_active_=0;
-            thread_.join();
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
+            }
         }
 
         /// list of camera controls that the camera supports
-        virtual std::vector<CamOptionId> supported_options()
+        virtual std::vector<CamOptionId> supported_options(CamErrorCode &e)
         {
-            int N=0;
-            ASI_ERROR_CODE code = ASIGetNumOfControls(info_.CameraID,&N);
-            if(code)
-                throw ASIError("Failed to get controls",code);
             std::vector<CamOptionId> opts;
-            for(int i=0;i<N;i++) {
-                ASI_CONTROL_CAPS cap;
-                code = ASIGetControlCaps(info_.CameraID,i,&cap);
+            try {
+                int N=0;
+                ASI_ERROR_CODE code = ASIGetNumOfControls(info_.CameraID,&N);
                 if(code)
-                    throw ASIError("Failed to get control info",code);
-                std::cerr << cap.Name << " min=" << cap.MinValue << " max=" << cap.MaxValue << " def=" << cap.DefaultValue << " auto=" << cap.IsAutoSupported <<" :" << cap.Description<< std::endl;
-                switch(cap.ControlType) {
-                case ASI_GAIN:
-                    opts.push_back(opt_gain);
-                    ops_map_[opt_gain] = cap;
-                    break;
-                case ASI_EXPOSURE:
-                    opts.push_back(opt_exp);
-                    ops_map_[opt_exp] = cap;
-                    break;
-                default:
-                    continue;
+                    throw ASIError("Failed to get controls",code);
+                for(int i=0;i<N;i++) {
+                    ASI_CONTROL_CAPS cap;
+                    code = ASIGetControlCaps(info_.CameraID,i,&cap);
+                    if(code)
+                        throw ASIError("Failed to get control info",code);
+                    std::cerr << cap.Name << " min=" << cap.MinValue << " max=" << cap.MaxValue << " def=" << cap.DefaultValue << " auto=" << cap.IsAutoSupported <<" :" << cap.Description<< std::endl;
+                    switch(cap.ControlType) {
+                    case ASI_GAIN:
+                        opts.push_back(opt_gain);
+                        ops_map_[opt_gain] = cap;
+                        break;
+                    case ASI_EXPOSURE:
+                        opts.push_back(opt_exp);
+                        ops_map_[opt_exp] = cap;
+                        break;
+                    default:
+                        continue;
+                    }
                 }
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
             }
             return opts;
         }
         /// get camera control
-        virtual CamParam get_parameter(CamOptionId id,bool /*current_only = false*/) 
+        virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e) 
         {
-            auto p = ops_map_.find(id);
-            if(p==ops_map_.end())
-                throw ASIError("Option " +  cam_option_id_to_name(id));
-            auto cap = p->second;
             CamParam r;
-            memset(&r,0,sizeof(r));
-            r.option = id;
-            long val;
-            ASI_BOOL auto_val;
-            ASI_ERROR_CODE code = ASIGetControlValue(info_.CameraID,cap.ControlType,&val,&auto_val);
-            if(code)
-                throw ASIError("Failed to get control value",code);
-            switch(id) {
-            case opt_exp:
-                {
-                    r.type = type_msec;
-                    r.min_val = cap.MinValue * 1e-3; 
-                    r.max_val = cap.MaxValue * 1e-3; 
-                    r.def_val = cap.DefaultValue * 1e-3;
-                    r.cur_val = val * 1e-3;
-                    r.step_size = 1e-3;
+            auto p = ops_map_.find(id);
+            try {
+                if(p==ops_map_.end())
+                    throw ASIError("Option " +  cam_option_id_to_name(id));
+                auto cap = p->second;
+                memset(&r,0,sizeof(r));
+                r.option = id;
+                long val;
+                ASI_BOOL auto_val;
+                ASI_ERROR_CODE code = ASIGetControlValue(info_.CameraID,cap.ControlType,&val,&auto_val);
+                if(code)
+                    throw ASIError("Failed to get control value",code);
+                switch(id) {
+                case opt_exp:
+                    {
+                        r.type = type_msec;
+                        r.min_val = cap.MinValue * 1e-3; 
+                        r.max_val = cap.MaxValue * 1e-3; 
+                        r.def_val = cap.DefaultValue * 1e-3;
+                        r.cur_val = val * 1e-3;
+                        r.step_size = 1e-3;
+                    }
+                    break;
+                case opt_gain:
+                    {
+                        r.type = type_number;
+                        r.min_val = cap.MinValue;
+                        r.max_val = cap.MaxValue;
+                        r.def_val = cap.DefaultValue;
+                        r.cur_val = val;
+                        r.step_size = 1;
+                    }
+                    break;
+                default:
+                    throw ASIError("Internal error can't get control");
                 }
-                break;
-            case opt_gain:
-                {
-                    r.type = type_number;
-                    r.min_val = cap.MinValue;
-                    r.max_val = cap.MaxValue;
-                    r.def_val = cap.DefaultValue;
-                    r.cur_val = val;
-                    r.step_size = 1;
-                }
-                break;
-            default:
-                throw ASIError("Internal error can't get control");
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
             }
             return r;
         }
         /// set camera control
-        virtual void set_parameter(CamOptionId id,double value)
+        virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e)
         {
-            ASI_ERROR_CODE code;
-            switch(id) {
-            case opt_exp:
-                code = ASISetControlValue(info_.CameraID,ASI_EXPOSURE,long(value*1000),ASI_FALSE);
-                break;
-            case opt_gain:
-                code = ASISetControlValue(info_.CameraID,ASI_GAIN,long(value),ASI_FALSE);
-                break;
-            default:
-                throw ASIError("Unimplemented");
+            try {
+                ASI_ERROR_CODE code;
+                switch(id) {
+                case opt_exp:
+                    code = ASISetControlValue(info_.CameraID,ASI_EXPOSURE,long(value*1000),ASI_FALSE);
+                    break;
+                case opt_gain:
+                    code = ASISetControlValue(info_.CameraID,ASI_GAIN,long(value),ASI_FALSE);
+                    break;
+                default:
+                    throw ASIError("Unimplemented");
+                }
+                if(code)
+                    throw ASIError("Failed to set option", code);
             }
-            if(code)
-                throw ASIError("Failed to set option", code);
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
+            }
+
         }
     private:
         ASI_CAMERA_INFO info_;
@@ -347,16 +378,22 @@ namespace ols {
                 throw ASIError("Failed to access camera",code);
             name_ = info.Name;
         }
-        virtual std::vector<std::string> list_cameras() 
+        virtual std::vector<std::string> list_cameras(CamErrorCode &) 
         {
             return {name_};
         }
-        virtual std::unique_ptr<Camera> open_camera(int id) 
+        virtual std::unique_ptr<Camera> open_camera(int id,CamErrorCode &e)
         {
-            if(id!=0)
-                throw ASIError("No such camera " + std::to_string(id));
-            std::unique_ptr<Camera> cam(new ASICamera(id_));
-            return cam;
+            try {
+                if(id!=0)
+                    throw ASIError("No such camera " + std::to_string(id));
+                std::unique_ptr<Camera> cam(new ASICamera(id_));
+                return cam;
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
+                return std::unique_ptr<Camera>();
+            }
         }
     private:
         int id_;
@@ -366,27 +403,38 @@ namespace ols {
 
     class ASICameraDriver : public CameraDriver {
     public:
-        virtual std::vector<std::string> list_cameras() 
+        virtual std::vector<std::string> list_cameras(CamErrorCode &e) 
         {
-            int N = ASIGetNumOfConnectedCameras();
-            ASI_CAMERA_INFO info;
-            ASI_ERROR_CODE r;
-            for(int i=0;i<N;i++) {
-                r=ASIGetCameraProperty(&info,i);
-                if(r!=ASI_SUCCESS)
-                    throw ASIError("Failed to get camera details",r);
-                std::string name = std::string(info.Name) + "/" + std::to_string(i);
-                names_.push_back(name);
-                cams_.push_back(info);
+            try {
+                int N = ASIGetNumOfConnectedCameras();
+                ASI_CAMERA_INFO info;
+                ASI_ERROR_CODE r;
+                for(int i=0;i<N;i++) {
+                    r=ASIGetCameraProperty(&info,i);
+                    if(r!=ASI_SUCCESS)
+                        throw ASIError("Failed to get camera details",r);
+                    std::string name = std::string(info.Name) + "/" + std::to_string(i);
+                    names_.push_back(name);
+                    cams_.push_back(info);
+                }
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
             }
             return names_;
         }
-        virtual std::unique_ptr<Camera> open_camera(int id) 
+        virtual std::unique_ptr<Camera> open_camera(int id,CamErrorCode &e) 
         {
-            if(size_t(id) >= cams_.size())
-                throw ASIError("No such camera " + std::to_string(id));
-            std::unique_ptr<Camera> cam(new ASICamera(cams_.at(id)));
-            return cam;
+            try {
+                if(size_t(id) >= cams_.size())
+                    throw ASIError("No such camera " + std::to_string(id));
+                std::unique_ptr<Camera> cam(new ASICamera(cams_.at(id)));
+                return cam;
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
+                return std::unique_ptr<Camera>();
+            }
         }
     private:
         std::vector<ASI_CAMERA_INFO> cams_;

@@ -77,7 +77,9 @@ namespace ols {
         virtual ~SIMCamera()
         {
             try {
-                stop_stream();
+                CamErrorCode e;
+                stop_stream(e);
+                e.check();
             }
             catch(std::exception const &e) {
                 fprintf(stderr,"Failed to close stream %s\n",e.what());
@@ -87,12 +89,12 @@ namespace ols {
             }
         }
         /// Camera name
-        virtual std::string name() 
+        virtual std::string name(CamErrorCode &) 
         {
             return "sim";
         }
         /// Return list of suppored video formats
-        virtual std::vector<CamStreamFormat> formats()
+        virtual std::vector<CamStreamFormat> formats(CamErrorCode &)
         {
             std::vector<CamStreamFormat> res;
             CamStreamFormat fmt;
@@ -156,73 +158,85 @@ namespace ols {
         }
 
         /// Start a video stream with provided callback 
-        virtual void start_stream(CamStreamFormat format,frame_callback_type callback) 
+        virtual void start_stream(CamStreamFormat format,frame_callback_type callback,CamErrorCode &e) 
         {
-            if(stream_active_ != 0)
-                stop_stream();
-            if(format.format != stream_ || format.width != width_ || format.height != height_)
-                throw SIMError("Invalid format");
-            {
-                std::unique_lock<std::mutex> guard(lock_);
-                callback_ = callback;
-            }
-            stream_active_ = 1;
-            thread_ = std::move(std::thread([=]() {
-                int size = frames_.size();
-                double next_time = timestamp() + exposure_ * 1e-3;
-                while(stream_active_) {
-                    double remains;
-                    while((remains = (next_time - timestamp()))>= 1e-3) {
-                        double ms = std::min(remains * 1000,500.0);
-                        std::this_thread::sleep_for(std::chrono::milliseconds(int(ms)));
-                        if(stream_active_ != 1)
-                            return;
-                    }
-                    next_time += exposure_ * 1e-3;
-                    handle_frame(current_index_);
-                    if(current_dir_ == 1) {
-                        if(current_index_ >= size - 1) {
-                            current_index_ = std::max(0,current_index_ - 1);
-                            current_dir_ = -1;
-                        }
-                        else {
-                            current_index_ ++;
-                        }
-                    }
-                    else {
-                        if(current_index_ <= 0) {
-                            current_index_ = std::min(size - 1,current_index_ + 1);
-                            current_dir_ = +1;
-                        }
-                        else {
-                            current_index_ --;
-                        }
-                    }
+            try {
+                if(stream_active_ != 0) {
+                    stop_stream(e);
+                    e.check();
                 }
-            }));
+                if(format.format != stream_ || format.width != width_ || format.height != height_)
+                    throw SIMError("Invalid format");
+                {
+                    std::unique_lock<std::mutex> guard(lock_);
+                    callback_ = callback;
+                }
+                stream_active_ = 1;
+                thread_ = std::move(std::thread([=]() {
+                    int size = frames_.size();
+                    double next_time = timestamp() + exposure_ * 1e-3;
+                    while(stream_active_) {
+                        double remains;
+                        while((remains = (next_time - timestamp()))>= 1e-3) {
+                            double ms = std::min(remains * 1000,500.0);
+                            std::this_thread::sleep_for(std::chrono::milliseconds(int(ms)));
+                            if(stream_active_ != 1)
+                                return;
+                        }
+                        next_time += exposure_ * 1e-3;
+                        handle_frame(current_index_);
+                        if(current_dir_ == 1) {
+                            if(current_index_ >= size - 1) {
+                                current_index_ = std::max(0,current_index_ - 1);
+                                current_dir_ = -1;
+                            }
+                            else {
+                                current_index_ ++;
+                            }
+                        }
+                        else {
+                            if(current_index_ <= 0) {
+                                current_index_ = std::min(size - 1,current_index_ + 1);
+                                current_dir_ = +1;
+                            }
+                            else {
+                                current_index_ --;
+                            }
+                        }
+                    }
+                }));
+            }
+            catch(std::exception const &err) {
+                e = CamErrorCode(err);
+            }
         }
 
         /// stop the stream - once function ends callback will not be called any more
-        virtual void stop_stream()
+        virtual void stop_stream(CamErrorCode &e)
         {
-            if(stream_active_ == 0)
-                return;
-            {
-                std::unique_lock<std::mutex> guard(lock_);
-                callback_ = nullptr;
+            try {
+                if(stream_active_ == 0)
+                    return;
+                {
+                    std::unique_lock<std::mutex> guard(lock_);
+                    callback_ = nullptr;
+                }
+                stream_active_=0;
+                thread_.join();
             }
-            stream_active_=0;
-            thread_.join();
+            catch(std::exception const &err) {
+                e = CamErrorCode(err);
+            }
         }
 
         /// list of camera controls that the camera supports
-        virtual std::vector<CamOptionId> supported_options()
+        virtual std::vector<CamOptionId> supported_options(CamErrorCode &)
         {
             std::vector<CamOptionId> opts = {opt_exp,opt_gamma};
             return opts;
         }
         /// get camera control
-        virtual CamParam get_parameter(CamOptionId id,bool /*current_only = false*/) 
+        virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e) 
         {
             CamParam r;
             memset(&r,0,sizeof(r));
@@ -245,26 +259,31 @@ namespace ols {
                 r.step_size = 0.01;
                 break;
             default:
-                throw SIMError("Unimplemented: " + cam_option_id_to_name(id));
+                e=CamErrorCode("Unimplemented: " + cam_option_id_to_name(id));
             }
             return r;
         }
         /// set camera control
-        virtual void set_parameter(CamOptionId id,double value)
+        virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e)
         {
-            switch(id) {
-            case opt_exp:
-                if(value < 10 || value > 10000)
-                    throw SIMError("Invalid range");
-                exposure_ = value;
-                break;
-            case opt_gamma:
-                if(value < 0.75 || value > 3.0)
-                    throw SIMError("Invalid range");
-                gamma_ = value;
-                break;
-            default:
-                throw SIMError("Unimplemented" +  cam_option_id_to_name(id));
+            try {
+                switch(id) {
+                case opt_exp:
+                    if(value < 10 || value > 10000)
+                        throw SIMError("Invalid range");
+                    exposure_ = value;
+                    break;
+                case opt_gamma:
+                    if(value < 0.75 || value > 3.0)
+                        throw SIMError("Invalid range");
+                    gamma_ = value;
+                    break;
+                default:
+                    throw SIMError("Unimplemented" +  cam_option_id_to_name(id));
+                }
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
             }
         }
     private:
@@ -290,20 +309,26 @@ namespace ols {
 
     class SIMCameraDriver : public CameraDriver {
     public:
-        virtual std::vector<std::string> list_cameras() 
+        virtual std::vector<std::string> list_cameras(CamErrorCode &) 
         {
             return std::vector<std::string>{"sim"};
         }
-        virtual std::unique_ptr<Camera> open_camera(int id) 
+        virtual std::unique_ptr<Camera> open_camera(int id,CamErrorCode &e) 
         {
-            if(id!=0)
-                throw SIMError("No such camera " + std::to_string(id));
-            std::string dir = data_dir;
-            char *dir_override = getenv("OLS_SIM_DIR");
-            if(dir_override)
-                dir = dir_override;
-            std::unique_ptr<Camera> cam(new SIMCamera(dir));
-            return cam;
+            try {
+                if(id!=0)
+                    throw SIMError("No such camera " + std::to_string(id));
+                std::string dir = data_dir;
+                char *dir_override = getenv("OLS_SIM_DIR");
+                if(dir_override)
+                    dir = dir_override;
+                std::unique_ptr<Camera> cam(new SIMCamera(dir));
+                return cam;
+            }
+            catch(std::exception const &err) {
+                e=CamErrorCode(err);
+                return std::unique_ptr<Camera>();
+            }
         }
         static std::string data_dir;
     };

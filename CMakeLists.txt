@@ -3,7 +3,7 @@ project(OpenLiveStacker)
 
 include_directories(include)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2 -g")
-set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -Wl,--export-dynamic")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
 option(OPENCV_ROOT "Path to OpenCV Library" "")
 
 find_library(ASI_CAMERA_LIB ASICamera2)

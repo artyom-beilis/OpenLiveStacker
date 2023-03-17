@@ -51,7 +51,9 @@ namespace ols {
             double value = content_.get<double>("value");
             CamOptionId opt = cam_option_id_from_string_id(id);
             guard g(cam_->lock());
-            cam_->cam().set_parameter(opt,value);
+            CamErrorCode e;
+            cam_->cam().set_parameter(opt,value,e);
+            e.check();
         }
         void options()
         {
@@ -59,9 +61,12 @@ namespace ols {
             {
                 guard g(cam_->lock());
                 auto &cam = cam_->cam();
-                auto opts = cam.supported_options();
+                CamErrorCode e;
+                auto opts = cam.supported_options(e);
+                e.check();
                 for(auto opt:opts) {
-                    CamParam param = cam.get_parameter(opt);
+                    CamParam param = cam.get_parameter(opt,e);
+                    e.check();
                     params.push_back(param);
                 }
             }
@@ -81,7 +86,9 @@ namespace ols {
         void list_cameras()
         {
             guard g(cam_->lock()); 
-            std::vector<std::string> cams = cam_->driver().list_cameras();
+            CamErrorCode e;
+            std::vector<std::string> cams = cam_->driver().list_cameras(e);
+            e.check();
             for(size_t i=0;i<cams.size();i++) {
                 response_[i]["id"] = i;
                 response_[i]["name"] = cams[i];
@@ -128,7 +135,9 @@ namespace ols {
         void load_formats(cppcms::json::value &v)
         {
             guard g(cam_->lock());
-            auto fmts = cam_->cam().formats();
+            CamErrorCode e;
+            auto fmts = cam_->cam().formats(e);
+            e.check();
             formats_.clear();
             for(size_t i=0;i<fmts.size();i++) {
                 auto &fmt = fmts[i];

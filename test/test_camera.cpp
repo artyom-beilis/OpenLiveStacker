@@ -6,11 +6,13 @@
 int main()
 {   
     try {
+        ols::CamErrorCode e;
         auto drivers = ols::CameraDriver::drivers();
         for(auto driver: drivers)
             std::cout << "Driver " << driver << std::endl;
-        std::unique_ptr<ols::CameraDriver> driver = ols::CameraDriver::get(0);
-        auto cameras = driver->list_cameras();
+        std::unique_ptr<ols::CameraDriver> driver = ols::CameraDriver::get(0,-1);
+        auto cameras = driver->list_cameras(e);
+        e.check();
         for(auto camera: cameras)
             std::cout << "Camera " << camera << std::endl;
         int cam_id = 0;
@@ -18,10 +20,14 @@ int main()
             std::cout << "Select :" << std::flush;
             std::cin >> cam_id;
         }
-        std::unique_ptr<ols::Camera> camera = driver->open_camera(cam_id);
-        std::cout << "Opened " << camera->name() << std::endl;
+        std::unique_ptr<ols::Camera> camera = driver->open_camera(cam_id,e);
+        e.check();
+        std::string name = camera->name(e);
+        e.check();
+        std::cout << "Opened " << name << std::endl;
         
-        auto formats = camera->formats();
+        auto formats = camera->formats(e);
+        e.check();
         for(size_t i=0;i<formats.size();i++) {
             std::cout << "  " << i <<":"<< formats[i] << std::endl;
         }
@@ -34,9 +40,11 @@ int main()
                 f.write((char*)(frame.data),frame.data_size);
                 f.close();
             }
-        });
+        },e);
+        e.check();
         sleep(20);
-        camera->stop_stream();
+        camera->stop_stream(e);
+        e.check();
         camera.reset();
         driver.reset();
     }

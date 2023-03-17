@@ -47,7 +47,9 @@ void OpenLiveStacker::open_camera(int id)
 {
     close_camera();
     guard g(camera_lock_);
-    camera_ = std::move(driver_->open_camera(id));
+    CamErrorCode e;
+    camera_ = std::move(driver_->open_camera(id,e));
+    e.check();
     stream_active_ = false;
 }
 Camera &OpenLiveStacker::cam() 
@@ -68,7 +70,9 @@ void OpenLiveStacker::close_camera()
     guard g(camera_lock_);
     if(!camera_)
         return;
-    camera_->stop_stream();
+    CamErrorCode e;
+    camera_->stop_stream(e);
+    e.check();
     camera_.reset();
     stream_active_ = false;
 }
@@ -76,15 +80,19 @@ void OpenLiveStacker::close_camera()
 void OpenLiveStacker::stop_stream()
 {
     guard g(camera_lock_);
-    cam().stop_stream();
+    CamErrorCode e;
+    cam().stop_stream(e);
+    e.check();
     stream_active_ = false;
 }
 void OpenLiveStacker::start_stream(CamStreamFormat format)
 {
     guard g(camera_lock_);
+    CamErrorCode e;
     cam().start_stream(format,[=](CamFrame const &cf) {
         handle_video_frame(cf);
-    });
+    },e);
+    e.check();
     current_format_ = format;
     stream_active_ = true;
 }
@@ -178,8 +186,13 @@ void OpenLiveStacker::shutdown()
 }
 void OpenLiveStacker::stop()
 {
-    if(camera_)
-        camera_->stop_stream();
+    if(camera_) {
+        CamErrorCode e;
+        camera_->stop_stream(e);
+        if(e) {
+            BOOSTER_ERROR("stacker") << "Can't stop stream:" << e.message();
+        }
+    }
     video_generator_queue_->push(std::shared_ptr<QueueData>(new ShutDownData()));
 
     video_generator_queue_.reset();
