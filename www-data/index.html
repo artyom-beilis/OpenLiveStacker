@@ -365,7 +365,7 @@ function prepareControls(ctls)
             control_str += `<td>${ctl.default != 0 ? 'on' : 'off'}</td>`;
         }
         else {
-            control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input id="control_opt_${ctl.option_id}" type="text" value="${ctl.cur}" /></form></td>`;
+            control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input id="control_opt_${ctl.option_id}" min="${ctl.min}" max="${ctl.max}" step="${ctl.step}" type="number" value="${ctl.cur}" /></form></td>`;
             control_str +=`<td>[${ctl.min},${ctl.max}]</td>`;
             control_str +=`<td>${ctl.default}</td>`;
         }
