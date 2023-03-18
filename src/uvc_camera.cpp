@@ -505,7 +505,7 @@ namespace ols {
             fd_ = fd;
         }
 
-        virtual std::vector<std::string> list_cameras() 
+        virtual std::vector<std::string> list_cameras(CamErrorCode &) 
         {
             return std::vector<std::string>({"camera_0"});
         }
