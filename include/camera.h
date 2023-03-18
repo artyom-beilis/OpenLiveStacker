@@ -21,6 +21,12 @@ namespace ols {
         CamErrorCode(std::exception const &e) : status_(true), message_(e.what())
         {
         }
+        CamErrorCode &operator=(std::string const &msg)
+        {
+            status_ = true;
+            message_ = msg;
+            return *this;
+        }
         CamErrorCode(CamErrorCode const &) = default;
         CamErrorCode &operator=(CamErrorCode const &) = default;
         explicit operator bool() const
