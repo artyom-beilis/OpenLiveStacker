@@ -16,6 +16,9 @@
 #include <opencv2/imgcodecs.hpp>
 #include <booster/log.h>
 #include <booster/regex.h>
+#ifdef WITH_LIBRAW
+#include <libraw/libraw.h>
+#endif
 
 namespace ols {
     class WDIRError : public CamError {
@@ -24,6 +27,52 @@ namespace ols {
         {
         }
     };
+
+
+#ifdef WITH_LIBRAW
+    cv::Mat load_libraw(std::string const &path)
+    {
+        LibRaw raw;
+        int code=0;
+        if((code = raw.open_file(path.c_str()))!=LIBRAW_SUCCESS
+            || (code=raw.unpack())!=LIBRAW_SUCCESS)
+        {
+            throw WDIRError("Failed to open or read " + path + ": " + libraw_strerror(code));
+        }
+        printf("%p max=%d lmax=%ld\n",raw.imgdata.rawdata.raw_image,raw.imgdata.color.maximum,raw.imgdata.color.linear_max[0]);
+        auto params = raw.output_params_ptr();
+        printf("gamma=%f/%f auto br=%d\n",params->gamm[0],params->gamm[1],params->no_auto_bright);
+        printf("auto wb=%d\n",params->use_auto_wb);
+        params->gamm[0] = params->gamm[1] = 1.0f;
+        params->output_bps = 16;
+        params->no_auto_bright = 1;
+        if((code = raw.dcraw_process()) != LIBRAW_SUCCESS) {
+            throw WDIRError("Failed to process " + path + ": " + libraw_strerror(code));
+        }
+        int w=0,h=0,c=0,bpp=0;
+        raw.get_mem_image_format(&w,&h,&c,&bpp);
+        printf("Got image w=%d h=%d c=%d bpp=%d\n",w,h,c,bpp);
+        cv::Mat img;
+        if(c!=1 && c!=3)
+            throw WDIRError("Expecting mono or color, but got channesl=" + std::to_string(c) + " in raw file:" + path);
+        if(bpp!=8 && bpp!=16)
+            throw WDIRError("Expecting 8 bit or 16 bit, bit got bits=" + std::to_string(bpp) + " in raw file:" + path);
+        int cv_type;
+        if(bpp == 8)
+            cv_type = c == 1 ? CV_8UC1 : CV_8UC3;
+        else
+            cv_type = c == 1 ? CV_16UC1 : CV_16UC3;
+        img.create(h,w,cv_type);
+        if((code = raw.copy_mem_image(img.data,img.step[0],1))!=LIBRAW_SUCCESS) {
+            throw WDIRError("Failed to read image data for " + path + ": " + libraw_strerror(code));
+        }
+        double minv,maxv;
+        cv::minMaxLoc(img,&minv,&maxv,nullptr,nullptr);
+        printf("minv=%f, maxv=%f\n",minv,maxv);
+        return img;
+    }
+#endif
+
 
     class WDIRCamera : public Camera {
     public:
@@ -109,6 +158,10 @@ namespace ols {
             cv::Mat img;
             if(ends_with(fname,".tiff") || ends_with(fname,".tif"))
                 img = load_tiff(fname);
+#ifdef WITH_LIBRAW
+            else if(ends_with(fname,".dng") || ends_with(fname,".raw"))
+                img = load_libraw(fname);
+#endif                
             else
                 img = cv::imread(fname);
             if(img.cols != width_ || img.rows != height_) {

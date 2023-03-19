@@ -13,6 +13,9 @@ find_library(LIBTIFF tiff)
 find_library(LIBCPPCMS cppcms)
 find_library(LIBBOOSTER booster)
 find_library(LIBUVC uvc)
+find_library(LIBRAW_LIB raw_r)
+find_path(LIBRAW_HDR libraw/libraw.h)
+
 
 set(WITH_SSE OFF)
 set(OLS_EXTRA )
@@ -102,8 +105,17 @@ endif()
 add_library(ols_driver_sim SHARED src/sim_camera.cpp)
 target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
 
+
 add_library(ols_driver_wdir SHARED src/wdir_camera.cpp)
 target_link_libraries(ols_driver_wdir ols ${OPENCV_IMGCODECS} ${LIBBOOSTER})
+if(LIBRAW_LIB AND LIBRAW_HDR)
+    include_directories(${LIBRAW_HDR})
+    set_target_properties(ols_driver_wdir PROPERTIES COMPILE_DEFINITIONS WITH_LIBRAW)
+    target_link_libraries(ols_driver_wdir ${LIBRAW_LIB})
+    message("- Using libraw")
+else()
+    message("- no libraw found")
+endif()
 
 install(TARGETS ols ols_driver_sim ols_driver_wdir
             RUNTIME DESTINATION bin
