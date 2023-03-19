@@ -102,7 +102,10 @@ endif()
 add_library(ols_driver_sim SHARED src/sim_camera.cpp)
 target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
 
-install(TARGETS ols ols_driver_sim
+add_library(ols_driver_wdir SHARED src/wdir_camera.cpp)
+target_link_libraries(ols_driver_wdir ols ${OPENCV_IMGCODECS} ${LIBBOOSTER})
+
+install(TARGETS ols ols_driver_sim ols_driver_wdir
             RUNTIME DESTINATION bin
             LIBRARY DESTINATION lib
 )
