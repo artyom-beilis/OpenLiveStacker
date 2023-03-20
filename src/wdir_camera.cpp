@@ -14,8 +14,10 @@
 #include "util.h"
 #include "tiffmat.h"
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 #include <booster/log.h>
 #include <booster/regex.h>
+
 #ifdef WITH_LIBRAW
 #include <libraw/libraw.h>
 #endif
@@ -29,49 +31,6 @@ namespace ols {
     };
 
 
-#ifdef WITH_LIBRAW
-    cv::Mat load_libraw(std::string const &path)
-    {
-        LibRaw raw;
-        int code=0;
-        if((code = raw.open_file(path.c_str()))!=LIBRAW_SUCCESS
-            || (code=raw.unpack())!=LIBRAW_SUCCESS)
-        {
-            throw WDIRError("Failed to open or read " + path + ": " + libraw_strerror(code));
-        }
-        printf("%p max=%d lmax=%ld\n",raw.imgdata.rawdata.raw_image,raw.imgdata.color.maximum,raw.imgdata.color.linear_max[0]);
-        auto params = raw.output_params_ptr();
-        printf("gamma=%f/%f auto br=%d\n",params->gamm[0],params->gamm[1],params->no_auto_bright);
-        printf("auto wb=%d\n",params->use_auto_wb);
-        params->gamm[0] = params->gamm[1] = 1.0f;
-        params->output_bps = 16;
-        params->no_auto_bright = 1;
-        if((code = raw.dcraw_process()) != LIBRAW_SUCCESS) {
-            throw WDIRError("Failed to process " + path + ": " + libraw_strerror(code));
-        }
-        int w=0,h=0,c=0,bpp=0;
-        raw.get_mem_image_format(&w,&h,&c,&bpp);
-        printf("Got image w=%d h=%d c=%d bpp=%d\n",w,h,c,bpp);
-        cv::Mat img;
-        if(c!=1 && c!=3)
-            throw WDIRError("Expecting mono or color, but got channesl=" + std::to_string(c) + " in raw file:" + path);
-        if(bpp!=8 && bpp!=16)
-            throw WDIRError("Expecting 8 bit or 16 bit, bit got bits=" + std::to_string(bpp) + " in raw file:" + path);
-        int cv_type;
-        if(bpp == 8)
-            cv_type = c == 1 ? CV_8UC1 : CV_8UC3;
-        else
-            cv_type = c == 1 ? CV_16UC1 : CV_16UC3;
-        img.create(h,w,cv_type);
-        if((code = raw.copy_mem_image(img.data,img.step[0],1))!=LIBRAW_SUCCESS) {
-            throw WDIRError("Failed to read image data for " + path + ": " + libraw_strerror(code));
-        }
-        double minv,maxv;
-        cv::minMaxLoc(img,&minv,&maxv,nullptr,nullptr);
-        printf("minv=%f, maxv=%f\n",minv,maxv);
-        return img;
-    }
-#endif
 
 
     class WDIRCamera : public Camera {
@@ -140,6 +99,93 @@ namespace ols {
                 return true;
             return false;
         }
+#ifdef WITH_LIBRAW
+        std::string index2color(LibRaw &raw)
+        {
+            std::string res;
+            int pat_index[4] = {raw.COLOR(0,0),raw.COLOR(0,1),raw.COLOR(1,0),raw.COLOR(1,1)};
+            for(int i=0;i<4;i++) {
+                char const *v="RGBG";
+                if(pat_index[i] < 0 || pat_index[i]>3)
+                    res += '?';
+                else
+                    res += v[pat_index[i]];
+            }
+            return res;
+        }
+        cv::Mat load_libraw(std::string const &path)
+        {
+            cv::Mat img;
+            LibRaw raw;
+            int code=0;
+            if((code = raw.open_file(path.c_str()))!=LIBRAW_SUCCESS
+                || (code=raw.unpack())!=LIBRAW_SUCCESS)
+            {
+                throw WDIRError("Failed to open or read " + path + ": " + libraw_strerror(code));
+            }
+#if 1
+            #if 0
+            printf("%p raw=%dx%d act=%dx%d stride_bytes %d pat=%s\n",raw.imgdata.rawdata.raw_image,
+                    raw.imgdata.sizes.raw_height,raw.imgdata.sizes.raw_width,
+                    raw.imgdata.sizes.height,raw.imgdata.sizes.width,
+                    raw.imgdata.sizes.raw_pitch,
+                    raw.imgdata.idata.cdesc);
+            #endif
+
+            if(!raw.imgdata.rawdata.raw_image) {
+                throw WDIRError("Is not 16 bit bayer:" + path);
+            }
+            cv::Mat raw_image(raw.imgdata.sizes.raw_height,raw.imgdata.sizes.raw_width,CV_16UC1,raw.imgdata.rawdata.raw_image,raw.imgdata.sizes.raw_pitch);
+            int scale = 65535 / raw.imgdata.color.maximum;
+            std::string bayer = index2color(raw);
+            int pat_code = -1;
+            if(bayer == "RGGB")
+                pat_code = cv::COLOR_BayerRGGB2BGR;
+            else if(bayer == "GRBG")
+                pat_code = cv::COLOR_BayerGRBG2BGR;
+            else if(bayer == "BGGR")
+                pat_code = cv::COLOR_BayerBGGR2BGR;
+            else if(bayer == "GBRG")
+                pat_code = cv::COLOR_BayerGBRG2BGR;
+            else
+                throw WDIRError("Unsupported bayer pattern " + bayer + " in file:" + path);
+            cv::cvtColor(raw_image,img,pat_code);
+            if(scale != 1)
+                img = img.mul(cv::Scalar::all(scale));
+
+#else           
+            auto params = raw.output_params_ptr();
+            params->use_auto_wb = 0;
+            params->no_auto_bright = 1;
+            params->gamm[0] = params->gamm[1] = 1.0f;
+            if(raw.imgdata.color.maximum > 255)
+                params->output_bps = 16;
+            else
+                params->output_bps = 8;
+            
+
+            if((code = raw.dcraw_process()) != LIBRAW_SUCCESS) {
+                throw WDIRError("Failed to process " + path + ": " + libraw_strerror(code));
+            }
+            int w=0,h=0,c=0,bpp=0;
+            raw.get_mem_image_format(&w,&h,&c,&bpp);
+            if(c!=1 && c!=3)
+                throw WDIRError("Expecting mono or color, but got channesl=" + std::to_string(c) + " in raw file:" + path);
+            if(bpp!=8 && bpp!=16)
+                throw WDIRError("Expecting 8 bit or 16 bit, bit got bits=" + std::to_string(bpp) + " in raw file:" + path);
+            int cv_type;
+            if(bpp == 8)
+                cv_type = c == 1 ? CV_8UC1 : CV_8UC3;
+            else
+                cv_type = c == 1 ? CV_16UC1 : CV_16UC3;
+            img.create(h,w,cv_type);
+            if((code = raw.copy_mem_image(img.data,img.step[0],1))!=LIBRAW_SUCCESS) {
+                throw WDIRError("Failed to read image data for " + path + ": " + libraw_strerror(code));
+            }
+#endif            
+            return img;
+        }
+#endif
 
         void handle_frame(std::string const &fname)
         {
