@@ -53,10 +53,22 @@ else()
     find_library(OPENCV_CORE        opencv_core      )
     find_library(OPENCV_IMGPROC     opencv_imgproc   )
     find_library(OPENCV_IMGCODECS   opencv_imgcodecs )
-    find_path(OPENCV_INC opencv2/core.hpp)
+    find_path(OPENCV_INC_A opencv2/core.hpp)
+    if(NOT OPENCV_INC_A)
+        find_path(OPENCV_INC_B opencv4/opencv2/core.hpp)
+        if(OPENCV_INC_B)
+            set(OPENCV_INC "${OPENCV_INC_B}/opencv4")
+        else()
+            message("Can't find OpenCV include")
+        endif()
+    else()
+        set(OPENCV_INC "${OPENCV_INC_A}")
+    endif()
+
 endif()
 
 include_directories(${OPENCV_INC})
+message("- OpenCV Include Path ${OPENCV_INC}")
 
 
 if(ASI_CAMERA_HDR AND ASI_CAMERA_LIB)
