@@ -140,13 +140,13 @@ namespace ols {
             std::string bayer = index2color(raw);
             int pat_code = -1;
             if(bayer == "RGGB")
-                pat_code = cv::COLOR_BayerRGGB2BGR;
+                pat_code = cv::COLOR_BayerBG2BGR; // COLOR_BayerRGGB2BGR = COLOR_BayerBG2BGR
             else if(bayer == "GRBG")
-                pat_code = cv::COLOR_BayerGRBG2BGR;
+                pat_code = cv::COLOR_BayerGB2BGR; // COLOR_BayerGRBG2BGR = COLOR_BayerGB2BGR
             else if(bayer == "BGGR")
-                pat_code = cv::COLOR_BayerBGGR2BGR;
+                pat_code = cv::COLOR_BayerRG2BGR; // COLOR_BayerBGGR2BGR = COLOR_BayerRG2BGR
             else if(bayer == "GBRG")
-                pat_code = cv::COLOR_BayerGBRG2BGR;
+                pat_code = cv::COLOR_BayerGR2BGR; // COLOR_BayerGBRG2BGR = COLOR_BayerGR2BGR
             else
                 throw WDIRError("Unsupported bayer pattern " + bayer + " in file:" + path);
             cv::cvtColor(raw_image,img,pat_code);

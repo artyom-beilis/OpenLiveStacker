@@ -117,10 +117,10 @@ namespace ols {
                     cv::Mat bayer(frame->format.height,frame->format.width,(bpp==1 ? CV_8UC1 : CV_16UC1),frame->source_frame->data());
                     cv::Mat rgb;
                     switch(frame->bayer) {
-                    case bayer_rg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerRGGB2BGR); break;
-                    case bayer_gr:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGRBG2BGR); break;
-                    case bayer_bg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerBGGR2BGR); break;
-                    case bayer_gb:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGBRG2BGR); break;
+                    case bayer_rg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerBG2BGR); break; // COLOR_BayerRGGB2BGR = COLOR_BayerBG2BGR
+                    case bayer_gr:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGB2BGR); break; // COLOR_BayerGRBG2BGR = COLOR_BayerGB2BGR
+                    case bayer_bg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerRG2BGR); break; // COLOR_BayerBGGR2BGR = COLOR_BayerRG2BGR
+                    case bayer_gb:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGR2BGR); break; // COLOR_BayerGBRG2BGR = COLOR_BayerGR2BGR
                     default:
                         BOOSTER_ERROR("stacker") << "Invalid bayer patter";
                     }
