@@ -7,7 +7,7 @@
 #include "camera_ctl.h"
 #include "stacker_ctl_app.h"
 #include "processors.h"
-
+#include "common_utils.h"
 
 namespace ols {
 OpenLiveStacker::OpenLiveStacker(std::string data_dir)
@@ -89,6 +89,10 @@ void OpenLiveStacker::start_stream(CamStreamFormat format)
 {
     guard g(camera_lock_);
     CamErrorCode e;
+    auto frame = generate_dummy_frame(format.width,format.height,0,192,0);
+    dropped_since_last_update_ = 0;
+    video_generator_queue_->push(frame);
+
     cam().start_stream(format,[=](CamFrame const &cf) {
         handle_video_frame(cf);
     },e);

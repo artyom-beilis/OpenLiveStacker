@@ -2,6 +2,7 @@
 #include "rotation.h"
 #include "stacker.h"
 #include "tiffmat.h"
+#include "common_utils.h"
 #include <booster/log.h>
 #include "processors.h"
 #include <cppcms/json.h>
@@ -326,23 +327,7 @@ namespace ols {
         
         std::shared_ptr<CameraFrame> generate_dummy_frame()
         {
-            std::shared_ptr<CameraFrame> frame(new CameraFrame());
-            frame->format.width = width_;
-            frame->format.height = height_;
-            cv::Mat img(height_,width_,CV_8UC3);
-            unsigned char *data = img.data;
-            for(int r=0;r<height_;r++) {
-                for(int c=0;c<width_;c++) {
-                    int color = (((r / 8) ^ (c / 8)) & 1) * 192;
-                    *data++ = color;
-                    *data++ = color;
-                    *data++ = color;
-                }
-            }
-            std::vector<unsigned char> buf;
-            cv::imencode(".jpeg",img,buf);
-            frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
-            return frame;
+            return ols::generate_dummy_frame(width_,height_);
         }
 
         std::shared_ptr<CameraFrame> generate_output_frame(std::pair<cv::Mat,StretchInfo> data)

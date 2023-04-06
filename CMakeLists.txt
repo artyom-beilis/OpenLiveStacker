@@ -94,6 +94,7 @@ add_library(ols SHARED
     src/video_generator.cpp
     src/tiffmat.cpp
     src/processors.cpp
+    src/common_utils.cpp
     src/util.cpp
     src/server_sent_events.cpp
     ${OLS_EXTRA}
