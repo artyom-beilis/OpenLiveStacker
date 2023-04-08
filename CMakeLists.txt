@@ -96,6 +96,7 @@ add_library(ols SHARED
     src/processors.cpp
     src/common_utils.cpp
     src/util.cpp
+    src/plate_solver.cpp
     src/server_sent_events.cpp
     ${OLS_EXTRA}
     )
@@ -144,9 +145,11 @@ if(NOT ANDROID_BUILD)
     add_executable(test_camera test/test_camera.cpp)
     add_executable(ols_cmd test/ols_cmd.cpp)
     add_executable(offline_ols test/offline_sim.cpp)
+    add_executable(ols_plate_solver_test test/plate_solver_test.cpp)
     target_link_libraries(test_camera ols)
     target_link_libraries(ols_cmd ols)
     target_link_libraries(offline_ols ols)
+    target_link_libraries(ols_plate_solver_test ols ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
     install(TARGETS ols_driver_sim ols_cmd offline_ols
             RUNTIME DESTINATION bin
             LIBRARY DESTINATION lib

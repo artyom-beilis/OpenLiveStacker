@@ -1,0 +1,227 @@
+#include "plate_solver.h"
+#include "tiffmat.h"
+
+#include <cmath>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
+#include <iostream>
+
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
+
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <booster/posix_time.h>
+
+namespace ols {
+    PlateSolver::PlateSolver(std::string const &db_path,std::string const &astap,double limit) :
+        db_(db_path),
+        exe_(astap),
+        timeout_(limit),
+        temp_dir_("/tmp")
+    {
+        if(exe_.empty())
+            exe_ = "astap_cli";
+    }
+    void PlateSolver::set_tempdir(std::string const &p) 
+    {
+        temp_dir_ = p;
+    }
+    PlateSolver::Result PlateSolver::solve(std::string const &img_path,double fov,double ra,double de,double rad)
+    {
+        std::vector<std::string> cmd = {
+            exe_,
+           "-f",img_path,
+           "-fov",std::to_string(fov),
+            "-ra",std::to_string(ra/15.0),
+            "-spd",std::to_string(de+90),
+            "-r",std::to_string(rad),
+            "-o",temp_dir_ + "/ols_astap_output"
+        };
+        if(!db_.empty()) {
+            cmd.push_back("-d");
+            cmd.push_back(db_);
+        }
+        std::string res_file = temp_dir_ + "/ols_astap_output.ini";
+        std::remove(res_file.c_str());
+        int status = run(cmd);
+        switch(status) {
+        case 0: break;
+        case 1: 
+            {
+                std::string err;
+                parse_ini(res_file,err);
+                throw std::runtime_error("Failed to find solution " + err);
+            }
+        case 2: throw std::runtime_error("Not enough stars detected");
+        case 7: throw std::runtime_error("Failed to exec astap");
+        case 16:throw std::runtime_error("Error reading image file: " + img_path);
+        case 32:throw std::runtime_error("No star database found " + db_);
+        case 33:throw std::runtime_error("Error reading star database " + db_);
+        default:throw std::runtime_error("astap returned error code " + std::to_string(status));
+        }
+        return make_result(temp_dir_ + "/ols_astap_output.ini",ra,de);
+    }
+
+    PlateSolver::Result PlateSolver::make_result(std::string const &path,double ra,double de)
+    {
+        std::string err;
+        std::map<std::string,double> vals = parse_ini(path,err);
+        if(!vals["PLTSOLVD"])
+            throw std::runtime_error("Plate solving failed:" + err);
+        double x0 = get(vals,"CRPIX1");
+        double y0 = get(vals,"CRPIX2");
+        double ra0 = get(vals,"CRVAL1");
+        double de0 = get(vals,"CRVAL2");
+        double cd1 = get(vals,"CDELT1");
+        double cd2 = get(vals,"CDELT2");
+        double angle = get(vals,"CROTA2")/180 * M_PI; 
+        double ca = std::cos(angle);
+        double sa = std::sin(angle);
+        double delta_ra = (ra - ra0)*std::cos(de0/180*M_PI);
+        double delta_de = de - de0;
+        double Mi[2][2] = {
+            {ca/cd1,-sa/cd2},
+            {sa/cd1,ca/cd2}
+        };
+        double xt = Mi[0][0] * delta_ra + Mi[0][1] * delta_de + x0;
+        double yt = Mi[1][0] * delta_ra + Mi[1][1] * delta_de + y0;
+        double diff_deg = std::sqrt(delta_ra*delta_ra + delta_de*delta_de);
+        int rows = y0 * 2;
+        Result r;
+        r.center_col = x0;
+        r.center_row = y0;
+        r.target_col = xt;
+        r.target_row = rows - yt;
+        r.angle_to_target_deg = diff_deg;
+        return r;
+    }
+    double PlateSolver::get(std::map<std::string,double> const &vals,std::string const &name)
+    {
+        auto p = vals.find(name);
+        if(p==vals.end())
+            throw std::runtime_error("Failed to get results key " + name);
+        return p->second;
+    }
+    std::string PlateSolver::trim(std::string const &s)
+    {
+        size_t start = s.find_first_not_of(" \t\r\n");
+        if(start == std::string::npos)
+            return "";
+        size_t end = s.find_last_not_of(" \t\r\n");
+        if(end == std::string::npos)
+            return s.substr(start);
+        else
+            return s.substr(start,end+1-start);
+    }
+    std::map<std::string,double> PlateSolver::parse_ini(std::string const &path,std::string &error)
+    {
+        std::map<std::string,double> vals;
+        std::ifstream f(path);
+        if(!f)
+            throw std::runtime_error("Failed to open " + path);
+        std::string key,value;
+        while(std::getline(f,key,'=') && std::getline(f,value)) {
+            double v;
+            key = trim(key);
+            value = trim(value);
+            if(key == "PLTSOLVD") {
+                v = value == "T";
+            }
+            else if(key == "ERROR") {
+                error = value;
+                continue;
+            }
+            else
+                v = atof(value.c_str());
+            vals[key]=v;
+        }
+        return vals;
+    }
+
+    PlateSolver::Result PlateSolver::solve_and_mark(
+            cv::Mat &img,int dr,
+            std::string const &jpeg_with_marks,
+            double fov_deg,
+            double target_ra_deg,
+            double target_de_deg,
+            double search_radius_deg)
+    {
+        std::string tiff = temp_dir_ + "/ols_astap_input.tiff";
+        save_tiff(img,tiff);
+        auto r = solve(tiff,fov_deg,target_ra_deg,target_de_deg,search_radius_deg);
+        cv::Mat img8bit;
+        double factor = 255.0 / dr;
+        img.convertTo(img8bit,CV_8UC3,factor);
+        cv::arrowedLine(img8bit,
+                        cv::Point(r.center_col,r.center_row),
+                        cv::Point(r.target_col,r.target_row),
+                        cv::Scalar::all(255),
+                        3);
+        cv::imwrite(jpeg_with_marks,img8bit);
+        return r;
+    }
+
+
+    int PlateSolver::run(std::vector<std::string> &opts)
+    {
+        std::ostringstream ss;
+        std::vector<char *> args;
+        for(auto &opt: opts) {
+            args.push_back(&opt[0]);
+            ss << opt << " ";
+        }
+        args.push_back(nullptr);
+        int child_pid = fork();
+        if(child_pid == 0) {
+            int in_fd = open("/dev/null",O_RDONLY);
+            int out_fd = open("/dev/null",O_WRONLY);
+            dup2(in_fd,0);
+            dup2(out_fd,1);
+            dup2(out_fd,2);
+            execvp(exe_.c_str(),args.data());
+            _exit(7);
+        }
+        else if(child_pid < 0) {
+            throw std::system_error(errno,std::generic_category(),"Failed to create aprocess"); 
+        }
+        else {
+            int N = int(timeout_ * 10);
+            int status = 0;
+            bool wait_done = false;
+            bool timeout = false;
+            for(int i=0;i<N+1;i++) {
+                booster::ptime::millisleep(100);
+                int r,opt = WNOHANG;
+                if(i >= N) {
+                    timeout = true;
+                    kill(child_pid,SIGKILL);
+                    opt = 0;
+                }
+                r = waitpid(child_pid,&status,opt);
+                int err = errno;
+                if(r == 0)
+                    continue;
+                if(r < 0)
+                    throw std::system_error(err,std::generic_category(),"wait failed"); 
+                if(r != child_pid)
+                    throw std::runtime_error("Unexpected wait returned!");
+                wait_done = true;
+                break;
+            }
+            if(!wait_done)
+                throw std::runtime_error("Failed to wait for process");
+            if(timeout)
+                throw std::runtime_error("Execution took too much time, current limit is " + std::to_string(timeout_) +"s");
+            if(!WIFEXITED(status))
+                throw std::runtime_error("Execution of the astap process failed");
+            return WEXITSTATUS(status);
+        }
+    }
+}
