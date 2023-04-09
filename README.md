@@ -58,9 +58,12 @@ Just run
 
 Start service:
 
-    ./build/ols_cmd DRIVER build
+    ./build/ols_cmd config.json
 
-where `DRIVER` is either `uvc` or `asi` according to the device you want to use
+Important parameters in config.json:
+
+- `driver` - one of asi, uvc, sim or wdir 
+- `libdir` - path to directory with drivers, for example build
 
 Open browser and go to `http://127.0.0.1:8080/` to open UI
 

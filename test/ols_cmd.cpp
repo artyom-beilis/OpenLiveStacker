@@ -1,4 +1,5 @@
 #include "ols.h"
+#include <cppcms/json.h>
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
@@ -9,22 +10,39 @@ int main(int argc,char **argv)
 
         std::string path;
         std::string driver;
+        std::string driver_opt;
 
-        if(argc < 2) {
-            std::cerr  << "Usage driver_name [/path/to/drivers/dir]" << std::endl;
+        if(argc!=2) {
+            std::cerr << "Usage ols_cmd config.json" << std::endl;
             return 1;
         }
-        driver=argv[1];
-        if(argc >= 3)
-            path = argv[2];
+
+        cppcms::json::value cfg;
+        std::ifstream jsf(argv[1]);
+        if(!jsf) {
+            std::cerr << "Failed to open config file:"<<argv[1] << std::endl;
+            return 1;
+        }
+        if(!cfg.load(jsf,true)) {
+            std::cerr << "Failed to parse config file:" << argv[1]<<std::endl;
+            return 1;
+        }
+        driver = cfg.get<std::string>("driver");
+        path = cfg.get("libdir","");
+        if(driver == "sim") {
+            driver_opt = cfg.get("sim.path","");
+        }
+        else if(driver == "wdir") {
+            int w = cfg.get<int>("wdir.width");
+            int h = cfg.get<int>("wdir.height");
+            std::string dir = cfg.get<std::string>("wdir.path");
+            std::string format = cfg.get<std::string>("wdir.format");
+            driver_opt=format + "@" + std::to_string(w) + "x" + std::to_string(h) + ":" + dir;
+        }
 
         char const *driver_opt_ptr = nullptr;
-        std::string driver_opt;
-        size_t pos;
-        if((pos=driver.find(':'))!=std::string::npos) {
-            driver_opt = driver.substr(pos+1);
+        if(!driver_opt.empty()) {
             driver_opt_ptr = driver_opt.c_str();
-            driver=driver.substr(0,pos);
         }
 
         ols::CameraDriver::load_driver(driver,path,driver_opt_ptr);

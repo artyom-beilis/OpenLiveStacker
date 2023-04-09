@@ -1,0 +1,13 @@
+{
+    "libdir" : "./build",
+    "driver" : "sim",
+    "sim" : {
+        "path" : "sim"
+    },
+    "wdir" : {
+        "width" : 2028,
+        "height": 1520,
+        "format" : "rgb48",
+        "path" : "./wd"
+    }
+}
