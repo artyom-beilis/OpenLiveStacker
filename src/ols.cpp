@@ -8,6 +8,8 @@
 #include "stacker_ctl_app.h"
 #include "processors.h"
 #include "common_utils.h"
+#include "plate_solver.h"
+#include "plate_solver_ctl_app.h"
 
 namespace ols {
 OpenLiveStacker::OpenLiveStacker(std::string data_dir)
@@ -146,6 +148,7 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
                                             cppcms::mount_point("/stacker((/.*)?)",1),
                                             cppcms::app::asynchronous);
     web_service_->applications_pool().mount(stats_stream_app_,cppcms::mount_point("/updates",0));
+    web_service_->applications_pool().mount(cppcms::create_pool<PlateSolverControlApp>(data_dir_),cppcms::mount_point("/plate_solver((/.*)?)",1));
 }
 
 void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
@@ -166,16 +169,28 @@ void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
     dropped_since_last_update_ = 0;
     video_generator_queue_->push(frame);
 }
+
+void OpenLiveStacker::set_plate_solving_image(data_pointer_type p)
+{
+    std::shared_ptr<CameraFrame> frame = std::dynamic_pointer_cast<CameraFrame>(p);
+    if(!frame)
+        return;
+    
+    PlateSolver::set_image(frame->frame,frame->frame_dr);
+}
+
 void OpenLiveStacker::run()
 {
     video_display_queue_->call_on_push(video_generator_app_->get_callback());
     stack_display_queue_->call_on_push(stacked_video_generator_app_->get_callback());
     stacker_stats_queue_->call_on_push(stats_stream_app_->get_callback());
+    plate_solving_queue_->call_on_push(set_plate_solving_image);
 
     video_generator_thread_ = std::move(start_generator(video_generator_queue_,
                                                         preprocessor_queue_,
                                                         video_display_queue_,
-                                                        debug_save_queue_));
+                                                        debug_save_queue_,
+                                                        plate_solving_queue_));
 
     debug_save_thread_ = std::move(start_debug_saver(debug_save_queue_,debug_dir_));
     preprocessor_thread_ = std::move(start_preprocessor(preprocessor_queue_,stacker_queue_));

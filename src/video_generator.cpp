@@ -10,11 +10,13 @@ namespace ols {
         VideoGenerator(queue_pointer_type queue,
                        queue_pointer_type stacking_output,
                        queue_pointer_type live_output,
-                       queue_pointer_type debug): 
+                       queue_pointer_type debug,
+                       queue_pointer_type plate_solving_output): 
             data_queue_(queue),
             stack_out_(stacking_output),
             live_out_(live_output),
-            debug_out_(debug)
+            debug_out_(debug),
+            plate_solving_out_(plate_solving_output)
         {
         }
         void handle_jpeg_stack(std::shared_ptr<CameraFrame> frame,cv::Mat rgb,bool copy)
@@ -31,7 +33,7 @@ namespace ols {
             cv::imencode(".jpeg",normalized,buf);
 
             frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
-            if(stacking_active_) {
+            if(stacking_active_ || plate_solving_out_) {
                 if(copy)
                     frame->frame = rgb.clone();
                 else
@@ -74,7 +76,7 @@ namespace ols {
                 {
                     frame->jpeg_frame = frame->source_frame;
                     // decode jpeg if needed
-                    if(stacking_active_) {
+                    if(stacking_active_ || plate_solving_out_) {
                         size_t len = frame->jpeg_frame->size();
                         cv::Mat buffer(1,len,CV_8UC1,frame->jpeg_frame->data());
                         try {
@@ -156,6 +158,8 @@ namespace ols {
                 stack_out_->push(frame);
             if(debug_active_ && stacking_active_)
                 debug_out_->push(frame);
+            if(plate_solving_out_)
+                plate_solving_out_->push(frame);
         }
         void run()
         {
@@ -201,7 +205,7 @@ namespace ols {
             }
         }
     private:
-        queue_pointer_type data_queue_, stack_out_, live_out_, debug_out_;
+        queue_pointer_type data_queue_, stack_out_, live_out_, debug_out_, plate_solving_out_;
         bool stacking_active_ = false;
         bool debug_active_ = false;
     };
@@ -209,9 +213,10 @@ namespace ols {
     std::thread start_generator(queue_pointer_type input,
                                 queue_pointer_type stacking_output,
                                 queue_pointer_type live_output,
-                                queue_pointer_type debug_save)
+                                queue_pointer_type debug_save,
+                                queue_pointer_type plate_solving_out)
     {
-        std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,stacking_output,live_output,debug_save));
+        std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,stacking_output,live_output,debug_save,plate_solving_out));
         std::thread t([=](){vg->run();});
         return std::move(t);
     }

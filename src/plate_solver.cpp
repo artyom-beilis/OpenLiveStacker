@@ -162,7 +162,7 @@ namespace ols {
         cv::arrowedLine(img8bit,
                         cv::Point(r.center_col,r.center_row),
                         cv::Point(r.target_col,r.target_row),
-                        cv::Scalar::all(255),
+                        cv::Scalar(0,0,255),
                         3);
         cv::imwrite(jpeg_with_marks,img8bit);
         return r;
@@ -224,4 +224,53 @@ namespace ols {
             return WEXITSTATUS(status);
         }
     }
+
+
+    void PlateSolver::init(std::string const &db_path,std::string const &path_to_astap_cli,double time_limit_sec,std::string const &temp_dir)
+    {
+        std::unique_lock<std::mutex> g(lock_);
+        instance_.reset(new PlateSolver(db_path,path_to_astap_cli,time_limit_sec));
+        if(!temp_dir.empty())
+            instance_->set_tempdir(temp_dir);
+    }
+    
+    void PlateSolver::set_image(cv::Mat img,int dynamic_range)
+    {
+        cv::Mat img_copy = img.clone();
+        std::unique_lock<std::mutex> g(img_lock_);
+        image_.reset(new cv::Mat(img_copy));
+        image_dr_ = dynamic_range;
+    }
+
+    PlateSolver::Result PlateSolver::solve_last_image( std::string const &jpeg_with_marks,
+                                        double fov,
+                                        double ra,
+                                        double de,
+                                        double rad)
+    {
+        cv::Mat img;
+        int dr;
+        {
+            std::unique_lock<std::mutex> g(img_lock_);
+            if(!image_)
+                throw std::runtime_error("No image was set");
+            img = *image_;
+            dr = image_dr_;
+        }
+        {
+            std::unique_lock<std::mutex> g(lock_);
+            if(!instance_)
+                throw std::runtime_error("plate solver is not ready");
+            return instance_->solve_and_mark(img,dr,jpeg_with_marks,fov,ra,de,rad);
+        }
+    }
+
+    /// static stuff
+    std::mutex PlateSolver::lock_;
+    std::mutex PlateSolver::img_lock_;
+    std::unique_ptr<PlateSolver> PlateSolver::instance_;
+    std::unique_ptr<cv::Mat> PlateSolver::image_;
+    int PlateSolver::image_dr_;
+
+
 }

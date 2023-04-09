@@ -1,4 +1,5 @@
 #include "ols.h"
+#include "plate_solver.h"
 #include <cppcms/json.h>
 #include <iostream>
 #include <fstream>
@@ -11,6 +12,7 @@ int main(int argc,char **argv)
         std::string path;
         std::string driver;
         std::string driver_opt;
+        std::string astap_exe,astap_db;
 
         if(argc!=2) {
             std::cerr << "Usage ols_cmd config.json" << std::endl;
@@ -29,6 +31,9 @@ int main(int argc,char **argv)
         }
         driver = cfg.get<std::string>("driver");
         path = cfg.get("libdir","");
+        astap_exe = cfg.get("astap.exe","astap_cli");
+        astap_db = cfg.get("astap.db","");
+        double astap_timeout = cfg.get("astap.timeout",5.0);
         if(driver == "sim") {
             driver_opt = cfg.get("sim.path","");
         }
@@ -46,6 +51,7 @@ int main(int argc,char **argv)
         }
 
         ols::CameraDriver::load_driver(driver,path,driver_opt_ptr);
+        ols::PlateSolver::init(astap_db,astap_exe,astap_timeout);
         ols::OpenLiveStacker stacker;
         stacker.init(driver);
         stacker.run();

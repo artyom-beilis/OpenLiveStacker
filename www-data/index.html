@@ -30,6 +30,10 @@
         background: url(/media/img/stretch.png) no-repeat center center;
         background-size: 10mm 10mm;
     }
+    .solve_background {
+        background: url(/media/img/solve.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
     .pause_background {
         background: url(/media/img/pause.png) no-repeat center center;
         background-size: 10mm 10mm;
@@ -51,6 +55,10 @@
         margin:0;
     }
     #live_stream_video {
+        padding:0;
+        margin:0;
+    }
+    #solver_result_image {
         padding:0;
         margin:0;
     }
@@ -227,6 +235,7 @@ function changeStackerStatus(new_status)
         stack: true,
         pause: false,
         resume: false,
+        solve: true,
         save: false,
         live: false,
         pp: false,
@@ -238,6 +247,7 @@ function changeStackerStatus(new_status)
             showThumbLive(false);
         }
         ui_ctl.stack = true;
+        ui_ctl.solve = true;
         ui_ctl.pause = false;
         ui_ctl.resume = false;
         ui_ctl.save=false;
@@ -250,6 +260,7 @@ function changeStackerStatus(new_status)
             showStackedVideo(true);
         }
         ui_ctl.stack = false;
+        ui_ctl.solve = false;
         ui_ctl.pause = true;
         ui_ctl.resume = false;
         ui_ctl.save = true;
@@ -262,6 +273,7 @@ function changeStackerStatus(new_status)
             showStackedVideo(true);
         }
         ui_ctl.stack = false;
+        ui_ctl.solve = false;
         ui_ctl.pause = false;
         ui_ctl.resume = true;
         ui_ctl.save = true;
@@ -501,6 +513,11 @@ function onResize(ev)
         thumb.style.marginRight = '0px';
         thumb.style.marginTop  = '0px';
     }
+    var solved = document.getElementById('solver_result_image');
+    if(solved) {
+        solved.style.width = Math.round(size[0] / 2) + 'px';
+        solved.style.height = Math.round(size[1] / 2) + 'px';
+    }
 }
 
 function startStream()
@@ -726,14 +743,43 @@ function startStack()
 
 function updateRADE(name)
 {
+    updateRADEFor(name,'stack');
+}
+function updateSolverRADE(name)
+{
+    updateRADEFor(name,'solver');
+}
+
+function updateRADEFor(name,target_id)
+{
     var coord=['','']
     name = name.toUpperCase();
     if(name in jsdb) {
         coord = jsdb[name]
     }
-    document.getElementById('stack_ra').value = coord[0];
-    document.getElementById('stack_de').value = coord[1];
+    document.getElementById(target_id + '_ra').value = coord[0];
+    document.getElementById(target_id + '_de').value = coord[1];
 }
+
+function recalcFOV()
+{
+    try {
+        var pixel_size = parseFloat(document.getElementById('solver_pixel_size').value);
+        var FL = parseFloat(document.getElementById('solver_focal_length').value);
+        var fov = global_height * pixel_size * 1e-3 / FL * 180 / 3.14159;
+        document.getElementById('solver_fov').value = fov.toFixed(3);
+    }
+    catch(e) {
+        console.log('calcing FOV failed' + e)
+    }
+
+}
+
+function showSolve(show)
+{
+    document.getElementById('plate_solve_div').style.display = show ? 'inline' : 'none';
+}
+
 
 function toggleFS(fs)
 {
@@ -744,6 +790,57 @@ function toggleFS(fs)
         document.exitFullscreen();
     }
 }
+
+
+function plateSolve()
+{
+    var ra,de,fov,rad;
+    try {
+        ra = parseRA(document.getElementById('solver_ra').value);
+        de = parseDEC(document.getElementById('solver_de').value);
+        fov = parseFloat(document.getElementById('solver_fov').value);
+        rad = parseFloat(document.getElementById('solver_radius').value);
+    }
+    catch(e) {
+        alert('Invalid Inputs' + e)
+        return;
+    }
+    document.getElementById('solver_config').style.display = 'none';
+    document.getElementById('solver_status_div').style.display = 'inline';
+    document.getElementById('solver_status').innerHTML = 'Waiting...';
+    document.getElementById('solver_result').style.display = 'none';
+    var req = {
+        "fov" : fov,
+        "ra"  : ra,
+        "de"  : de,
+        "rad" : rad
+    };
+    restCall('post','/api/plate_solver',req,solveResult)
+}
+
+function solveResult(v)
+{
+    var status, jpeg = null;
+    if(v.solved) {
+        jpeg = v.result_image + '?' + Date.now();
+        status = 'Distance to target ' + v.distance_to_target.toFixed(2) + '°';
+    }
+    else {
+        status = v.error;
+    }
+    document.getElementById('solver_status').innerHTML = status;
+    if(jpeg) {
+        document.getElementById('solver_result_image').src = jpeg;
+    }
+    document.getElementById('solver_result').style.display = jpeg ? 'inline' : 'none';
+}
+
+function solverRestart()
+{
+    document.getElementById('solver_status_div').style.display='none';
+    document.getElementById('solver_config').style.display='inline';
+}
+
 
 window.onload = (event) => {
   run();
@@ -764,6 +861,7 @@ window.onresize = onResize;
 <p id='std_controls' style="display:none;" >
     <button class="comp_but settings_background" onclick="showConfig(true);">&nbsp;</button>
     <button style="display:none" id="stacking_ui_stack" class="comp_but" onclick="showStack(true);">≡</button>
+    <button style="display:none" id="stacking_ui_solve" class="comp_but solve_background" onclick="showSolve(true);">&nbsp;</button>
     <button style="display:none" id="stacking_ui_pause" class="comp_but pause_background" onclick="ctlStack('pause');">&nbsp;</button>
     <button style="display:none" id="stacking_ui_resume" class="comp_but resume_background" onclick="ctlStack('resume');">&nbsp;</button>
     <button style="display:none" id="stacking_ui_save" class="comp_but save_background" onclick="ctlStack('save');" >&nbsp;</button>
@@ -849,6 +947,26 @@ window.onresize = onResize;
     <tbody id='cam_controls' >
     </tbody>
     </table>
+</div>
+<div class="config_div" id="plate_solve_div" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
+    <span style="position:absolute; right:1mm; top:1mm">
+        <button class="incdec_but" onclick="showSolve(false);">X</button>
+    </span>
+    <div id="solver_config">
+        <p>Pixel Size (μm) <input id="solver_pixel_size" type="number" value="" oninput='recalcFOV();' />, Focal Length (mm) <input id="solver_focal_length" type="number" value="" oninput='recalcFOV();' /></p>
+        <p>Vertical FOV (°) <input id="solver_fov" type="number" value="" /></p>
+        <p>Object <input type="text" oninput='updateSolverRADE(this.value)'  value="" /> (M31, NGC457)</p>
+        <p>RA <input id="solver_ra" type="text" value="" />, DEC <input id="solver_de" type="text" value=""/></p>
+        <p>Radius (°) <input id="solver_radius" type="number" min="0.1" max="10.0" step="0.1" value="5.0" /></p>
+        <p><button onclick="plateSolve();" >Solve</button></p>
+    </div>
+    <div id="solver_status_div" style="display:none;" >
+        <p>Status: <span id="solver_status"></span></p>
+        <p><button onclick="solverRestart();" >Restart</button></p>
+        <div id="solver_result" style="display:none; text-align:center;">
+            <p><img alt="Solving result" src="" id="solver_result_image" /></p>
+        </div>
+    </div>
 </div>
 </body>
 </html>

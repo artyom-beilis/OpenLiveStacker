@@ -27,6 +27,7 @@ Generated files
     /media/data/debug/stacking_id/ 
     /media/data/debug/stacking_id/log.txt - log of all the results, meta data etc, everything needed to recreate stacking offline
     /media/data/debug/stacking_id/(other images) -  saved frames depedning on type
+    /media/data/plate_solving_solution.jpeg - visual plate solving solution
 
 
 Calibration index:
@@ -69,6 +70,7 @@ Basic API layout
 
     /api/camera - camera controls
     /api/stacker - stacker controls
+    /api/plate_solver - plate solver controls
 
     
 ### Camera API `/api/camera`
