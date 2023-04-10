@@ -14,13 +14,12 @@
     - Implemented
         - UVC Based like webcam, sv105
         - ASI ZWO support - initial exposure and gain controls only
+        - Watch directoy for files (universal integration with ekos)
         - Sim - simulation for development
     - Future extected drivers:
-        - Watch directoy for files (universal integration with ekos)
         - Android camera
         - INDI Library (for wide range of cameras)
 - Switch pure JS UI to better looking one
-- Integrate as Android App
 
 ## Using on Android
 
@@ -45,14 +44,24 @@ Stacked images and all data is stored under `DCIM/OpenLiveStacker`
 - cppcms 2.0 beta
 - OpenCV >= 3.2 core, imgproc, imgcodecs
 - C++11 enabled compiler
-- ASI ZWO SDK (optional) for ASI support
+- Optional:
+    - ASI ZWO SDK for ASI support
+    - libraw for watch directory driver support of dng/raw files
 
-Just run
+Clone repo:
+
+    git clone --recurse-submodules https://github.com/artyom-beilis/OpenLiveStacker
+
+cd OpenLiveStacker and run
 
     mkdir build
     cd build
     cmake ..
     make
+    
+For 3rd part libraries or non-standard installations like SDK pass `-DCMAKE_INCLUDE_PATH=/path/to/includes` and `-DCMAKE_LIBRARY_PATH=/path/to/libs` parameters to cmake
+
+For building for old Intel CPUs without SSE4 support add `-DNO_SSE4=OFF` to cmake.
 
 ### Running
 
