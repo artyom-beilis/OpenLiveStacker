@@ -1,4 +1,6 @@
 #include "ols.h"
+#include "plate_solver.h"
+#include "util.h"
 #include <sstream>
 #include <booster/log.h>
 #include <android/log.h>
@@ -27,6 +29,7 @@ extern "C" {
     {
         return ols_andoid_error_str;
     }
+
     int ols_android_init(
             char const *data_path,          /// Path to data location
             char const *document_root,      /// Document root for html files
@@ -41,8 +44,13 @@ extern "C" {
             booster::shared_ptr<booster::log::sink> logger(new ols::AndroidSink());
             booster::log::logger::instance().add_sink(logger);
             ols::CameraDriver::load_driver(driver,driver_dir,driver_config);
-            BOOSTER_INFO("ols") <<"Driver loaded" << driver;
+            BOOSTER_ERROR("ols") <<"Driver loaded" << driver;
             ols::OpenLiveStacker::disableCVThreads();
+            std::string astap_exe = driver_dir + std::string("/libastap_cli.so");
+            std::string astap_db = data_path + std::string("/db");
+            std::string astap_tmp = data_path + std::string("/debug");
+            ols::PlateSolver::init(astap_db,astap_exe,10.0,astap_tmp);
+
             g_stacker.reset(new ols::OpenLiveStacker(data_path));
             g_stacker->http_port = http_port;
             g_stacker->http_ip = http_ip;

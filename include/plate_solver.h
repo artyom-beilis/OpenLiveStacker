@@ -48,7 +48,7 @@ namespace ols {
         Result make_result(std::string const &path,double ra,double de);
         double get(std::map<std::string,double> const &vals,std::string const &name);
         std::map<std::string,double> parse_ini(std::string const &path,std::string &error);
-        int run(std::vector<std::string> &opts);
+        int run(std::vector<std::string> &opts,std::string ini_path);
         std::string db_,exe_;
         double timeout_;
         std::string temp_dir_;

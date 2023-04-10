@@ -50,7 +50,7 @@ namespace ols {
         }
         std::string res_file = temp_dir_ + "/ols_astap_output.ini";
         std::remove(res_file.c_str());
-        int status = run(cmd);
+        int status = run(cmd,res_file);
         switch(status) {
         case 0: break;
         case 1: 
@@ -60,13 +60,12 @@ namespace ols {
                 throw std::runtime_error("Failed to find solution " + err);
             }
         case 2: throw std::runtime_error("Not enough stars detected");
-        case 7: throw std::runtime_error("Failed to exec astap");
         case 16:throw std::runtime_error("Error reading image file: " + img_path);
         case 32:throw std::runtime_error("No star database found " + db_);
         case 33:throw std::runtime_error("Error reading star database " + db_);
         default:throw std::runtime_error("astap returned error code " + std::to_string(status));
         }
-        return make_result(temp_dir_ + "/ols_astap_output.ini",ra,de);
+        return make_result(res_file,ra,de);
     }
 
     PlateSolver::Result PlateSolver::make_result(std::string const &path,double ra,double de)
@@ -169,13 +168,19 @@ namespace ols {
     }
 
 
-    int PlateSolver::run(std::vector<std::string> &opts)
+    int PlateSolver::run(std::vector<std::string> &opts,std::string ini_path)
     {
-        std::ostringstream ss;
         std::vector<char *> args;
+        #ifdef ANDROID_SUPPORT
+        // workaround of linker issue
+        char exe[128];
+        snprintf(exe,sizeof(exe),"/system/bin/linker%s",(sizeof(void*)==8 ? "64" : ""));
+        args.push_back(exe);
+        #else
+        char const *exe=exe_.c_str();
+        #endif
         for(auto &opt: opts) {
             args.push_back(&opt[0]);
-            ss << opt << " ";
         }
         args.push_back(nullptr);
         int child_pid = fork();
@@ -185,11 +190,15 @@ namespace ols {
             dup2(in_fd,0);
             dup2(out_fd,1);
             dup2(out_fd,2);
-            execvp(exe_.c_str(),args.data());
-            _exit(7);
+            execvp(exe,args.data());
+            int err = errno;
+            std::ofstream f(ini_path);
+            f<<"PLTSOLVD=F\nERROR=exec of " << exe_ << " failed with: " << strerror(err);
+            f.close();
+            _exit(1);
         }
         else if(child_pid < 0) {
-            throw std::system_error(errno,std::generic_category(),"Failed to create aprocess"); 
+            throw std::system_error(errno,std::generic_category(),"Failed to create process"); 
         }
         else {
             int N = int(timeout_ * 10);
