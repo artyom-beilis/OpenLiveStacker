@@ -250,7 +250,6 @@ function changeStackerStatus(new_status)
             showThumbLive(false);
         }
         ui_ctl.stack = true;
-        ui_ctl.solve = true;
         ui_ctl.pause = false;
         ui_ctl.resume = false;
         ui_ctl.save=false;
@@ -263,7 +262,6 @@ function changeStackerStatus(new_status)
             showStackedVideo(true);
         }
         ui_ctl.stack = false;
-        ui_ctl.solve = false;
         ui_ctl.pause = true;
         ui_ctl.resume = false;
         ui_ctl.save = true;
@@ -276,7 +274,6 @@ function changeStackerStatus(new_status)
             showStackedVideo(true);
         }
         ui_ctl.stack = false;
-        ui_ctl.solve = false;
         ui_ctl.pause = false;
         ui_ctl.resume = true;
         ui_ctl.save = true;

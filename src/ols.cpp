@@ -194,7 +194,11 @@ void OpenLiveStacker::run()
 
     debug_save_thread_ = std::move(start_debug_saver(debug_save_queue_,debug_dir_));
     preprocessor_thread_ = std::move(start_preprocessor(preprocessor_queue_,stacker_queue_));
-    stacker_thread_ = std::move(start_stacker(stacker_queue_,stack_display_queue_,stacker_stats_queue_,data_dir_));
+    stacker_thread_ = std::move(start_stacker(stacker_queue_,
+                                              stack_display_queue_,
+                                              stacker_stats_queue_,
+                                              plate_solving_queue_,
+                                              data_dir_));
     web_service_->run();
     stop();
     

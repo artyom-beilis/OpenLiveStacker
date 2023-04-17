@@ -274,10 +274,11 @@ namespace ols {
     
     class StackerProcessor {
     public:
-        StackerProcessor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,std::string data_dir) :
+        StackerProcessor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,std::string data_dir) :
             in_(in),
             out_(out),
             stats_(stats),
+            plate_solving_(plate_solving),
             data_dir_(data_dir)
         {
         }
@@ -293,10 +294,15 @@ namespace ols {
                 }
                 auto video_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
                 if(video_ptr) {
-                    auto res = handle_video(video_ptr);
+                    auto frames = handle_video(video_ptr);
+                    auto res = frames.first;
+                    auto ps  = frames.second;
                     if(res) {
                         if(out_)
                             out_->push(res);
+                    }
+                    if(ps && plate_solving_) {
+                        plate_solving_->push(ps);
                     }
                     continue;
                 }
@@ -330,26 +336,38 @@ namespace ols {
             return ols::generate_dummy_frame(width_,height_);
         }
 
-        std::shared_ptr<CameraFrame> generate_output_frame(std::pair<cv::Mat,StretchInfo> data)
+        std::pair<std::shared_ptr<CameraFrame>,std::shared_ptr<CameraFrame> > generate_output_frame(std::pair<cv::Mat,StretchInfo> data,bool create_ps_frame=true)
         {
             cv::Mat img = data.first;
             save_stretch(data.second);
             cv::Mat img8;
             img.convertTo(img8,CV_8UC3,255);
             std::shared_ptr<CameraFrame> frame(new CameraFrame());
+            std::shared_ptr<CameraFrame> plate_solving_frame;
             frame->format.width = img8.cols;
             frame->format.height = img8.rows;
             std::vector<unsigned char> buf;
             cv::imencode(".jpeg",img8,buf);
             frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
-            return frame;
+            if(plate_solving_ && create_ps_frame) {
+                plate_solving_frame.reset(new CameraFrame());
+                plate_solving_frame->format.width = img8.cols;
+                plate_solving_frame->format.height = img8.rows;
+                plate_solving_frame->frame = img8;
+                plate_solving_frame->frame_dr = 255;
+            }
+            return std::make_pair(frame,plate_solving_frame);
         }
 
         void send_updated_image()
         {
             if(out_) {
-                if(stacker_->stacked_count() > 0)
-                    out_->push(generate_output_frame(stacker_->get_stacked_image()));
+                if(stacker_->stacked_count() > 0) {
+                    auto frames = generate_output_frame(stacker_->get_stacked_image());
+                    out_->push(frames.first);
+                    if(plate_solving_)
+                        plate_solving_->push(frames.second);
+                }
                 else
                     out_->push(generate_dummy_frame());
             }
@@ -382,7 +400,8 @@ namespace ols {
                 tpath += suffix + "_stacked.tiff";
             }
             save_tiff(to16bit(stacker_->get_raw_stacked_image()),tpath);
-            auto frame = generate_output_frame(stacker_->get_stacked_image());
+            auto frames = generate_output_frame(stacker_->get_stacked_image(),false);
+            auto frame = frames.first;
             std::ofstream f(path,std::ofstream::binary);
             f.write((char*)frame->jpeg_frame->data(),frame->jpeg_frame->size());
             f.close();
@@ -400,9 +419,10 @@ namespace ols {
         }
 
 
-        std::shared_ptr<CameraFrame> handle_video(std::shared_ptr<CameraFrame> video)
+        std::pair<std::shared_ptr<CameraFrame>,std::shared_ptr<CameraFrame> > handle_video(std::shared_ptr<CameraFrame> video)
         {
             std::shared_ptr<CameraFrame> res;
+            std::shared_ptr<CameraFrame> ps;
             std::shared_ptr<StatsData> stats(new StatsData());
 		    auto start = std::chrono::high_resolution_clock::now();
             try {
@@ -426,7 +446,9 @@ namespace ols {
                         if(out_) {
                             auto img = stacker_->get_stacked_image();
                             auto p2 = std::chrono::high_resolution_clock::now();
-                            res = generate_output_frame(img);
+                            auto frames = generate_output_frame(img);
+                            res=frames.first;
+                            ps=frames.second;
                             auto p3 = std::chrono::high_resolution_clock::now();
                             gtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p2-p1).count();
                             jtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p3-p2).count();
@@ -448,7 +470,7 @@ namespace ols {
             catch(std::exception const &e) {
                 BOOSTER_ERROR("stacker") << "Stacking Failed:" << e.what();
             }
-            return res;
+            return std::make_pair(res,ps);
         }
         void save_calibration()
         {
@@ -549,7 +571,7 @@ namespace ols {
             }
         }
     private:
-        queue_pointer_type in_,out_,stats_;
+        queue_pointer_type in_,out_,stats_,plate_solving_;
         std::string data_dir_;
         int width_,height_;
         bool calibration_=false;
@@ -561,9 +583,9 @@ namespace ols {
         bool restart_;
     };
 
-    std::thread start_stacker(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,std::string data_dir)
+    std::thread start_stacker(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,std::string data_dir)
     {
-        std::shared_ptr<StackerProcessor> p(new StackerProcessor(in,out,stats,data_dir));
+        std::shared_ptr<StackerProcessor> p(new StackerProcessor(in,out,stats,plate_solving,data_dir));
         return std::thread([=]() { p->run(); });
     }
 

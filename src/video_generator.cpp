@@ -158,7 +158,7 @@ namespace ols {
                 stack_out_->push(frame);
             if(debug_active_ && stacking_active_)
                 debug_out_->push(frame);
-            if(plate_solving_out_)
+            if(plate_solving_out_ && !stacking_in_process_)
                 plate_solving_out_->push(frame);
         }
         void run()
@@ -182,15 +182,21 @@ namespace ols {
                     switch(ctl_ptr->op) {
                     case StackerControl::ctl_init:
                         stacking_active_ = true;
+                        stacking_in_process_ = true;
                         debug_active_ = ctl_ptr->save_inputs;
                         break;
                     case StackerControl::ctl_resume:
                     case StackerControl::ctl_save_and_continue:
                         stacking_active_ = true;
+                        stacking_in_process_ = true;
                         break;
                     case StackerControl::ctl_pause:
+                        stacking_active_ = false;
+                        stacking_in_process_ = true;
+                        break;
                     case StackerControl::ctl_save:
                         stacking_active_ = false;
+                        stacking_in_process_ = false;
                         break;
                     case StackerControl::ctl_update:
                         break;
@@ -207,6 +213,7 @@ namespace ols {
     private:
         queue_pointer_type data_queue_, stack_out_, live_out_, debug_out_, plate_solving_out_;
         bool stacking_active_ = false;
+        bool stacking_in_process_ = false;
         bool debug_active_ = false;
     };
 

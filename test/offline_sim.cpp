@@ -27,7 +27,7 @@ namespace ols {
                 out->call_on_push([](std::shared_ptr<QueueData> ){});
             }
             std::thread t1 = start_preprocessor(input_queue_,stacker_queue_);
-            std::thread t2 = start_stacker(stacker_queue_,out,nullptr,output_dir_);
+            std::thread t2 = start_stacker(stacker_queue_,out,nullptr,nullptr,output_dir_);
             std::shared_ptr<StackerControl> ctl(new StackerControl(cfg_));
             std::cerr << cfg_.width << " " << cfg_.height << std::endl;
             input_queue_->push(ctl);

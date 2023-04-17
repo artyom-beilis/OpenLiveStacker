@@ -7,12 +7,12 @@ This is the data flow (up down)
               |    ----
               |   /
             Video Generator: bayer/yuv2rgb, rgb2jpeg, jpeg2rgb when stacking
-              | \                       \
-              |  - Save Debug Images     - Live Video Generator (app)
-              |
-            preprocessor: rgb2float, darks/flats, derotate
-              |
-            Stacker: stack images
+              | \                       \                               \
+              |  - Save Debug Images     - Live Video Generator (app)     - Save frame for Plate Solving
+              |                                                           /
+            preprocessor: rgb2float, darks/flats, derotate               /
+              |                                                         /
+            Stacker: stack and stretch images -------------------------/
               |
               |- Stats: send stacking stats/status to web client
               |
