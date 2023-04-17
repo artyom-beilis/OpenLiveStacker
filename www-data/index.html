@@ -23,6 +23,9 @@
     a:hover { color:red; }
     img { padding:0; margin:0; }
     button { border-radius:2mm; height:10mm; font-size:5mm ; text-align:center; vertical-align: middle; background-color:black; color:red; border: 2px solid red }
+    button:disabled {
+        color:#800000;
+    }
     .slider { width: 100%; }
     .slider_elem { background-color: transparent; }
     .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
@@ -340,11 +343,26 @@ function openCamera()
 
 function updateControl(optid,value)
 {
-    restCall('post','/api/camera/option/' + optid,{'value':value},(e)=>{});
+    restCall('post','/api/camera/option/' + optid,{'value':value},(e)=>{
+        enableNumControl(optid,false);
+        if(optid == 'auto_exp') {
+            enableNumControl('exp',value ? false : true);
+        }
+        else if(optid == 'auto_wb') {
+            enableNumControl('wb',value ? false : true);
+        }
+    });
 }
 function updateBoolControl(optid,value)
 {
     updateControl(optid,value ? 1 : 0);
+}
+
+function enableNumControl(optid,val)
+{
+    var ctl = document.getElementById('control_button_' + optid);
+    if(ctl)
+        ctl.disabled = !val;
 }
 
 function updateNumControl(optid)
@@ -352,6 +370,7 @@ function updateNumControl(optid)
     var val = document.getElementById('control_opt_' + optid).value;
     val = parseFloat(val);
     updateControl(optid,val);
+    enableNumControl(optid,false);
     return false;
 }
 
@@ -374,10 +393,12 @@ function prepareControls(ctls)
             var checked = ctl.cur != 0 ? 'checked' : '';
             control_str += `<td><input type="checkbox" ${checked} onchange="updateBoolControl('${ctl.option_id}',this.checked ? 1 : 0);" /></td>`;
             control_str += '<td>&nbsp;</td>';
+            control_str += '<td>&nbsp;</td>';
             control_str += `<td>${ctl.default != 0 ? 'on' : 'off'}</td>`;
         }
         else {
-            control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input id="control_opt_${ctl.option_id}" min="${ctl.min}" max="${ctl.max}" step="${ctl.step}" type="number" value="${ctl.cur}" /></form></td>`;
+            control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input id="control_opt_${ctl.option_id}" min="${ctl.min}" max="${ctl.max}" step="${ctl.step}" type="number" value="${ctl.cur}" oninput="enableNumControl('${ctl.option_id}',true);"  /></form></td>`;
+            control_str += `<td><button disabled id="control_button_${ctl.option_id}" onclick="updateNumControl('${ctl.option_id}');" >set</button></td>`;
             control_str +=`<td>[${ctl.min},${ctl.max}]</td>`;
             control_str +=`<td>${ctl.default}</td>`;
         }
@@ -940,6 +961,7 @@ window.onresize = onResize;
         <tr>
             <td>Name</td>
             <td>Value</td>
+            <td>&nbsp;</td>
             <td>Range</td>
             <td>Default</td>
         </td>
