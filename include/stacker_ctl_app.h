@@ -51,8 +51,9 @@ namespace ols {
                 cmd->op = StackerControl::ctl_resume;
                 status_ = "stacking";
             }
-            else if(op == "save_and_continue"){
-                cmd->op = StackerControl::ctl_save_and_continue;
+            else if(op == "cancel"){
+                cmd->op = StackerControl::ctl_cancel;
+                status_ = "idle";
             }
             else
                 throw std::runtime_error("Unknown operation " + op);

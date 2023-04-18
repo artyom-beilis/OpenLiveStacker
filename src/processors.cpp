@@ -383,22 +383,11 @@ namespace ols {
             return res;
         }
 
-        void save_stacked_image_and_send(bool final_image)
+        void save_stacked_image_and_send()
         {
-            std::string path = output_path_;
-            std::string ipath = output_path_;
-            std::string tpath = output_path_;
-            if(final_image) {
-                path += "_stacked.jpeg";
-                ipath += "_stacked.txt";
-                tpath += "_stacked.tiff";
-            }
-            else {
-                std::string suffix = "_interm_" + std::to_string(stacker_->stacked_count());
-                path += suffix+ ".jpeg";    
-                ipath += suffix + ".txt";
-                tpath += suffix + "_stacked.tiff";
-            }
+            std::string path = output_path_ + "_stacked.jpeg";
+            std::string ipath = output_path_ + "_stacked.txt";
+            std::string tpath = output_path_ + "_stacked.tiff";
             save_tiff(to16bit(stacker_->get_raw_stacked_image()),tpath);
             auto frames = generate_output_frame(stacker_->get_stacked_image(),false);
             auto frame = frames.first;
@@ -544,13 +533,17 @@ namespace ols {
             case StackerControl::ctl_pause:
                 restart_ = true;
                 break;
-            case StackerControl::ctl_save_and_continue:
-                if(stacker_)
-                    save_stacked_image_and_send(false);
+            case StackerControl::ctl_cancel:
+                if(stacker_) {
+                    stacker_.reset();
+                }
+                else if(calibration_) {
+                    calibration_ = false;
+                }
                 break;
             case StackerControl::ctl_save:
                 if(stacker_) {
-                    save_stacked_image_and_send(true);
+                    save_stacked_image_and_send();
                     stacker_.reset();
                 }
                 else if(calibration_) {

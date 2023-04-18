@@ -45,7 +45,7 @@ namespace ols {
             ctl_pause,    /// pause stacking (for non tracking mount)
             ctl_resume,   /// resume paused stacking
             ctl_save,     /// save result and complete
-            ctl_save_and_continue,  /// save intermediate result and continue
+            ctl_cancel,   /// cancel processing and discard the result
             ctl_update /// update strectch parameters
         };
         ControlType op = ctl_init;

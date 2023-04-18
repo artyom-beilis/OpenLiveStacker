@@ -186,7 +186,6 @@ namespace ols {
                         debug_active_ = ctl_ptr->save_inputs;
                         break;
                     case StackerControl::ctl_resume:
-                    case StackerControl::ctl_save_and_continue:
                         stacking_active_ = true;
                         stacking_in_process_ = true;
                         break;
@@ -195,6 +194,7 @@ namespace ols {
                         stacking_in_process_ = true;
                         break;
                     case StackerControl::ctl_save:
+                    case StackerControl::ctl_cancel:
                         stacking_active_ = false;
                         stacking_in_process_ = false;
                         break;

@@ -49,6 +49,10 @@
         background: url(/media/img/save.png) no-repeat center center;
         background-size: 10mm 10mm;
     }
+    .cancel_background {
+        background: url(/media/img/cancel.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
     .settings_background {
         background: url(/media/img/settings.png) no-repeat center center;
         background-size: 10mm 10mm;
@@ -237,6 +241,7 @@ function changeStackerStatus(new_status)
     var ui_ctl = {
         stack: true,
         pause: false,
+        cancel: false,
         resume: false,
         solve: true,
         save: false,
@@ -253,6 +258,7 @@ function changeStackerStatus(new_status)
         ui_ctl.pause = false;
         ui_ctl.resume = false;
         ui_ctl.save=false;
+        ui_ctl.cancel=false;
         ui_ctl.pp=false;
         ui_ctl.live = false;
         ui_ctl.stats = false;
@@ -262,6 +268,7 @@ function changeStackerStatus(new_status)
             showStackedVideo(true);
         }
         ui_ctl.stack = false;
+        ui_ctl.cancel = true;
         ui_ctl.pause = true;
         ui_ctl.resume = false;
         ui_ctl.save = true;
@@ -275,6 +282,7 @@ function changeStackerStatus(new_status)
         }
         ui_ctl.stack = false;
         ui_ctl.pause = false;
+        ui_ctl.cancel = true;
         ui_ctl.resume = true;
         ui_ctl.save = true;
         ui_ctl.pp = true;
@@ -586,7 +594,7 @@ function getPVal(name)
 function ctlStack(status)
 {
     restCall('post','/api/stacker/control',{operation:status},(s)=> {
-        if(status == 'save') {
+        if(status == 'save' || status == 'cancel') {
             changeStackerStatus('idle');
         }
         else if(status == 'resume') {
@@ -883,6 +891,7 @@ window.onresize = onResize;
     <button style="display:none" id="stacking_ui_pause" class="comp_but pause_background" onclick="ctlStack('pause');">&nbsp;</button>
     <button style="display:none" id="stacking_ui_resume" class="comp_but resume_background" onclick="ctlStack('resume');">&nbsp;</button>
     <button style="display:none" id="stacking_ui_save" class="comp_but save_background" onclick="ctlStack('save');" >&nbsp;</button>
+    <button style="display:none" id="stacking_ui_cancel" class="comp_but cancel_background" onclick="ctlStack('cancel');" >&nbsp;</button>
     <button style="display:none" id="stacking_ui_pp" class="comp_but stretch_background" onclick="showPP(true);" >&nbsp;</button>
     <button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
 </p>

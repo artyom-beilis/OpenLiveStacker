@@ -177,8 +177,8 @@ Stacking controls
     POST /api/stacker/control
 
         {
-            "operation" : "pause" / "save" / "resume" / "save_and_continue" 
-            // pase and resume for manual tracking, save - finish stacking and save the result, save_and_continue - save intermediate result and continue stacking
+            "operation" : "pause" / "save" / "resume" / "cancel" 
+            // pase and resume for manual tracking, save - finish stacking and save the result, cancel - finish stacking and discard the result
             "save_unprocessed" : bool // default false - save floating point image before stretching and converting to 8bit jpeg
         }
         return { "status" : "ok"/"fail", "msg" : STRING" }
@@ -194,7 +194,7 @@ Stacking controls
         return { "status" : "ok"/"fail", "msg" : STRING" }
 
     GET /api/stacker/status
-        return { "status" : 
+        return { "status" : "idle"/"paused"/"stacking" }
             
 ### Live Updates
 
