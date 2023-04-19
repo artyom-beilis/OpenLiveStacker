@@ -91,7 +91,7 @@ namespace ols {
         /// Camera name
         virtual std::string name(CamErrorCode &) 
         {
-            return "sim";
+            return "Simulation";
         }
         /// Return list of suppored video formats
         virtual std::vector<CamStreamFormat> formats(CamErrorCode &)
@@ -311,7 +311,7 @@ namespace ols {
     public:
         virtual std::vector<std::string> list_cameras(CamErrorCode &) 
         {
-            return std::vector<std::string>{"sim"};
+            return std::vector<std::string>{"Simulation"};
         }
         virtual std::unique_ptr<Camera> open_camera(int id,CamErrorCode &e) 
         {

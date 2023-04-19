@@ -12,6 +12,9 @@
 #include "plate_solver_ctl_app.h"
 
 namespace ols {
+
+std::atomic<int> OpenLiveStacker::received_;
+
 OpenLiveStacker::OpenLiveStacker(std::string data_dir)
 {
     data_dir_ = data_dir;
@@ -151,8 +154,11 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     web_service_->applications_pool().mount(cppcms::create_pool<PlateSolverControlApp>(data_dir_),cppcms::mount_point("/plate_solver((/.*)?)",1));
 }
 
+
+
 void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
 {
+    received_ ++;
     if(video_generator_queue_->items > 20) {
         dropped_since_last_update_ ++;
         BOOSTER_WARNING("stacker") << "Processing is overloaded, dropping frame #" << (++dropped_);

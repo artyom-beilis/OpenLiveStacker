@@ -30,6 +30,11 @@ extern "C" {
         return ols_andoid_error_str;
     }
 
+    int ols_android_get_frames_count()
+    {
+        return ols::OpenLiveStacker::get_frames_count();
+    }
+
     int ols_android_init(
             char const *data_path,          /// Path to data location
             char const *document_root,      /// Document root for html files

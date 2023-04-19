@@ -6,6 +6,7 @@
 #include "camera_iface.h"
 #include <cppcms/service.h>
 #include <thread>
+#include <atomic>
 
 namespace ols {
 
@@ -47,6 +48,11 @@ namespace ols {
             return *driver_;
         }
 
+        static int get_frames_count()
+        {
+            return received_;
+        }
+
     private:
         void stop();
         void handle_video_frame(CamFrame const &cf);
@@ -71,6 +77,7 @@ namespace ols {
 
         int dropped_ = 0;
         int dropped_since_last_update_ = 0;
+        static std::atomic<int> received_;
 
         std::string data_dir_;
         std::string debug_dir_;
