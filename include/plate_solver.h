@@ -10,6 +10,8 @@ namespace ols {
     class PlateSolver {
     public:
         struct Result {
+            double center_ra_deg;
+            double center_de_deg;
             int center_row;
             int center_col;
             int target_row;

@@ -99,6 +99,8 @@ namespace ols {
         r.target_col = xt;
         r.target_row = rows - yt;
         r.angle_to_target_deg = diff_deg;
+        r.center_ra_deg = ra0;
+        r.center_de_deg = de0;
         return r;
     }
     double PlateSolver::get(std::map<std::string,double> const &vals,std::string const &name)
