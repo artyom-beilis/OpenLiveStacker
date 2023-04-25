@@ -1,5 +1,6 @@
 #include "plate_solver.h"
 #include "tiffmat.h"
+#include "util.h"
 
 #include <cmath>
 #include <fstream>
@@ -18,6 +19,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <booster/posix_time.h>
+#include <booster/log.h>
 
 namespace ols {
     PlateSolver::PlateSolver(std::string const &db_path,std::string const &astap,double limit) :
@@ -173,7 +175,8 @@ namespace ols {
     int PlateSolver::run(std::vector<std::string> &opts,std::string ini_path)
     {
         std::vector<char *> args;
-        #ifdef ANDROID_SUPPORT
+        std::ostringstream cmd;
+        #if 0 //ifdef ANDROID_SUPPORT - old workaround
         // workaround of linker issue
         char exe[128];
         snprintf(exe,sizeof(exe),"/system/bin/linker%s",(sizeof(void*)==8 ? "64" : ""));
@@ -184,7 +187,17 @@ namespace ols {
         for(auto &opt: opts) {
             args.push_back(&opt[0]);
         }
+        for(char *arg : args) {
+            cmd << arg << " ";
+        }
+        BOOSTER_INFO("ols") << "Running plate solver, exe=" << exe << " for architecture=" << OLS_ARCH <<  " with following command: "<<cmd.str();
         args.push_back(nullptr);
+        #ifdef ANDROID_SUPPORT
+        if(!exists(exe_)) {
+            BOOSTER_ERROR("ols") << "There is no such executable file " << exe_ << ". Is it x86/x86_64 android?";
+            throw std::runtime_error("The ASTAP isn't found, so such file " + exe_); 
+        }
+        #endif        
         int child_pid = fork();
         if(child_pid == 0) {
             int in_fd = open("/dev/null",O_RDONLY);
@@ -192,7 +205,11 @@ namespace ols {
             dup2(in_fd,0);
             dup2(out_fd,1);
             dup2(out_fd,2);
+            #ifdef ANDROID_SUPPORT
+            execv(exe,args.data());
+            #else
             execvp(exe,args.data());
+            #endif
             int err = errno;
             std::ofstream f(ini_path);
             f<<"PLTSOLVD=F\nERROR=exec of " << exe_ << " failed with: " << strerror(err);
