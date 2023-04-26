@@ -2,7 +2,7 @@
 
 ## Status
 
-- Early, alpha, runs on Linux, Android integration soon
+- Beta, runs on Linux and Android.
 - Works with UVC and ASI ZWO Cameras
 
 ## Roadmap
