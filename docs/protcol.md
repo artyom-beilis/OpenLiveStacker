@@ -128,6 +128,7 @@ Camera controls
                 "cur"  : value // current value for integer/float
                 "max"  : value // max value for integer/float
                 "step" : value  // step unit for integer/float
+                "read_only" : boolean // check if ctl is read only
                 "default": value // default value if applicable, null for not
             }
         ]
