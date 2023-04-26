@@ -23,8 +23,10 @@ namespace ols {
                         throw CamError("Invalid JSON");
                     }
                     content_.swap(request);
-                    std::cerr << "GOT:" << url << std::endl;
-                    content_.save(std::cerr,cppcms::json::readable);
+                    std::ostringstream log_in;
+                    log_in << "GOT:" << url << std::endl;
+                    content_.save(log_in,cppcms::json::readable);
+                    BOOSTER_INFO("stacker") << log_in.str();
                 }
 
                 cppcms::application::main(url);
@@ -32,9 +34,11 @@ namespace ols {
                 if(response_.is_undefined()) {
                     response_["status"] = "ok";
                 }
+                std::ostringstream log_out;
                 response_.save(response().out(),cppcms::json::readable);
-                std::cerr << "RESP:" << url << std::endl;
-                response_.save(std::cerr,cppcms::json::readable);
+                log_out << "RESP:" << url << std::endl;
+                response_.save(log_out,cppcms::json::readable);
+                BOOSTER_INFO("stacker") << log_out.str();
 
             }
             catch(std::exception const &e) {
