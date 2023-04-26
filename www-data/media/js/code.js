@@ -259,16 +259,37 @@ function openCamera()
     });
 }
 
+function updateDependent(opt,enable)
+{
+    enableNumControl(opt, enable);
+    var obj = document.getElementById('control_opt_' + opt);
+    if(obj) {
+        obj.readOnly = !enable;
+        if(enable) {
+            reloadNumControl(opt);
+        }
+    }
+}
+
+function updateAllDependent(optid,value)
+{
+    var enable = value ? false : true;
+    if(optid == 'auto_exp') {
+        updateDependent('exp',enable);
+        updateDependent('gain',enable);
+    }
+    else if(optid == 'auto_wb') {
+        updateDependent('wb',enable);
+        updateDependent('wb_r',enable);
+        updateDependent('wb_b',enable);
+    }
+}
+
 function updateControl(optid,value)
 {
     restCall('post','/api/camera/option/' + optid,{'value':value},(e)=>{
         enableNumControl(optid,false);
-        if(optid == 'auto_exp') {
-            enableNumControl('exp',value ? false : true);
-        }
-        else if(optid == 'auto_wb') {
-            enableNumControl('wb',value ? false : true);
-        }
+        updateAllDependent(optid,value);
     });
 }
 function updateBoolControl(optid,value)
@@ -279,8 +300,9 @@ function updateBoolControl(optid,value)
 function enableNumControl(optid,val)
 {
     var ctl = document.getElementById('control_button_' + optid);
-    if(ctl)
+    if(ctl) {
         ctl.disabled = !val;
+    }
 }
 
 function updateNumControl(optid)
@@ -295,6 +317,8 @@ function updateNumControl(optid)
 
 function reloadNumControl(optid)
 {
+    if(!document.getElementById("control_opt_" + optid))
+        return;
     restCall('get','/api/camera/option/' + optid,null,(e)=>{
         document.getElementById("control_opt_" + optid).value = e.value + '';
     });
@@ -303,9 +327,34 @@ function reloadNumControl(optid)
 function prepareControls(ctls)
 {
     var controls = document.getElementById('cam_controls');
-    var controls_str = ''
+    var controls_str = '';
+    var has_aexp = false, has_awb = false;
+    var aexp_on = false, awb_on = false;
     for(var i=0;i<ctls.length;i++) {
         var ctl = ctls[i];
+        var disabled = false;
+        if(ctl.option_id == 'auto_wb') {
+            has_awb = true;
+            awb_on = ctl.cur != 0;
+            console.log('AWB on=' + awb_on);
+        }
+        else if(ctl.option_id == 'auto_exp') {
+            has_aexp = true;
+            aexp_on = ctl.cur != 0;
+            console.log('AEXP on=' + aexp_on);
+        }
+        else if(ctl.option_id == 'wb' || ctl.option_id == 'wb_r' || ctl.option_id == 'wb_b') {
+            if(has_awb && awb_on)
+                disabled = true;
+        }
+        else if(ctl.option_id == 'exp' || ctl.option_id == 'gain') {
+            if(has_aexp && aexp_on)
+                disabled = true;
+        }
+        if(disabled)
+            console.log('Option ' + ctl.option_id + ' started disbaled')
+        else
+            console.log('Option ' + ctl.option_id + ' started enabled')
         var unit='';
         if(ctl.type == 'percent')
             unit='(%)';
@@ -318,7 +367,7 @@ function prepareControls(ctls)
         var control_str = `<td>${ctl.name}${unit}</td>`;
         if(ctl.type == 'bool') {
             var checked = ctl.cur != 0 ? 'checked' : '';
-            control_str += `<td><input type="checkbox" ${checked} onchange="updateBoolControl('${ctl.option_id}',this.checked ? 1 : 0);" /></td>`;
+            control_str += `<td><input type="checkbox" ${checked} onchange="updateBoolControl('${ctl.option_id}',this.checked ? 1 : 0);"/></td>`;
             control_str += '<td>&nbsp;</td>';
             control_str += '<td>&nbsp;</td>';
             control_str += `<td>${ctl.default != 0 ? 'on' : 'off'}</td>`;
@@ -330,7 +379,8 @@ function prepareControls(ctls)
             control_str += '<td>&nbsp;</td>';
         }
         else {
-            control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input id="control_opt_${ctl.option_id}" min="${ctl.min}" max="${ctl.max}" step="${ctl.step}" type="number" value="${ctl.cur}" oninput="enableNumControl('${ctl.option_id}',true);"  /></form></td>`;
+            var injected = disabled ? 'readonly' : '';
+            control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input id="control_opt_${ctl.option_id}" min="${ctl.min}" max="${ctl.max}" step="${ctl.step}" type="number" value="${ctl.cur}" oninput="enableNumControl('${ctl.option_id}',true);"  ${injected}  /></form></td>`;
             control_str += `<td><button disabled id="control_button_${ctl.option_id}" onclick="updateNumControl('${ctl.option_id}');" >set</button></td>`;
             control_str +=`<td>[${ctl.min},${ctl.max}]</td>`;
             control_str +=`<td>${ctl.default}</td>`;

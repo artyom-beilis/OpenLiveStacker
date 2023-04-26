@@ -273,6 +273,7 @@ namespace ols {
                 e=make_message("Failed to get controls",code);
                 return opts;
             }
+            bool auto_exp=false,auto_wb=false;
             for(int i=0;i<N;i++) {
                 ASI_CONTROL_CAPS cap;
                 code = ASIGetControlCaps(info_.CameraID,i,&cap);
@@ -281,11 +282,28 @@ namespace ols {
                     return opts;
                 }
 
+
                 std::cerr << cap.Name << " min=" << cap.MinValue << " max=" << cap.MaxValue << " def=" << cap.DefaultValue << " auto=" << cap.IsAutoSupported <<" :" << cap.Description<< std::endl;
                 CamOptionId opt_id = opt_count;
                 switch(cap.ControlType) {
+                case ASI_GAIN:
+                case ASI_EXPOSURE:
+                    if(cap.IsAutoSupported)
+                        auto_exp=true;
+                    break;
+                case ASI_WB_R:
+                case ASI_WB_B:
+                    if(cap.IsAutoSupported)
+                        auto_wb=true;
+                    break;
+                default:
+                    ;
+                }
+                switch(cap.ControlType) {
                 case ASI_GAIN: opt_id = opt_gain; break;
                 case ASI_EXPOSURE: opt_id = opt_exp; break;
+                case ASI_WB_R: opt_id = opt_wb_r; break;
+                case ASI_WB_B: opt_id = opt_wb_b; break;
                 case ASI_TEMPERATURE: opt_id = opt_temperature; break;
                 case ASI_TARGET_TEMP: opt_id = opt_cooler_target; break;
                 case ASI_COOLER_ON: opt_id = opt_cooler_on; break;
@@ -297,6 +315,15 @@ namespace ols {
                 opts.push_back(opt_id);
                 ops_map_[opt_id] = cap;
             }
+            if(auto_exp) {
+                opts.insert(opts.begin(),opt_auto_exp);
+                ops_map_[opt_auto_exp] = ASI_CONTROL_CAPS();
+            }
+            if(auto_wb) {
+                opts.insert(opts.begin(),opt_auto_wb);
+                ops_map_[opt_auto_wb] = ASI_CONTROL_CAPS();
+            }
+
             return opts;
         }
         /// get camera control
@@ -313,6 +340,20 @@ namespace ols {
             r.option = id;
             long val;
             ASI_BOOL auto_val;
+            if(id == opt_auto_exp || id==opt_auto_wb) {
+                ASI_ERROR_CODE code = ASIGetControlValue(info_.CameraID,id == opt_auto_exp ? ASI_EXPOSURE : ASI_WB_R,&val,&auto_val);
+                if(code) {
+                    e = make_message("Failed to get control value",code);
+                    return r;
+                }
+                r.type = type_bool;
+                r.min_val = 0;
+                r.max_val = 1;
+                r.step_size = 1;
+                r.cur_val = auto_val ? 1 : 0;
+                r.def_val = r.cur_val; // no way to query if auto is default
+                return r;
+            }
             ASI_ERROR_CODE code = ASIGetControlValue(info_.CameraID,cap.ControlType,&val,&auto_val);
             if(code) {
                 e = make_message("Failed to get control value",code);
@@ -330,6 +371,8 @@ namespace ols {
                 }
                 break;
             case opt_gain:
+            case opt_wb_r:
+            case opt_wb_b:
                 {
                     r.type = type_number;
                     r.min_val = cap.MinValue;
@@ -392,24 +435,53 @@ namespace ols {
         virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e)
         {
             ASI_ERROR_CODE code;
+            ASI_BOOL auto_value;
+
+            auto p = ops_map_.find(id);
+            if(p==ops_map_.end()) {
+                e="Unsupported option";
+                return;
+            }
+            auto cap = p->second;
+            
             switch(id) {
+            case opt_auto_exp:
+                {
+                    long exp_val,gain_val;
+                    ASI_BOOL aval = value ? ASI_TRUE : ASI_FALSE;
+                    if( (code = ASIGetControlValue(info_.CameraID,ASI_EXPOSURE,&exp_val,&auto_value))
+                        || (code = ASIGetControlValue(info_.CameraID,ASI_GAIN,&gain_val,&auto_value))
+                        || (code = ASISetControlValue(info_.CameraID,ASI_EXPOSURE,exp_val,aval))
+                        || (code = ASISetControlValue(info_.CameraID,ASI_GAIN,gain_val,aval)))
+                    {
+                        break;
+                    }
+                }
+                break;
+            case opt_auto_wb:
+                {
+                    long r_val,b_val;
+                    ASI_BOOL aval = value ? ASI_TRUE : ASI_FALSE;
+                    if( (code = ASIGetControlValue(info_.CameraID,ASI_WB_R,&r_val,&auto_value))
+                        || (code = ASIGetControlValue(info_.CameraID,ASI_WB_B,&b_val,&auto_value))
+                        || (code = ASISetControlValue(info_.CameraID,ASI_WB_R,r_val,aval))
+                        || (code = ASISetControlValue(info_.CameraID,ASI_WB_B,b_val,aval)))
+                    {
+                        break;
+                    }
+                }
+                break;
             case opt_exp:
                 code = ASISetControlValue(info_.CameraID,ASI_EXPOSURE,long(value*1000),ASI_FALSE);
                 break;
             case opt_gain:
-                code = ASISetControlValue(info_.CameraID,ASI_GAIN,long(value),ASI_FALSE);
-                break;
+            case opt_wb_r:
+            case opt_wb_b:
             case opt_cooler_target:
-                code = ASISetControlValue(info_.CameraID,ASI_TARGET_TEMP,long(value),ASI_FALSE);
-                break;
             case opt_cooler_on:
-                code = ASISetControlValue(info_.CameraID,ASI_COOLER_ON,long(value),ASI_FALSE);
-                break;
             case opt_fan_on:
-                code = ASISetControlValue(info_.CameraID,ASI_FAN_ON,long(value),ASI_FALSE);
-                break;
             case opt_cooler_power_perc:
-                code = ASISetControlValue(info_.CameraID,ASI_COOLER_POWER_PERC,long(value),ASI_FALSE);
+                code = ASISetControlValue(info_.CameraID,cap.ControlType,long(value),ASI_FALSE);
                 break;
             case opt_temperature:
                 e = "Temperature is read only";
