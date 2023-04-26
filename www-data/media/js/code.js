@@ -293,6 +293,13 @@ function updateNumControl(optid)
 }
 
 
+function reloadNumControl(optid)
+{
+    restCall('get','/api/camera/option/' + optid,null,(e)=>{
+        document.getElementById("control_opt_" + optid).value = e.value + '';
+    });
+}
+
 function prepareControls(ctls)
 {
     var controls = document.getElementById('cam_controls');
@@ -306,6 +313,8 @@ function prepareControls(ctls)
             unit='(ms)';
         else if(ctl.type == 'kelvin')
             unit='(K)';
+        else if(ctl.type == 'celsius')
+            unit='(C)';
         var control_str = `<td>${ctl.name}${unit}</td>`;
         if(ctl.type == 'bool') {
             var checked = ctl.cur != 0 ? 'checked' : '';
@@ -313,6 +322,12 @@ function prepareControls(ctls)
             control_str += '<td>&nbsp;</td>';
             control_str += '<td>&nbsp;</td>';
             control_str += `<td>${ctl.default != 0 ? 'on' : 'off'}</td>`;
+        }
+        else if(ctl.read_only) {
+            control_str +=`<td><input id="control_opt_${ctl.option_id}" type="text" value="${ctl.cur}" readonly</td>`;
+            control_str += `<td><button id="control_button_${ctl.option_id}" onclick="reloadNumControl('${ctl.option_id}');" >get</button></td>`;
+            control_str += '<td>&nbsp;</td>';
+            control_str += '<td>&nbsp;</td>';
         }
         else {
             control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input id="control_opt_${ctl.option_id}" min="${ctl.min}" max="${ctl.max}" step="${ctl.step}" type="number" value="${ctl.cur}" oninput="enableNumControl('${ctl.option_id}',true);"  /></form></td>`;

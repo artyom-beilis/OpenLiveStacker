@@ -75,10 +75,10 @@ std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)
 }
 
 static char const *option_string_ids[] = {
-    "auto_exp", "auto_wb", "exp", "wb", "gain", "gamma", "brightness","contrast",
+    "auto_exp", "auto_wb", "exp", "wb", "gain", "gamma", "brightness","contrast", "temperature", "cooler_target","cooler_on", "fan_on", "cooler_power"
 };
 static char const *option_names[] = {
-    "Auto Exposure", "Auto White Balance", "Exposure", "White Balance", "Gain", "Gamma", "Brightness", "Contrast"
+    "Auto Exposure", "Auto White Balance", "Exposure", "White Balance", "Gain", "Gamma", "Brightness", "Contrast", "Temperature", "Cooler Target", "Cooler On", "Fan On","Cooler Power"
 };
 
 std::string cam_option_id_to_string_id(CamOptionId id)
@@ -127,7 +127,7 @@ CamStreamType stream_type_from_str(std::string s)
 }
 
 
-static char const *cam_option_type_names[]={"bool","number","msec","percent","kelvin"};
+static char const *cam_option_type_names[]={"bool","number","msec","percent","kelvin","celsius"};
 
 std::string cam_option_type_to_str(CamOptionType type)
 {

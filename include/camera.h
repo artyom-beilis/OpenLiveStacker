@@ -56,6 +56,11 @@ namespace ols {
         opt_gamma,
         opt_brightness,
         opt_contrast,
+        opt_temperature,
+        opt_cooler_target,
+        opt_cooler_on,
+        opt_fan_on,
+        opt_cooler_power_perc,
         opt_count
     };
 
@@ -72,6 +77,7 @@ namespace ols {
         type_msec,
         type_percent,
         type_kelvin,
+        type_celsius,
     };
 
     std::string cam_option_type_to_str(CamOptionType type);
@@ -80,6 +86,7 @@ namespace ols {
     struct CamParam {
         CamOptionId option;
         CamOptionType type;
+        bool read_only = false;
         double step_size;
         double min_val;
         double max_val;

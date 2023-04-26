@@ -282,18 +282,20 @@ namespace ols {
                 }
 
                 std::cerr << cap.Name << " min=" << cap.MinValue << " max=" << cap.MaxValue << " def=" << cap.DefaultValue << " auto=" << cap.IsAutoSupported <<" :" << cap.Description<< std::endl;
+                CamOptionId opt_id = opt_count;
                 switch(cap.ControlType) {
-                case ASI_GAIN:
-                    opts.push_back(opt_gain);
-                    ops_map_[opt_gain] = cap;
-                    break;
-                case ASI_EXPOSURE:
-                    opts.push_back(opt_exp);
-                    ops_map_[opt_exp] = cap;
-                    break;
+                case ASI_GAIN: opt_id = opt_gain; break;
+                case ASI_EXPOSURE: opt_id = opt_exp; break;
+                case ASI_TEMPERATURE: opt_id = opt_temperature; break;
+                case ASI_TARGET_TEMP: opt_id = opt_cooler_target; break;
+                case ASI_COOLER_ON: opt_id = opt_cooler_on; break;
+                case ASI_FAN_ON: opt_id = opt_fan_on; break;
+                case ASI_COOLER_POWER_PERC: opt_id = opt_cooler_power_perc; break;
                 default:
                     continue;
                 }
+                opts.push_back(opt_id);
+                ops_map_[opt_id] = cap;
             }
             return opts;
         }
@@ -337,6 +339,49 @@ namespace ols {
                     r.step_size = 1;
                 }
                 break;
+            case opt_temperature:
+                {
+                    r.type = type_celsius;
+                    r.read_only = true;
+                    r.min_val = cap.MinValue * 0.1;
+                    r.max_val = cap.MaxValue * 0.1;
+                    r.def_val = cap.DefaultValue * 0.1;
+                    r.cur_val = val * 0.1;
+                    r.step_size = 0.1;
+                }
+                break;
+            case opt_cooler_target:
+                {
+                    r.type = type_celsius;
+                    r.min_val = cap.MinValue;
+                    r.max_val = cap.MaxValue;
+                    r.def_val = cap.DefaultValue;
+                    r.cur_val = val;
+                    r.step_size = 1;
+                }
+                break;
+            case opt_cooler_on:
+            case opt_fan_on:
+                {
+                    bool is_boolean = cap.MinValue ==0 && cap.MaxValue == 1;
+                    r.type = is_boolean ? type_bool : type_number;
+                    r.min_val = cap.MinValue;
+                    r.max_val = cap.MaxValue;
+                    r.def_val = cap.DefaultValue;
+                    r.cur_val = val;
+                    r.step_size = 1;
+                }
+                break;
+            case opt_cooler_power_perc:
+                {
+                    r.type = type_percent;
+                    r.min_val = cap.MinValue;
+                    r.max_val = cap.MaxValue;
+                    r.def_val = cap.DefaultValue;
+                    r.cur_val = val;
+                    r.step_size = 1;
+                }
+                break;
             default:
                 e = "Internal error can't get control";
                 return r;
@@ -354,6 +399,21 @@ namespace ols {
             case opt_gain:
                 code = ASISetControlValue(info_.CameraID,ASI_GAIN,long(value),ASI_FALSE);
                 break;
+            case opt_cooler_target:
+                code = ASISetControlValue(info_.CameraID,ASI_TARGET_TEMP,long(value),ASI_FALSE);
+                break;
+            case opt_cooler_on:
+                code = ASISetControlValue(info_.CameraID,ASI_COOLER_ON,long(value),ASI_FALSE);
+                break;
+            case opt_fan_on:
+                code = ASISetControlValue(info_.CameraID,ASI_FAN_ON,long(value),ASI_FALSE);
+                break;
+            case opt_cooler_power_perc:
+                code = ASISetControlValue(info_.CameraID,ASI_COOLER_POWER_PERC,long(value),ASI_FALSE);
+                break;
+            case opt_temperature:
+                e = "Temperature is read only";
+                return;
             default:
                 e = "Unimplemented";
                 return;

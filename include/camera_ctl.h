@@ -24,6 +24,7 @@ namespace ols {
             dispatcher().map("POST","/stream/?",&CameraControlApp::stream,this);
             dispatcher().map("GET","/options/?",&CameraControlApp::options,this);
             dispatcher().map("POST","/option/(\\w+)",&CameraControlApp::set_opt,this,1);
+            dispatcher().map("GET","/option/(\\w+)",&CameraControlApp::get_opt,this,1);
         }
 
         void status()
@@ -46,6 +47,19 @@ namespace ols {
             }
         }
 
+        void get_opt(std::string id)
+        {
+            CamOptionId opt = cam_option_id_from_string_id(id);
+            double val;
+            {
+                guard g(cam_->lock());
+                CamErrorCode e;
+                auto res = cam_->cam().get_parameter(opt,true,e);
+                e.check();
+                val = res.cur_val;
+            }
+            response_["value"] = val;
+        }
         void set_opt(std::string id)
         {
             double value = content_.get<double>("value");
@@ -73,6 +87,7 @@ namespace ols {
             for(unsigned i=0;i<params.size();i++) {
                 CamParam param = params[i];
                 response_[i]["option_id"] = cam_option_id_to_string_id(param.option);
+                response_[i]["read_only"] = param.read_only;
                 response_[i]["name"] = cam_option_id_to_name(param.option);
                 response_[i]["type"] = cam_option_type_to_str(param.type);
                 response_[i]["step"] = param.step_size;
