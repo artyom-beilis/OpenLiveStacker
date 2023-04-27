@@ -93,6 +93,57 @@ function restCall(method,url,request,on_response,on_error = alert)
     }
 }
 
+function getStoageValue()
+{
+    var storage = window.localStorage;
+    var data = storage.getItem('ols_data');
+    if(!data)
+        return {};
+    console.log('Loaded:' + data);
+    return JSON.parse(data);
+}
+
+function setStorageValue(obj)
+{
+    var data = JSON.stringify(obj);
+    console.log('Saved:' + data);
+    window.localStorage.setItem('ols_data',data);
+}
+
+function loadSavedInputValue(id)
+{
+    var storage = getStoageValue();
+    if(id in storage)
+        return storage[id];
+    return null;
+}
+
+function saveInputValue(id)
+{
+    var val = document.getElementById(id);
+    if(!val)
+        return;
+    var st = getStoageValue();
+    st[id] = val.value;
+    setStorageValue(st);
+}
+
+function updateSavedInputs()
+{
+    var els = document.getElementsByClassName('saved_input');
+    for(var i=0;i<els.length;i++) {
+        var el = els[i];
+        var id = el.id;
+        console.log("Loading " + id);
+        var val = loadSavedInputValue(id);
+        if(val!=null) {
+            el.value = val;
+            el.dispatchEvent(new Event("input"));
+        }
+        el.addEventListener('input',(e)=> { saveInputValue(e.currentTarget.id); });
+    }
+}
+
 function run()
 {
     restCall("get","/api/camera",null,listCameras);
@@ -102,6 +153,7 @@ function run()
             document.getElementById("stack_lon").value=pos.coords.longitude.toFixed(2);
         });
     }
+    updateSavedInputs();
 }
 
 
@@ -146,6 +198,7 @@ function checkOpenStatus(st)
         restCall('get','/api/stacker/status',null, (d)=> {
             changeStackerStatus(d.status);
         });
+        recalcFOV();
     }
 }
 
@@ -536,6 +589,7 @@ function startStream()
         global_height = r.height;
         showLiveVideo();
         changeStackerStatus('idle');
+        recalcFOV();
     });
     showConfig(false);
 }
@@ -779,8 +833,12 @@ function recalcFOV()
     try {
         var pixel_size = parseFloat(document.getElementById('solver_pixel_size').value);
         var FL = parseFloat(document.getElementById('solver_focal_length').value);
+        if(isNaN(pixel_size) || isNaN(FL))
+            return;
         var fov = global_height * pixel_size * 1e-3 / FL * 180 / 3.14159;
-        document.getElementById('solver_fov').value = fov.toFixed(3);
+        fov = fov.toFixed(3);
+        console.log('Setting FOV ' + fov);
+        document.getElementById('solver_fov').value = fov;
     }
     catch(e) {
         console.log('calcing FOV failed' + e)
