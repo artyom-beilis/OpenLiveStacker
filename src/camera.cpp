@@ -78,7 +78,7 @@ static char const *option_string_ids[] = {
     "auto_exp", "auto_wb", "exp", "wb", "wb_r", "wb_b", "gain", "gamma", "brightness","contrast", "temperature", "cooler_target","cooler_on", "fan_on", "cooler_power"
 };
 static char const *option_names[] = {
-    "Auto Exposure", "Auto White Balance", "Exposure", "White Balance", "White Balance Red", "White Balance Blue", "Gain", "Gamma", "Brightness", "Contrast", "Temperature", "Cooler Target", "Cooler On", "Fan On","Cooler Power"
+    "Auto Exp.", "Auto WB", "Exp.", "WB", "WB Red", "WB Blue", "Gain", "Gamma", "Bright.", "Contr.", "Temp.", "Cooler Tgt.", "Cooler", "Fan","Cooler Pwr."
 };
 
 std::string cam_option_id_to_string_id(CamOptionId id)

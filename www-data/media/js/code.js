@@ -373,16 +373,20 @@ function prepareControls(ctls)
             control_str += `<td>${ctl.default != 0 ? 'on' : 'off'}</td>`;
         }
         else if(ctl.read_only) {
-            control_str +=`<td><input id="control_opt_${ctl.option_id}" type="text" value="${ctl.cur}" readonly</td>`;
+            control_str +=`<td><input class="val_input" id="control_opt_${ctl.option_id}" type="text" value="${ctl.cur}" readonly</td>`;
             control_str += `<td><button id="control_button_${ctl.option_id}" onclick="reloadNumControl('${ctl.option_id}');" >get</button></td>`;
             control_str += '<td>&nbsp;</td>';
             control_str += '<td>&nbsp;</td>';
         }
         else {
             var injected = disabled ? 'readonly' : '';
-            control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input id="control_opt_${ctl.option_id}" min="${ctl.min}" max="${ctl.max}" step="${ctl.step}" type="number" value="${ctl.cur}" oninput="enableNumControl('${ctl.option_id}',true);"  ${injected}  /></form></td>`;
+            control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input class="val_input" id="control_opt_${ctl.option_id}" min="${ctl.min}" max="${ctl.max}" step="${ctl.step}" type="number" value="${ctl.cur}" oninput="enableNumControl('${ctl.option_id}',true);"  ${injected}  /></form></td>`;
             control_str += `<td><button disabled id="control_button_${ctl.option_id}" onclick="updateNumControl('${ctl.option_id}');" >set</button></td>`;
-            control_str +=`<td>[${ctl.min},${ctl.max}]</td>`;
+            var ctl_max = ctl.max;
+            if(ctl_max > 1000 && ctl_max % 1000 == 0 && ctl.type == "msec") {
+                ctl_max = (ctl_max / 1000) + 's';
+            }
+            control_str +=`<td>${ctl.min}&ndash;${ctl_max}</td>`;
             control_str +=`<td>${ctl.default}</td>`;
         }
         controls_str += '<tr>' + control_str + '</tr>\n';

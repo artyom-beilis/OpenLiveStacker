@@ -18,6 +18,7 @@
         color:#800000;
     }
     .slider { width: 100%; }
+    .val_input { width: 15mm; }
     .slider_elem { background-color: transparent; }
     .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
     .stretch_background {

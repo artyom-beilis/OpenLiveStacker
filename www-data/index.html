@@ -32,7 +32,7 @@
         <button class="incdec_but" onclick="showStack(false);">X</button>
     </span>
     <table>
-    <tr><td>Name</td><td><input id="stack_name" type="text" value="" ></td><td>&nbsp;</td></tr>
+    <tr><td>Name</td><td><input class="val_input" id="stack_name" type="text" value="" ></td><td>&nbsp;</td></tr>
     <tr>
         <td>Stacking</td>
         <td>
@@ -45,8 +45,8 @@
     <tr class="dso_config stack_opt" ><td>Derotate</td><td><input id="stack_field_derotation" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Derotate Mirror</td><td><input id="stack_image_flip" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Remove Satellites</td><td><input id="stack_remove_satellites" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr class="dso_config stack_opt" ><td>Object ID</td><td><input oninput="updateRADE(this.value)" id="stack_object" type="text" value="" ></td><td>for example: M31, NGC457</td></tr>
-    <tr class="dso_config stack_opt" ><td>Target</td><td>RA:<input id="stack_ra" type="text" ></td><td>DE:<input id="stack_de" type="text" ></td></tr>
+    <tr class="dso_config stack_opt" ><td>Object ID</td><td><input class="val_input" oninput="updateRADE(this.value)" id="stack_object" type="text" value="" ></td><td>for example: M31, NGC457</td></tr>
+    <tr class="dso_config stack_opt" ><td>Target</td><td>RA:<input class="val_input" id="stack_ra" type="text" ></td><td>DE:<input class="val_input" id="stack_de" type="text" ></td></tr>
     <tr class="dso_config stack_opt" ><td>Darks</td><td><select id="stack_darks"></select></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Flats</td><td><select id="stack_flats"></select></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Dark Flats</td><td><select id="stack_dark_flats"></select></td><td>&nbsp;</td></tr>
@@ -95,8 +95,8 @@
     <p>Format: <select id="stream_format"></select><button onclick="startStream()" >Stream</button></p>
     <p>
         <label for="FS_checked">Full screen</label><input id="FS_checked" type="checkbox" onchange="toggleFS(this.checked)" >
-        Lat:<input id="stack_lat" type="number" >
-        Lon:<input id="stack_lon" type="number" >
+        Lat:<input class="val_input" id="stack_lat" type="number" >
+        Lon:<input class="val_input" id="stack_lon" type="number" >
     </p>
     <table>
     <thead>
@@ -105,7 +105,7 @@
             <td>Value</td>
             <td>&nbsp;</td>
             <td>Range</td>
-            <td>Default</td>
+            <td>Def.</td>
         </td>
     <td>
     <tbody id='cam_controls' >
@@ -117,11 +117,11 @@
         <button class="incdec_but" onclick="showSolve(false);">X</button>
     </span>
     <div id="solver_config">
-        <p>Pixel Size (μm) <input id="solver_pixel_size" type="number" value="" oninput='recalcFOV();' />, Focal Length (mm) <input id="solver_focal_length" type="number" value="" oninput='recalcFOV();' /></p>
-        <p>Vertical FOV (°) <input id="solver_fov" type="number" value="" /></p>
-        <p>Object <input type="text" oninput='updateSolverRADE(this.value)'  value="" /> (M31, NGC457)</p>
-        <p>RA <input id="solver_ra" type="text" value="" />, DEC <input id="solver_de" type="text" value=""/></p>
-        <p>Radius (°) <input id="solver_radius" type="number" min="0.1" max="10.0" step="0.1" value="5.0" /></p>
+        <p>Pixel Size (μm) <input class="val_input" id="solver_pixel_size" type="number" value="" oninput='recalcFOV();' />, Focal Length (mm) <input class="val_input" id="solver_focal_length" type="number" value="" oninput='recalcFOV();' /></p>
+        <p>Vertical FOV (°) <input class="val_input" id="solver_fov" type="number" value="" /></p>
+        <p>Object <input class="val_input" type="text" oninput='updateSolverRADE(this.value)'  value="" /> (M31, NGC457)</p>
+        <p>RA <input class="val_input" id="solver_ra" type="text" value="" />, DEC <input id="solver_de" type="text" value=""/></p>
+        <p>Radius (°) <input class="val_input" id="solver_radius" type="number" min="0.1" max="10.0" step="0.1" value="5.0" /></p>
         <p><button onclick="plateSolve();" >Solve</button></p>
     </div>
     <div id="solver_status_div" style="display:none;" >
