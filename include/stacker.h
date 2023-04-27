@@ -79,6 +79,14 @@ namespace ols {
             make_fft_blur();
         }
 
+        void set_remove_satellites(bool v)
+        {
+            remove_satellites_ = v;
+            if(remove_satellites_) {
+                frame_max_ = sum_.clone();
+            }
+        }
+
         void set_stretch(bool auto_stretch,float low_index,float high_index,float stretch_index)
         {
             enable_stretch_ = auto_stretch;
@@ -120,7 +128,13 @@ namespace ols {
         cv::Mat get_raw_stacked_image()
         {
             BOOSTER_INFO("stacked") << "So far stacked " << fully_stacked_count_ << std::endl;
-            cv::Mat res = sum_ * (1.0/ fully_stacked_count_);
+            cv::Mat res;
+            if(remove_satellites_ && fully_stacked_count_ > 1) {
+                res = (sum_ - frame_max_) * (1.0/ (fully_stacked_count_ - 1));
+            }
+            else {
+                res = sum_ * (1.0/ fully_stacked_count_);
+            }
             if(subpixel_factor_ != 1) {
                 cv::Mat tmp;
                 cv::resize(res,tmp,cv::Size(0,0),1.0/subpixel_factor_,1.0/subpixel_factor_);
@@ -686,6 +700,10 @@ namespace ols {
             cv::Rect src_rect = cv::Rect(std::max(dx,0),std::max(dy,0),width,height);
             cv::Rect img_rect = cv::Rect(std::max(-dx,0),std::max(-dy,0),width,height);
             cv::Mat(sum_,src_rect) += cv::Mat(img,img_rect);
+            if(remove_satellites_) {
+                cv::Mat max_roi = cv::Mat(frame_max_,src_rect);
+                max_roi = cv::max(max_roi,cv::Mat(img,img_rect));
+            }
         }
 
         void add_image(cv::Mat img,cv::Point2f shift)
@@ -714,6 +732,8 @@ namespace ols {
         bool has_darks_;
         cv::Rect fully_stacked_area_;
         int fully_stacked_count_ = 0;
+        bool remove_satellites_ = false;
+        cv::Mat frame_max_;
         cv::Mat sum_;
         cv::Mat darks_;
         cv::Mat darks_gamma_corrected_;

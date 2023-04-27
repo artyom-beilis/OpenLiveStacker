@@ -109,6 +109,7 @@ namespace ols {
             cmd->stretch_low = content_.get("stretch_low",cmd->stretch_low);
             cmd->stretch_high = content_.get("stretch_high",cmd->stretch_high);
             cmd->stretch_gamma = content_.get("stretch_gamma",cmd->stretch_gamma);
+            cmd->remove_satellites = content_.get("remove_satellites",cmd->remove_satellites);
 
             if(!cmd->darks_path.empty())
                 cmd->darks_path = calibration_path_ + "/" + cmd->darks_path + ".tiff";

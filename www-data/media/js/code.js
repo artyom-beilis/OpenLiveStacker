@@ -726,6 +726,7 @@ function startStack()
         save_data:          getBVal("save_data"),
         field_derotation:   field_derotation,
         image_flip:         getBVal("image_flip"),
+        remove_satellites:  getBVal("remove_satellites"),
         auto_stretch:       getBVal("auto_stretch"),
         stretch_low:        getPVal('stretch_low'),
         stretch_high:       getPVal('stretch_high'),

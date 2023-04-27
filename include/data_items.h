@@ -56,6 +56,7 @@ namespace ols {
         int width = 0;
         int height = 0;
         bool calibration = false;  /// Collect calibration data
+        bool remove_satellites = false; // apply sat removal algorithm
 
         bool derotate = false; /// enable auto derote for AZ mount
         bool derotate_mirror = false; /// inverse direction for mirror image

@@ -126,6 +126,7 @@ namespace ols {
             cfg.stretch_low = v.get<double>("stretch_low");
             cfg.stretch_high = v.get<double>("stretch_high");
             cfg.stretch_gamma = v.get<double>("stretch_gamma");
+            cfg.remove_satellites = v.get("remove_satellites",cfg.remove_satellites);
 
             if(!cfg.calibration)
                 cfg.output_path =  output_dir_ + "/" + cfg.name;

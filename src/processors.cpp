@@ -521,6 +521,7 @@ namespace ols {
                 else {
                     stacker_.reset(new Stacker(width_,height_));
                     stacker_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
+                    stacker_->set_remove_satellites(ctl->remove_satellites);
                     restart_ = true;
                 }
                 if(out_)
@@ -669,6 +670,7 @@ namespace ols {
                     v["stretch_low"] = ctl->stretch_low;
                     v["stretch_high"] = ctl->stretch_high;
                     v["stretch_gamma"] = ctl->stretch_gamma;
+                    v["remove_satellites" ] = ctl->remove_satellites;
                     std::ofstream info(dirname_ + "/info.json");
                     v.save(info,cppcms::json::readable);
                 }
