@@ -283,7 +283,7 @@ namespace ols {
                 }
 
 
-                std::cerr << cap.Name << " min=" << cap.MinValue << " max=" << cap.MaxValue << " def=" << cap.DefaultValue << " auto=" << cap.IsAutoSupported <<" :" << cap.Description<< std::endl;
+                std::cerr << cap.Name << " min=" << cap.MinValue << " max=" << cap.MaxValue << " def=" << cap.DefaultValue << " auto=" << cap.IsAutoSupported << " readonly=" << !cap.IsWritable<<" :" << cap.Description<< std::endl;
                 CamOptionId opt_id = opt_count;
                 switch(cap.ControlType) {
                 case ASI_GAIN:
@@ -385,7 +385,7 @@ namespace ols {
             case opt_temperature:
                 {
                     r.type = type_celsius;
-                    r.read_only = true;
+                    r.read_only = !cap.IsWritable;
                     r.min_val = cap.MinValue * 0.1;
                     r.max_val = cap.MaxValue * 0.1;
                     r.def_val = cap.DefaultValue * 0.1;
@@ -423,6 +423,7 @@ namespace ols {
                     r.def_val = cap.DefaultValue;
                     r.cur_val = val;
                     r.step_size = 1;
+                    r.read_only = !cap.IsWritable;
                 }
                 break;
             default:
