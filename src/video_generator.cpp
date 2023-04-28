@@ -19,25 +19,27 @@ namespace ols {
             plate_solving_out_(plate_solving_output)
         {
         }
-        void handle_jpeg_stack(std::shared_ptr<CameraFrame> frame,cv::Mat rgb,bool copy)
+        void handle_jpeg_stack(std::shared_ptr<CameraFrame> frame,cv::Mat image,bool copy)
         {
             std::vector<unsigned char> buf;
 
             cv::Mat normalized;
             double factor = 255.0 / frame->frame_dr;
-            if(frame->frame_dr == 255 && rgb.elemSize1() == 1)
-                normalized = rgb;
-            else
-                rgb.convertTo(normalized,CV_8UC3,factor);
+            if(frame->frame_dr == 255 && image.elemSize1() == 1) {
+                normalized = image;
+            }
+            else {
+                image.convertTo(normalized,image.channels() == 3 ? CV_8UC3: CV_8UC1,factor);
+            }
 
             cv::imencode(".jpeg",normalized,buf);
 
             frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
             if(stacking_active_ || plate_solving_out_) {
                 if(copy)
-                    frame->frame = rgb.clone();
+                    frame->frame = image.clone();
                 else
-                    frame->frame = rgb;
+                    frame->frame = image;
             }
         }
         void process_frame(std::shared_ptr<CameraFrame> frame)
@@ -133,12 +135,9 @@ namespace ols {
             case stream_mono8:
             case stream_mono16:
                 {
-                    #warning "Better mono handling is needed rather than converting Gray 2 RGB)"
                     cv::Mat mono(frame->format.height,frame->format.width,(bpp==1 ? CV_8UC1 : CV_16UC1),frame->source_frame->data());
-                    cv::Mat rgb;
-                    cv::cvtColor(mono,rgb,cv::COLOR_GRAY2BGR); 
                     frame->frame_dr = (bpp==1 ? 255 : 65535);
-                    handle_jpeg_stack(frame,rgb,false);
+                    handle_jpeg_stack(frame,mono,true);
                 }
                 break;
             case stream_error:

@@ -74,6 +74,7 @@ namespace ols {
             std::shared_ptr<StackerControl> cmd(new StackerControl());
             cmd->op = StackerControl::ctl_init;
             auto format = cam_->stream_format();
+            cmd->mono = is_mono_stream(format.format);
             cmd->width = format.width;
             cmd->height = format.height;
             cmd->calibration = content_.get("type","dso") == "calibration";

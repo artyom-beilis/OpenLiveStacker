@@ -55,7 +55,7 @@ namespace ols {
             float *p=(float*)frame.data;
             float *f=(float*)flats_.data;
             float *d=(float*)darks_.data;
-            int N = frame.rows*frame.cols*3;
+            int N = frame.rows*frame.cols*channels_;
             int i=0;
 #ifdef USE_CV_SIMD
             cv::v_float32x4 zero = cv::v_setall_f32(0.0f);
@@ -78,7 +78,7 @@ namespace ols {
         {
             float *p=(float*)frame.data;
             float *d=(float*)darks_.data;
-            int N = frame.rows*frame.cols*3;
+            int N = frame.rows*frame.cols*channels_;
             int i=0;
 #ifdef USE_CV_SIMD 
             cv::v_float32x4 zero = cv::v_setzero_f32();
@@ -108,7 +108,7 @@ namespace ols {
             prepare_gamma();
 
             float *p = (float*)frame.data;
-            int N = frame.rows*frame.cols*3;
+            int N = frame.rows*frame.cols*channels_;
             int i=0;
 #ifdef USE_CV_SIMD
 
@@ -129,15 +129,15 @@ namespace ols {
 
         bool handle_video(std::shared_ptr<CameraFrame> video)
         {
-            if(video->frame.rows != height_ || video->frame.cols != width_) {
-                BOOSTER_ERROR("stacker") << "Invalid mat frame size, expecting " << height_ << "x" << width_ << " got " << video->frame.rows<< "x"<<video->frame.cols;
+            if(video->frame.rows != height_ || video->frame.cols != width_ || video->frame.channels() != channels_ ) {
+                BOOSTER_ERROR("stacker") << "Invalid mat frame size, expecting " << height_ << "x" << width_ << "x" << channels_ 
+                        << " got " << video->frame.rows<< "x"<<video->frame.cols << "x" << video->frame.channels();
                 return false;
             }
-            video->frame.convertTo(video->processed_frame,CV_32FC3,1.0/video->frame_dr);
+            video->frame.convertTo(video->processed_frame,cv_type_,1.0/video->frame_dr);
             if(calibration_)
                 return true;
             if(gamma_ != 1.0) {
-                //cv::pow(video->processed_frame,gamma_,video->processed_frame);
                 apply_gamma(video->processed_frame);
             }
             if(apply_darks_ && apply_flats_) {
@@ -173,6 +173,9 @@ namespace ols {
             case StackerControl::ctl_init:
                 width_ = ctl->width;
                 height_ = ctl->height;
+                mono_ = ctl->mono;
+                channels_ = mono_ ? 1 : 3;
+                cv_type_ = mono_ ? CV_32FC1 : CV_32FC3;
                 calibration_ = ctl->calibration;
                 if(calibration_)
                     break;
@@ -208,13 +211,19 @@ namespace ols {
                     using_dark_flats = true;
                 }
                 cv::Mat gray_flats;
-                cv::cvtColor(flats,gray_flats,cv::COLOR_BGR2GRAY);
+                if(flats.channels() > 1)
+                    cv::cvtColor(flats,gray_flats,cv::COLOR_BGR2GRAY);
+                else
+                    gray_flats = flats;
                 double minV,maxV;
                 cv::minMaxLoc(gray_flats,&minV,&maxV);
                 gray_flats = maxV/gray_flats;
-                cv::cvtColor(gray_flats,flats,cv::COLOR_GRAY2BGR);
+                if(flats.channels() > 1)
+                    cv::cvtColor(gray_flats,flats,cv::COLOR_GRAY2BGR);
+                else
+                    flats = gray_flats;
                 flats_ = flats;
-                if(flats_.rows == height_ && flats_.cols == width_) {
+                if(flats_.rows == height_ && flats_.cols == width_ && flats_.channels() == channels_) {
                     apply_flats_ = true;
                     BOOSTER_INFO("stacker") << "Using flats from " << flats_path << ( using_dark_flats ? (" with dark flats " + dark_flats_path) : " without dark flats");
                 }
@@ -232,7 +241,7 @@ namespace ols {
         {
             try {
                 darks_ = load_tiff(darks_path);
-                if(darks_.rows == height_ && darks_.cols == width_) {
+                if(darks_.rows == height_ && darks_.cols == width_ && darks_.channels() == channels_) {
                     apply_darks_ = true;
                     cv::Mat tmp;
                     if(gamma_ != 1.0) {
@@ -253,6 +262,9 @@ namespace ols {
 
         queue_pointer_type in_,out_;
         int width_,height_;
+        bool mono_;
+        int channels_;
+        int cv_type_;
         bool calibration_;
         float gamma_;
         float gamma_table_[gamma_table_size+1];
@@ -333,7 +345,7 @@ namespace ols {
         
         std::shared_ptr<CameraFrame> generate_dummy_frame()
         {
-            return ols::generate_dummy_frame(width_,height_);
+            return ols::generate_dummy_frame(width_,height_,channels_);
         }
 
         std::pair<std::shared_ptr<CameraFrame>,std::shared_ptr<CameraFrame> > generate_output_frame(std::pair<cv::Mat,StretchInfo> data,bool create_ps_frame=true)
@@ -379,7 +391,8 @@ namespace ols {
             double max_v;
             cv::minMaxLoc(m2,nullptr,&max_v);
             cv::Mat res;
-            m2.convertTo(res,CV_16UC3,65535/max_v);
+            m2.convertTo(res,channels_ == 3 ? CV_16UC3 : CV_16UC1,65535/max_v);
+            std::cerr << "Channels to 16bit" << channels_ << std::endl;
             return res;
         }
 
@@ -464,7 +477,7 @@ namespace ols {
         void save_calibration()
         {
             double factor = 1.0 / cframe_count_;
-            cv::Mat calib = cframe_.mul(cv::Scalar(factor,factor,factor)); 
+            cv::Mat calib = cframe_.mul(cv::Scalar::all(factor)); 
             double minV,maxV;
             cv::minMaxLoc(calib,&minV,&maxV);
             std::string tiff_path = output_path_ + "/" + name_ + ".tiff";
@@ -508,18 +521,21 @@ namespace ols {
             case StackerControl::ctl_init:
                 width_ = ctl->width;
                 height_ = ctl->height;
+                mono_ = ctl->mono;
+                channels_ = mono_ ? 1 : 3;
+                cv_type_ = mono_ ? CV_32FC1 : CV_32FC3;
                 calibration_ = ctl->calibration;
                 output_path_ = ctl->output_path;
                 name_ = ctl->name;
                 dropped_count_ = 0;
                 stacker_.reset();
                 if(calibration_) {
-                    cframe_ = cv::Mat(height_,width_,CV_32FC3);
+                    cframe_ = cv::Mat(height_,width_,cv_type_);
                     cframe_.setTo(0);
                     cframe_count_ = 0;
                 }
                 else {
-                    stacker_.reset(new Stacker(width_,height_));
+                    stacker_.reset(new Stacker(width_,height_,channels_));
                     stacker_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
                     stacker_->set_remove_satellites(ctl->remove_satellites);
                     restart_ = true;
@@ -568,6 +584,8 @@ namespace ols {
         queue_pointer_type in_,out_,stats_,plate_solving_;
         std::string data_dir_;
         int width_,height_;
+        bool mono_;
+        int channels_,cv_type_;
         bool calibration_=false;
         std::string output_path_,name_;
         cv::Mat cframe_;
@@ -655,6 +673,7 @@ namespace ols {
                     v["name"]=ctl->name;
                     v["width"] = ctl->width;
                     v["height"] = ctl->height;
+                    v["mono"] = ctl->mono;
                     v["darks"] = ctl->darks_path;
                     v["flats"] = ctl->flats_path;
                     v["dark_flats"] = ctl->dark_flats_path;

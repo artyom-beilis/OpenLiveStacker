@@ -111,6 +111,7 @@ namespace ols {
             cfg.name = v.get<std::string>("name");
             cfg.width = v.get<int>("width");
             cfg.height = v.get<int>("height");
+            cfg.mono = v.get<bool>("mono",false);
             cfg.calibration = v.get<bool>("calibration");
             cfg.derotate = v.get<bool>("derotate");
             cfg.derotate_mirror = v.get<bool>("derotate_mirror");

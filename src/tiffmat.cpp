@@ -28,7 +28,7 @@ namespace ols {
             TIFFSetField(out,TIFFTAG_BITSPERSAMPLE,data.elemSize1()*8);
             TIFFSetField(out,TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
             TIFFSetField(out,TIFFTAG_PLANARCONFIG,PLANARCONFIG_CONTIG);
-            TIFFSetField(out,TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
+            TIFFSetField(out,TIFFTAG_PHOTOMETRIC, data.channels()== 3 ? PHOTOMETRIC_RGB : PHOTOMETRIC_MINISBLACK);
             switch(data.type() & CV_MAT_DEPTH_MASK) {
             case CV_8U:
             case CV_16U:
@@ -68,7 +68,7 @@ namespace ols {
             throw std::runtime_error("Failed to open tiff file " + file);
         try {
             uint32_t width,height;
-            uint16_t depth,spp,format;
+            uint16_t depth,spp,format = SAMPLEFORMAT_UINT;
             TIFFGetField(in,TIFFTAG_IMAGEWIDTH,&width);
             TIFFGetField(in,TIFFTAG_IMAGELENGTH,&height);
             TIFFGetField(in,TIFFTAG_SAMPLESPERPIXEL,&spp);
@@ -103,7 +103,7 @@ namespace ols {
                 break;
             }
             if(type == -1)
-                throw std::runtime_error("Unsupported tiff format " + file);
+                throw std::runtime_error("Unsupported tiff format " + file + ": spp=" + std::to_string(spp) + " depth=" + std::to_string(depth) + " format=" + std::to_string(format));
             cv::Mat res(height,width,type);
             if(TIFFScanlineSize(in)!=int(res.step[0])) {
                 throw std::runtime_error("Internal error in stride/scanline size in " + file);

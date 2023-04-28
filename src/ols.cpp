@@ -94,7 +94,11 @@ void OpenLiveStacker::start_stream(CamStreamFormat format)
 {
     guard g(camera_lock_);
     CamErrorCode e;
-    auto frame = generate_dummy_frame(format.width,format.height,0,192,0);
+    int c = is_mono_stream(format.format) ? 1 : 3;
+    int red=0,green=192,blue=0;
+    if(c==1)
+        red=192;
+    auto frame = generate_dummy_frame(format.width,format.height,c,red,green,blue);
     dropped_since_last_update_ = 0;
     video_generator_queue_->push(frame);
 

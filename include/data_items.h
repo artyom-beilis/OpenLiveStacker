@@ -55,6 +55,7 @@ namespace ols {
         bool save_inputs = false;
         int width = 0;
         int height = 0;
+        bool mono = false; // is mono data
         bool calibration = false;  /// Collect calibration data
         bool remove_satellites = false; // apply sat removal algorithm
 

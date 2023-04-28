@@ -25,10 +25,12 @@ namespace ols {
         double gamma_limit_ = 4.0;
         double mean_target_ = 0.25;
 
-        Stacker(int width,int height,int roi_x=-1,int roi_y=-1,int roi_size = -1,int exp_multiplier=1) : 
+        Stacker(int width,int height,int channels,int roi_x=-1,int roi_y=-1,int roi_size = -1,int exp_multiplier=1) : 
             frames_(0),
             exp_multiplier_(exp_multiplier)
         {
+            channels_ = channels;
+            cv_type_ = channels == 1 ? CV_32FC1 : CV_32FC3;
             if(!enable_subpixel_registration || subpixel_factor_ == 1) {
                 subpixel_factor_ = 1;
                 enable_subpixel_registration = false;
@@ -74,7 +76,7 @@ namespace ols {
                 dy_ = std::min(height-window_size_,dy_);
             }
             
-            sum_ = cv::Mat(height*subpixel_factor_,width*subpixel_factor_,CV_32FC3);
+            sum_ = cv::Mat(height*subpixel_factor_,width*subpixel_factor_,cv_type_);
             sum_.setTo(0);
             make_fft_blur();
         }
@@ -193,7 +195,26 @@ namespace ols {
             return maxv;
         }
 
-        void scale_and_clip(cv::Mat &m,float f1,float f2,float f3)
+        void scale_mono_and_clip(cv::Mat &m,float f1)
+        {
+            float *p = (float *)m.data;
+            int N = m.rows*m.cols;
+            int i=0;
+#ifdef USE_CV_SIMD
+            cv::v_float32x4 w = cv::v_setall_f32(f1);
+            cv::v_float32x4 zero = cv::v_setzero_f32();
+            cv::v_float32x4 one  = cv::v_setall_f32(1.0f);
+            int limit = N/4*4;
+            for(;i<limit;i+=4,p+=4) {
+                cv::v_store(p,cv::v_max(zero,cv::v_min(one,cv::v_load(p+0)*w)));
+            }
+#endif            
+            for(;i<N;i++,p++) {
+                p[0] = std::max(0.0f,std::min(1.0f,p[0] * f1));
+            }
+        }
+
+        void scale_rgb_and_clip(cv::Mat &m,float f1,float f2,float f3)
         {
             float *p = (float *)m.data;
             int N = m.rows*m.cols*3;
@@ -222,7 +243,7 @@ namespace ols {
         void offset_scale_and_clip(cv::Mat &m,float offset,float scale)
         {
             float *p = (float *)m.data;
-            int N = m.rows*m.cols*3;
+            int N = m.rows*m.cols*channels_;
             int i=0;
 #ifdef USE_CV_SIMD
             cv::v_float32x4 zero = cv::v_setzero_f32();
@@ -244,7 +265,7 @@ namespace ols {
         void offset_scale_and_clip_gamma(cv::Mat &m,float offset,float scale,float gamma)
         {
             float *p = (float *)m.data;
-            int N = m.rows*m.cols*3;
+            int N = m.rows*m.cols*channels_;
             float invg= 1.0f/gamma;
             constexpr int M=128;
             float table[M+1];
@@ -280,12 +301,24 @@ namespace ols {
             cv::Mat tmp = get_raw_stacked_image();
             
             tp start = std::chrono::high_resolution_clock::now();
-            float scale[3];
-            calc_wb(tmp(fully_stacked_area_),scale);
-            
-            tp wb_coeff = std::chrono::high_resolution_clock::now();
-            scale_and_clip(tmp,scale[0],scale[1],scale[2]);
-            tp wb_apply = std::chrono::high_resolution_clock::now();
+            tp wb_coeff,wb_apply;
+            if(channels_ == 3) {
+                float scale[3];
+                calc_wb(tmp(fully_stacked_area_),scale);
+                wb_coeff = std::chrono::high_resolution_clock::now();
+                scale_rgb_and_clip(tmp,scale[0],scale[1],scale[2]);
+                wb_apply = std::chrono::high_resolution_clock::now();
+            }
+            else {
+                float scale = 1.0f;
+                double maxv;
+                cv::minMaxLoc(tmp(fully_stacked_area_),nullptr,&maxv);
+                if(maxv > 0)
+                    scale = 1.0f/maxv;
+                wb_coeff = std::chrono::high_resolution_clock::now();
+                scale_mono_and_clip(tmp,scale);
+                wb_apply = std::chrono::high_resolution_clock::now();
+            }
             double gscale=1.0;
             double goffset = 0.0;
             double mean = 0.5;
@@ -372,16 +405,26 @@ namespace ols {
         {
             cv::Mat tmp;
             static constexpr int hist_bins = 1<<10;
-            img.convertTo(tmp,CV_16UC3,(hist_bins-1),0);
             int counters[hist_bins]={};
-            int N=tmp.rows*tmp.cols;
-            uint16_t *p=reinterpret_cast<uint16_t*>(tmp.data);
-            for(int i=0;i<N;i++) {
-                unsigned R = *p++;
-                unsigned G = *p++;
-                unsigned B = *p++;
-                unsigned Y = unsigned(0.3f * R + 0.6f * G + 0.1f * B);
-                counters[Y]++;
+            int N=img.rows*img.cols;
+            if(channels_ == 3) {
+                img.convertTo(tmp,CV_16UC3,(hist_bins-1),0);
+                uint16_t *p=reinterpret_cast<uint16_t*>(tmp.data);
+                for(int i=0;i<N;i++) {
+                    unsigned R = *p++;
+                    unsigned G = *p++;
+                    unsigned B = *p++;
+                    unsigned Y = unsigned(0.3f * R + 0.6f * G + 0.1f * B);
+                    counters[Y]++;
+                }
+            }
+            else {
+                img.convertTo(tmp,CV_16UC1,(hist_bins-1),0);
+                uint16_t *p=reinterpret_cast<uint16_t*>(tmp.data);
+                for(int i=0;i<N;i++) {
+                    unsigned Y = *p++;
+                    counters[Y]++;
+                }
             }
             int sum=N;
             int hp=-1;
@@ -613,8 +656,13 @@ namespace ols {
         {
             cv::Mat rgb[3],gray,dft;
             cv::Mat roi = cv::Mat(frame,cv::Rect(dx_,dy_,window_size_,window_size_));
-            cv::split(roi,rgb);
-            rgb[1].convertTo(gray,CV_32FC1);
+            if(channels_ == 3) {
+                cv::split(roi,rgb);
+                rgb[1].convertTo(gray,CV_32FC1);
+            }
+            else {
+                roi.copyTo(gray);
+            }
             cv::dft(gray,dft,cv::DFT_COMPLEX_OUTPUT);
             if(first_frame) {
                 cv::mulSpectrums(dft,fft_kern_,dft,0);
@@ -751,6 +799,9 @@ namespace ols {
         float low_cut_ = 0.0f;
         float high_cut_ = 1.0f;
         float target_gamma_ = 2.2f;
+
+        int channels_;
+        int cv_type_;
 
         //float low_per_= 0.05;
         //float high_per_=99.999f;

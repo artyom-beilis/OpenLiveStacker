@@ -119,6 +119,11 @@ namespace ols {
     std::string stream_type_to_str(CamStreamType s);
     CamStreamType stream_type_from_str(std::string s);
 
+    inline bool is_mono_stream(CamStreamType s)
+    {
+        return s==stream_mono8 || s==stream_mono16;
+    }
+
     struct CamStreamFormat {
         CamStreamType format;
         int width,height;

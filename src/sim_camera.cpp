@@ -67,6 +67,10 @@ namespace ols {
                         stream_ = stream_rgb24;
                     else if(img.elemSize1() == 2 && img.channels() == 3)
                         stream_ = stream_rgb48;
+                    else if(img.elemSize1() == 1 && img.channels() == 1)
+                        stream_ = stream_mono8;
+                    else if(img.elemSize1() == 2 && img.channels() == 1)
+                        stream_ = stream_mono16;
                     else
                         throw SIMError("Unsupported image format for " + path);
                 }

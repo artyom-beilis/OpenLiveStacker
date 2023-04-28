@@ -3,20 +3,30 @@
 #include "data_items.h"
 
 namespace ols {
-    std::shared_ptr<CameraFrame> generate_dummy_frame(int w,int h,int red,int green, int blue)
+    std::shared_ptr<CameraFrame> generate_dummy_frame(int w,int h,int c,int red,int green, int blue)
     {
         std::shared_ptr<CameraFrame> frame(new CameraFrame());
         frame->format.width = w;
         frame->format.height = h;
         frame->format.format = stream_mjpeg;
-        cv::Mat img(h,w,CV_8UC3);
+        cv::Mat img(h,w,c == 3 ? CV_8UC3: CV_8UC1);
         unsigned char *data = img.data;
-        for(int r=0;r<h;r++) {
-            for(int c=0;c<w;c++) {
-                int color = (((r / 8) ^ (c / 8)) & 1);
-                *data++ = color * red;
-                *data++ = color * green;
-                *data++ = color * blue;
+        if(c == 3) {
+            for(int r=0;r<h;r++) {
+                for(int c=0;c<w;c++) {
+                    int color = (((r / 8) ^ (c / 8)) & 1);
+                    *data++ = color * red;
+                    *data++ = color * green;
+                    *data++ = color * blue;
+                }
+            }
+        }
+        else {
+            for(int r=0;r<h;r++) {
+                for(int c=0;c<w;c++) {
+                    int color = (((r / 8) ^ (c / 8)) & 1);
+                    *data++ = color * red;
+                }
             }
         }
         std::vector<unsigned char> buf;

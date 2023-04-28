@@ -159,6 +159,11 @@ namespace ols {
         std::string tiff = temp_dir_ + "/ols_astap_input.tiff";
         save_tiff(img,tiff);
         auto r = solve(tiff,fov_deg,target_ra_deg,target_de_deg,search_radius_deg);
+        if(img.channels() != 3) {
+            cv::Mat tmp;
+            cv::cvtColor(img,tmp,cv::COLOR_GRAY2BGR);
+            img = tmp;
+        }
         cv::Mat img8bit;
         double factor = 255.0 / dr;
         img.convertTo(img8bit,CV_8UC3,factor);
