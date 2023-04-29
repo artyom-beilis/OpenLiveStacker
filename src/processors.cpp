@@ -200,15 +200,30 @@ namespace ols {
             }
         }
     private:
+        bool check_file(cv::Mat &m,std::string const &type,std::string const &path)
+        {
+            if(m.rows != height_ || m.cols != width_ || m.channels() != channels_) {
+                BOOSTER_ERROR("stacker") << "Invalid " << type  << "format, expecting " << height_ <<"x" << width_ << "x" <<channels_
+                    << " got " << m.rows<<"x" <<m.cols<<"x"<<m.channels()<< " for file " << path;
+                return false;    
+            }
+            return true;
+
+        }
         void load_flats(std::string flats_path,std::string dark_flats_path)
         {
             try {
-                bool using_dark_flats = false;
+                apply_flats_=false;
                 cv::Mat flats = load_tiff(flats_path);
+                if(!check_file(flats,"flats",flats_path)) {
+                    return;
+                }
                 if(!dark_flats_path.empty()) {
                     cv::Mat dark_flats = load_tiff(dark_flats_path);
-                    flats = cv::max(1e-16f,flats - dark_flats);
-                    using_dark_flats = true;
+                    if(!check_file(dark_flats,"dark flats",dark_flats_path)) {
+                        return;
+                    }
+                    flats = cv::max(0.0f,flats - dark_flats);
                 }
                 cv::Mat gray_flats;
                 if(flats.channels() > 1)
@@ -217,20 +232,17 @@ namespace ols {
                     gray_flats = flats;
                 double minV,maxV;
                 cv::minMaxLoc(gray_flats,&minV,&maxV);
+                if(minV <= 0 || maxV / minV > 100) {
+                    BOOSTER_ERROR("stacker") << " Flats have too grate min/max range, suspecting collection issue - disableing flats minValue=" << minV << " maxValue="<<maxV;
+                    return;
+                }
                 gray_flats = maxV/gray_flats;
                 if(flats.channels() > 1)
                     cv::cvtColor(gray_flats,flats,cv::COLOR_GRAY2BGR);
                 else
                     flats = gray_flats;
                 flats_ = flats;
-                if(flats_.rows == height_ && flats_.cols == width_ && flats_.channels() == channels_) {
-                    apply_flats_ = true;
-                    BOOSTER_INFO("stacker") << "Using flats from " << flats_path << ( using_dark_flats ? (" with dark flats " + dark_flats_path) : " without dark flats");
-                }
-                else {
-                    BOOSTER_ERROR("stacker") << "Failed to load flats from " << flats_path << ": size mistmatch";
-                    apply_flats_ = false;
-                }
+                apply_flats_=true;
             }
             catch(std::exception const &e) {
                 BOOSTER_ERROR("stacker") << "Failed to load flats from " << flats_path << " and dark flats from " << dark_flats_path << ": " << e.what();
@@ -241,7 +253,7 @@ namespace ols {
         {
             try {
                 darks_ = load_tiff(darks_path);
-                if(darks_.rows == height_ && darks_.cols == width_ && darks_.channels() == channels_) {
+                if(check_file(darks_,"darks",darks_path)) {
                     apply_darks_ = true;
                     cv::Mat tmp;
                     if(gamma_ != 1.0) {
@@ -251,7 +263,6 @@ namespace ols {
                 }
                 else {
                     apply_darks_ = false;
-                    BOOSTER_ERROR("stacker") << "Failed to load darks from " << darks_path << ": size mistmatch";
                 }
             }
             catch(std::exception const &e) {
