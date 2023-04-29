@@ -130,19 +130,18 @@ namespace ols {
         cv::Mat get_raw_stacked_image()
         {
             BOOSTER_INFO("stacked") << "So far stacked " << fully_stacked_count_ << std::endl;
-            cv::Mat res;
             if(remove_satellites_ && fully_stacked_count_ > 1) {
-                res = (sum_ - frame_max_) * (1.0/ (fully_stacked_count_ - 1));
+                stacked_res_ = (sum_ - frame_max_) * (1.0/ (fully_stacked_count_ - 1));
             }
             else {
-                res = sum_ * (1.0/ fully_stacked_count_);
+                stacked_res_ = sum_ * (1.0/ fully_stacked_count_);
             }
             if(subpixel_factor_ != 1) {
                 cv::Mat tmp;
-                cv::resize(res,tmp,cv::Size(0,0),1.0/subpixel_factor_,1.0/subpixel_factor_);
-                res = tmp;
+                cv::resize(stacked_res_,tmp,cv::Size(0,0),1.0/subpixel_factor_,1.0/subpixel_factor_);
+                stacked_res_ = tmp;
             }
-            return res;
+            return stacked_res_;
         }
 
         static double tdiff(std::chrono::time_point<std::chrono::high_resolution_clock> const &a,
@@ -403,29 +402,32 @@ namespace ols {
     private:
         void stretch(cv::Mat img,double &scale,double &offset,double &mean)
         {
-            cv::Mat tmp;
             static constexpr int hist_bins = 1<<10;
             int counters[hist_bins]={};
             int N=img.rows*img.cols;
+            
             if(channels_ == 3) {
-                img.convertTo(tmp,CV_16UC3,(hist_bins-1),0);
-                uint16_t *p=reinterpret_cast<uint16_t*>(tmp.data);
-                for(int i=0;i<N;i++) {
-                    unsigned R = *p++;
-                    unsigned G = *p++;
-                    unsigned B = *p++;
-                    unsigned Y = unsigned(0.3f * R + 0.6f * G + 0.1f * B);
-                    counters[Y]++;
+                for(int r=0;r<img.rows;r++) {
+                    float *p = (float*)(img.data + img.step[0] * r);
+                    for(int c=0;c<img.cols;c++) {
+                        float R = *p++;
+                        float G = *p++;
+                        float B = *p++;
+                        unsigned Y = unsigned((0.3f * R + 0.6f * G + 0.1f * B) * (hist_bins-1));
+                        counters[Y]++;
+                    }
                 }
             }
             else {
-                img.convertTo(tmp,CV_16UC1,(hist_bins-1),0);
-                uint16_t *p=reinterpret_cast<uint16_t*>(tmp.data);
-                for(int i=0;i<N;i++) {
-                    unsigned Y = *p++;
-                    counters[Y]++;
+                for(int r=0;r<img.rows;r++) {
+                    float *p = (float*)(img.data + img.step[0] * r);
+                    for(int c=0;c<img.cols;c++) {
+                        unsigned Y = (hist_bins-1) * *p++;
+                        counters[Y]++;
+                    }
                 }
             }
+
             int sum=N;
             int hp=-1;
             for(int i=hist_bins-1;i>=0;i--) {
@@ -789,6 +791,8 @@ namespace ols {
         cv::Mat fft_kern_;
         cv::Mat fft_roi_;
         cv::Point2f current_position_;
+
+        cv::Mat stacked_res_;
         int count_frames_,missed_frames_;
         float step_sum_sq_;
         int dx_,dy_,window_size_;
