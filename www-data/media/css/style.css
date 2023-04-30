@@ -17,6 +17,7 @@
     button:disabled {
         color:#800000;
     }
+    .nowr { white-space: nowrap; }
     .slider { width: 100%; }
     .val_input { width: 15mm; }
     .slider_elem { background-color: transparent; }
