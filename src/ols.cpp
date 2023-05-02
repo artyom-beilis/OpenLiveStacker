@@ -90,10 +90,11 @@ void OpenLiveStacker::stop_stream()
     e.check();
     stream_active_ = false;
 }
-void OpenLiveStacker::start_stream(CamStreamFormat format)
+void OpenLiveStacker::start_stream(CamStreamFormat format,double max_framerate)
 {
     guard g(camera_lock_);
     CamErrorCode e;
+    max_framerate_ = max_framerate;
     int c = is_mono_stream(format.format) ? 1 : 3;
     int red=0,green=192,blue=0;
     if(c==1)
@@ -162,6 +163,11 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
 
 void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
 {
+    auto now = booster::ptime::now();
+    if(max_framerate_ > 0 && booster::ptime::to_number(now - last_frame_ts_) < 1.0/max_framerate_)
+        return;
+    last_frame_ts_ = now;
+
     received_ ++;
     if(video_generator_queue_->items > 20) {
         dropped_since_last_update_ ++;

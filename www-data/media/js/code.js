@@ -584,7 +584,10 @@ function onResize(ev)
 function startStream()
 {
     var format_id = document.getElementById('stream_format').value;
-    restCall('post','/api/camera/stream',{op:'start',format_id:format_id},(r)=>{
+    var max_fr = parseFloat(document.getElementById('stream_max_framerate').value);
+    if(isNaN(max_fr))
+        max_fr = 0;
+    restCall('post','/api/camera/stream',{op:'start',format_id:format_id, max_framerate: max_fr },(r)=>{
         global_width = r.width;
         global_height = r.height;
         showLiveVideo();

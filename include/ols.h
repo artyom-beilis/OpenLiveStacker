@@ -5,8 +5,12 @@
 #include "video_generator.h"
 #include "camera_iface.h"
 #include <cppcms/service.h>
+#include <booster/posix_time.h>
 #include <thread>
 #include <atomic>
+#pragma once
+#include "camera.h"
+#include "camera_iface.h"
 
 namespace ols {
 
@@ -37,7 +41,7 @@ namespace ols {
         virtual CamStatus status();
         virtual void open_camera(int id);
         virtual void close_camera();
-        virtual void start_stream(CamStreamFormat format);
+        virtual void start_stream(CamStreamFormat format,double max_framerate);
         virtual CamStreamFormat stream_format()
         {
             return current_format_;
@@ -77,6 +81,8 @@ namespace ols {
 
         int dropped_ = 0;
         int dropped_since_last_update_ = 0;
+        booster::ptime last_frame_ts_;
+        double max_framerate_ = 0;
         static std::atomic<int> received_;
 
         std::string data_dir_;

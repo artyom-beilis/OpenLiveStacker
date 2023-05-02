@@ -129,11 +129,12 @@ namespace ols {
                 cppcms::json::value v;
                 load_formats(v);
                 std::string format_id = content_.get<std::string>("format_id");
+                double max_framerate = content_.get<double>("max_framerate");
                 auto p = formats_.find(format_id);
                 if(p == formats_.end()) {
                     throw CamError("No such format: " + format_id);
                 }
-                cam_->start_stream(p->second);
+                cam_->start_stream(p->second,max_framerate);
                 response_["status"]="ok";
                 response_["width"]=p->second.width;
                 response_["height"]=p->second.height;
