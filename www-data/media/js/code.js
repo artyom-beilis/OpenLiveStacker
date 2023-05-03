@@ -423,7 +423,7 @@ function prepareControls(ctls)
             control_str += `<td><input type="checkbox" ${checked} onchange="updateBoolControl('${ctl.option_id}',this.checked ? 1 : 0);"/></td>`;
             control_str += '<td>&nbsp;</td>';
             control_str += '<td>&nbsp;</td>';
-            control_str += `<td>${ctl.default != 0 ? 'on' : 'off'}</td>`;
+            control_str += '<td>&nbsp;</td>';
         }
         else if(ctl.read_only) {
             control_str +=`<td><input class="val_input" id="control_opt_${ctl.option_id}" type="text" value="${ctl.cur}" readonly</td>`;
