@@ -74,4 +74,17 @@
         padding: 0;
         margin:0;
     }
+    .alert_div {
+            display:none;
+            position:absolute;
+            left:20%;
+            top:20%;
+            z-index:5;
+            padding: 1% 1% 1% 1%;
+            width: 58%;
+            background:black;
+            border: 1px solid red;
+            margin: auto;
+            text-align: center;
+    }
 

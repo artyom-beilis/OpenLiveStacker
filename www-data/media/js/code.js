@@ -7,6 +7,17 @@ var g_stacker_status = 'idle';
 var g_show_thumb_live = false;
 var g_stats = null;
 
+
+function showError(message)
+{
+    document.getElementById('error_message').innerHTML = message;
+    document.getElementById('error_alert').style.display = 'inline';
+}
+function hideError(message)
+{
+    document.getElementById('error_alert').style.display = 'none';
+}
+
 function parseRA(svalue)
 {
     const re_float = /^(\d+\.\d+)$/;
@@ -65,7 +76,7 @@ function parseDEC(svalue)
     return sig*(d + (60 * m + s) / 3600.0);
 }
 
-function restCall(method,url,request,on_response,on_error = alert)
+function restCall(method,url,request,on_response,on_error = showError)
 {
     var xhr = new XMLHttpRequest()
     xhr.open(method,url,true)
@@ -144,13 +155,56 @@ function updateSavedInputs()
     }
 }
 
+function setGPS(lat,lon)
+{
+    document.getElementById("stack_lat").value=lat.toFixed(2);
+    document.getElementById("stack_lon").value=lon.toFixed(2);
+}
+
+function getQueryParameters()
+{
+    var url=window.location.href;
+    var queryPos = url.indexOf('?');
+    var vals={};
+    if(queryPos == -1)
+        return vals;
+    var params = url.slice(queryPos + 1).split('&');
+    for(var i=0;i<params.length;i++) {
+        var param = params[i];
+        var data = param.split('=');
+        if(data.length == 2) {
+            vals[data[0]] = parseFloat(data[1]);
+        }
+    }
+    return vals;
+}
+
+function checkParams(params)
+{
+    if('android_view' in params && params.android_view == 1) {
+        document.getElementById('FS_tooggle').style.display = 'none'
+    }
+}
+
+function checkAndSetLocation(params)
+{
+    if('lat' in params && 'lon' in params) {
+        setGPS(params.lat,params.lon);
+        return true;
+    }
+    return false;
+}
+
+
 function run()
 {
+    var params = getQueryParameters();
+    console.log(params)
+    checkParams(params);
     restCall("get","/api/camera",null,listCameras);
-    if(navigator.geolocation) {
+    if(!checkAndSetLocation(params) && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((pos)=>{
-            document.getElementById("stack_lat").value=pos.coords.latitude.toFixed(2);
-            document.getElementById("stack_lon").value=pos.coords.longitude.toFixed(2);
+            setGPS(pos.coords.latitude,pos.coords.longitude);
         });
     }
     updateSavedInputs();
@@ -256,7 +310,7 @@ function changeStackerStatus(new_status)
         ui_ctl.stats = true;
     }
     else {
-        alert('Internal error invalud status' + new_status);
+        showError('Internal error invalud status' + new_status);
     }
     for(var name in ui_ctl) {
         var st = ui_ctl[name] ? 'inline' : 'none';
@@ -747,11 +801,11 @@ function startStack()
     var field_derotation = getBVal("field_derotation");
     if(field_derotation) {
         if(isNaN(lat) || isNaN(lon)) {
-            alert('Need Geolocation for derotation support\n(see settings menu)');
+            showError('Need Geolocation for derotation support\n(see settings menu)');
             return;
         }
         if(ra==null || de==null) {
-            alert('Need RA, DE for derotation');
+            showError('Need RA, DE for derotation');
             return;
         }
     }
@@ -774,11 +828,11 @@ function startStack()
     name = name.replace(/ /g,'_');
     const name_pat = /^[A-Za-z0-9_.\-]*$/g;
     if(!name.match(name_pat)) {
-        alert('Name and Object should contain only English letters, digits, "_", "-" and "."')
+        showError('Name and Object should contain only English letters, digits, "_", "-" and "."')
         return;
     }
     if(calib && name=='') {
-        alert('Provide name for calibration frame');
+        showError('Provide name for calibration frame');
         return;
     }
 
@@ -882,7 +936,7 @@ function plateSolve()
             lon = null;
     }
     catch(e) {
-        alert('Invalid Inputs' + e)
+        showError('Invalid Inputs' + e)
         return;
     }
     document.getElementById('solver_config').style.display = 'none';

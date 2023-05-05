@@ -94,7 +94,7 @@
     </span>
     <p>Format: <select id="stream_format"></select> <span class="nowr">FR Lim.<input id="stream_max_framerate" class="val_input saved_input" type="number" step="1" value="10" /></span> <button onclick="startStream()" >Stream</button></p>
     <p>
-        <span class="nowr" ><label for="FS_checked">Full screen</label><input id="FS_checked" type="checkbox" onchange="toggleFS(this.checked)" ></span>
+        <span id="FS_tooggle" class="nowr" ><label for="FS_checked">Full screen</label><input id="FS_checked" type="checkbox" onchange="toggleFS(this.checked)" ></span>
         <span class="nowr" >Lat:<input class="val_input" id="stack_lat" type="number" step="0.01" ></span>
         <span class="nowr" >Lon:<input class="val_input" id="stack_lon" type="number" step="0.01"></span>
     </p>
@@ -137,6 +137,10 @@
             <p><img alt="Solving result" src="" id="solver_result_image" /></p>
         </div>
     </div>
+</div>
+<div class="alert_div" id="error_alert" style=" ">
+<p id="error_message">No error</p>
+<p><button onclick="hideError();">Ok</button></p>
 </div>
 <script src="/media/js/jsdb.js"></script>
 <script src="/media/js/code.js"></script>
