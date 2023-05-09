@@ -668,7 +668,13 @@ function onResize(ev)
         video.style.height = size[1] * global_zoom + 'px';
         var dx = size[0] * (global_zoom - 1) / 2;
         var dy = size[1] * (global_zoom - 1) / 2;
-        video_div.scroll(dx,dy);
+        if(video_div.scroll) {
+            video_div.scroll(dx,dy);
+        }
+        else {
+            video_div.scrollLeft = dx;
+            video_div.scrollTop = dy;
+        }
     }
     var thumb = document.getElementById('thumb_stream_video')
     if(thumb) {
@@ -691,7 +697,7 @@ function startStream()
     var max_fr = parseFloat(document.getElementById('stream_max_framerate').value);
     if(isNaN(max_fr))
         max_fr = 0;
-    restCall('post','/api/camera/stream',{op:'start',format_id:format_id, max_framerate: max_fr },(r)=>{
+        restCall('post','/api/camera/stream',{op:'start',format_id:format_id, max_framerate: max_fr },(r)=>{
         global_width = r.width;
         global_height = r.height;
         showLiveVideo();
