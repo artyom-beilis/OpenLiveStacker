@@ -1,12 +1,27 @@
 
 var global_width = 0;
 var global_height = 0;
+var global_zoom = 1.0;
 var g_prev_high = -1;
 var g_prev_low = -1;
 var g_stacker_status = 'idle';
 var g_show_thumb_live = false;
 var g_stats = null;
 
+
+function zoom(offset)
+{
+    if(offset > 0 && global_zoom < 4)
+        global_zoom += offset;
+    else if(offset < 0 && global_zoom > 1)
+        global_zoom += offset;
+    var zspan = document.getElementById('current_zoom')
+    if(global_zoom == 1)
+        zspan.innerHTML = '';
+    else
+        zspan.innerHTML = '×' + global_zoom;
+    onResize(null);
+}
 
 function showError(message)
 {
@@ -342,6 +357,7 @@ function loadFormats()
 {
     document.getElementById('open_camera').style.display='none';
     document.getElementById('std_controls').style.display='inline';
+    document.getElementById('zoom_controls').style.display='inline';
     showConfig(true);
     restCall('get','/api/camera/formats', null, (formats)=> {
         var sel = document.getElementById('stream_format')
@@ -578,7 +594,7 @@ function showStackedVideo(stacked_on)
 
 function showStream(name)
 {
-    document.getElementById('video').innerHTML = `<img id="live_stream_video" alt="streaming video" src="/api/video/${name}" />`;
+    document.getElementById('video').innerHTML = `<div id="live_stream_video_div"><img id="live_stream_video" alt="streaming video" src="/api/video/${name}" /></div>`;
     onResize(null);
 }
 
@@ -610,16 +626,17 @@ function showLiveVideo()
 {
     showStream('live');
 }
-
+/*
 function onResize(ev)
 {
     var video = document.getElementById('live_stream_video');
+    var video_div = document.getElementById('live_stream_video_div');
     var size = calcImgSize();
     if(video) {
-        video.style.width = size[0] + 'px';
-        video.style.height = size[1] + 'px';
-        video.style.marginLeft = size[2] + 'px';
-        video.style.marginTop  = size[3] + 'px';
+        video.style.width = size[0] * global_zoom + 'px';
+        video.style.height = size[1] * global_zoom + 'px';
+        video.style.marginLeft = (size[2] - size[0] * (global_zoom - 1) / 2 ) + 'px';
+        video.style.marginTop  = (size[3] - size[1] * (global_zoom - 1) / 2 ) + 'px';
     }
     var thumb = document.getElementById('thumb_stream_video')
     if(thumb) {
@@ -634,6 +651,39 @@ function onResize(ev)
         solved.style.height = Math.round(size[1] / 2) + 'px';
     }
 }
+*/
+
+function onResize(ev)
+{
+    var video = document.getElementById('live_stream_video');
+    var video_div = document.getElementById('live_stream_video_div');
+    var size = calcImgSize();
+    if(video) {
+        video_div.style.width  = size[0]+ 'px';
+        video_div.style.height = size[1] + 'px';
+        video_div.style.marginLeft = size[2] + 'px';
+        video_div.style.marginTop  = size[3] + 'px';
+        
+        video.style.width  = size[0] * global_zoom + 'px';
+        video.style.height = size[1] * global_zoom + 'px';
+        var dx = size[0] * (global_zoom - 1) / 2;
+        var dy = size[1] * (global_zoom - 1) / 2;
+        video_div.scroll(dx,dy);
+    }
+    var thumb = document.getElementById('thumb_stream_video')
+    if(thumb) {
+        thumb.style.width = Math.round(size[0] / 4) + 'px';
+        thumb.style.height = Math.round(size[1] / 4) + 'px';
+        thumb.style.marginRight = '0px';
+        thumb.style.marginTop  = '0px';
+    }
+    var solved = document.getElementById('solver_result_image');
+    if(solved) {
+        solved.style.width = Math.round(size[0] / 2) + 'px';
+        solved.style.height = Math.round(size[1] / 2) + 'px';
+    }
+}
+
 
 function startStream()
 {

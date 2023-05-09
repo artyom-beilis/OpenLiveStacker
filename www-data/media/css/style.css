@@ -1,6 +1,7 @@
     html {
         overflow: scroll;
         overflow-x: hidden;
+        overflow-y: hidden;
         scrollbar-width: none; /* Firefox */
         -ms-overflow-style: none;
     }
@@ -55,6 +56,12 @@
         margin:0;
     }
     #live_stream_video {
+        padding:0;
+        margin:0;
+    }
+    #live_stream_video_div {
+        overflow-x:scroll;
+        overflow-y:scroll;
         padding:0;
         margin:0;
     }

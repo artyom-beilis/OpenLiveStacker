@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=4.0, user-scalable=yes" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta charset="UTF-8">
     <link rel="icon" type="image/x-icon" href="/media/img/facicon.png" >
     <link rel="stylesheet" href="/media/css/style.css">
@@ -27,6 +27,11 @@
     <button style="display:none" id="stacking_ui_pp" class="comp_but stretch_background" onclick="showPP(true);" >&nbsp;</button>
     <button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
 </p>
+<div id='zoom_controls' style="display:none; position: absolute; bottom: 1mm; left: 1mm">
+    <button class="comp_but" onclick="zoom(+1);">+</button>
+    <button class="comp_but" onclick="zoom(-1);">-</button>
+    <span id="current_zoom"></span>
+</div>
 <div class="config_div" id="stack" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showStack(false);">X</button>
