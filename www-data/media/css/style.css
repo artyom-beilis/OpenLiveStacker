@@ -81,6 +81,11 @@
         padding: 0;
         margin:0;
     }
+    .config_tab {
+        border: 1px solid red;
+        margin: 1mm 1mm 1mm 1mm;
+        padding: 1mm 1mm 1mm 1mm;
+    }
     .alert_div {
             display:none;
             position:absolute;

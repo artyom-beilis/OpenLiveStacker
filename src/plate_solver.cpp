@@ -266,6 +266,13 @@ namespace ols {
         if(!temp_dir.empty())
             instance_->set_tempdir(temp_dir);
     }
+
+    std::string PlateSolver::db_path()
+    {
+        if(!instance_)
+            throw std::runtime_error("PlateSolver is not configured");
+        return instance_->db_;
+    }
     
     void PlateSolver::set_image(cv::Mat img,int dynamic_range)
     {

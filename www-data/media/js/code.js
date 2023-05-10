@@ -1,5 +1,6 @@
 
 var global_width = 0;
+var global_download_progress = null;
 var global_height = 0;
 var global_zoom = 1.0;
 var g_prev_high = -1;
@@ -571,6 +572,7 @@ function updateCalibFramesById(data,elemid)
     sel.value = selected;
 }
 
+
 function updateCalibFrames(data)
 {
     updateCalibFramesById(data,'stack_darks');
@@ -1081,6 +1083,135 @@ function solverRestart()
     document.getElementById('solver_status_div').style.display='none';
     document.getElementById('solver_config').style.display='inline';
 }
+
+function selectAstapConfig()
+{
+    restCall("get","/api/astap_db",null,onAstapVisible);
+}
+
+function onAstapVisible(st)
+{
+    if(!st.has_db) {
+        document.getElementById('astap_ready_list').innerHTML = 'No Star DB for ASTAP';
+    }
+    else {
+        document.getElementById('astap_ready_list').innerHTML = st.db.join(', ');
+    }
+    console.log(st)
+    var sel = document.getElementById('astap_download_db');
+    console.log('Selected = ' + sel.value);
+    for(var opt=0;opt < sel.options.length;opt++) {
+        setDownloadURL('');
+        if(st.db.indexOf(sel.options[opt].value)!=-1) {
+            sel.options[opt].disabled=true;
+        }
+        else {
+            if(!sel.value) {
+                sel.options[opt].selected = true;
+            }
+        }
+    }
+    setDownloadURL(sel.value);
+    updateDownloadStatus(st.downloading)
+}
+
+function updateDownloadProgress(data)
+{
+    var msg;
+    var st = JSON.parse(data);
+    if(st.completed) {
+        updateDownloadStatus(false);
+        if(st.success)
+            msg = 'Done';
+        else
+            msg = 'Failed: ' + st.error;
+        selectAstapConfig();
+    }
+    else {
+        msg = `Downloading ${st.last_file}, ${st.downloaded}/${st.expected}`;
+    }
+    document.getElementById('download_status').innerHTML = msg;
+}
+
+function downloadStart()
+{
+    var url = document.getElementById('astap_download_url').value;
+    if(url == '') {
+        showError('URL is empty');
+        return;
+    }
+    var el = document.getElementById('astap_download_db');
+    var db = el.value;
+    restCall('post','/api/astap_db/download',{"db": db, "url":url},(r) =>{
+        updateDownloadStatus(true);
+    });
+}
+
+function downloadStop()
+{
+    restCall('post','/api/astap_db/cancel',{},(r)=> {
+        updateDownloadStatus(false);
+    });
+
+}
+
+function updateDownloadStatus(active)
+{
+    var dstart = document.getElementById('download_start');
+    var dstop = document.getElementById('download_stop');
+    dstart.style.display = active ? 'none':'inline';
+    dstop.style.display = !active ? 'none':'inline';
+    if(active) {
+        if(!global_download_progress) {
+            global_download_progress = new EventSource("/api/astap_db/progress");
+            global_download_progress.onmessage = (e) => {
+                updateDownloadProgress(e.data);
+            };
+        }
+    }
+    else {
+        if(global_download_progress) {
+            global_download_progress.close();
+            global_download_progress = null;
+        }
+    }
+}
+
+function switchASTAPURL()
+{
+    var sel = document.getElementById('astap_download_db');
+    setDownloadURL(sel.value);
+    return true;
+}
+
+function setDownloadURL(db_id)
+{
+    var url = ''
+    if(db_id != '') {
+        var base = 'https://downloads.sourceforge.net/project/astap-program/star_databases/';
+        //var base = 'http://127.0.0.1:8080/media/';
+        url = `${base}/${db_id}_star_database.zip`;
+    }
+    document.getElementById('astap_download_url').value = url;
+}
+
+function selectConfig(cfg)
+{
+    var cfgs = ['astap','camera'];
+    for(var i=0;i<cfgs.length;i++) {
+        var obj = document.getElementById('config_tab_' + cfgs[i]);
+        if(cfgs[i] == cfg) {
+            obj.style.display = 'block';
+        }
+        else {
+            obj.style.display = 'none';
+        }
+    }
+    if(cfg=='astap') {
+        selectAstapConfig();
+    }
+}
+
 
 
 window.onload = (event) => {

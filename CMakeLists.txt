@@ -18,9 +18,29 @@ find_library(LIBRAW_LIB raw_r)
 find_path(LIBRAW_HDR libraw/libraw.h)
 
 
+find_path(LIBCURL_HDR curl/curl.h)
+find_path(LIBZ_HDR zlib.h)
+find_library(LIBCURL curl)
+find_library(LIBZ z)
+
+
+
 set(WITH_SSE OFF)
 set(OLS_EXTRA )
 add_definitions(-DUSE_CV_SIMD)
+
+
+if(LIBCURL_HDR AND LIBZ_HDR AND LIBCURL AND LIBZ)
+    set(WITH_CURL ON)
+    set(OLS_EXTRA src/downloader.cpp)
+    add_definitions(-DWITH_CURL)
+    message("-- ASTAP DB Download enabled")
+else()
+    message("-- ASTAP DB Download DISABLED")
+    set(WITH_CURL OFF)
+endif()
+
+
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
     set(OLS_EXTRA src/android_main.cpp)
@@ -77,6 +97,10 @@ else()
 endif()
 
 include_directories(${OPENCV_INC})
+if(WITH_CURL)
+    include_directories(${LIBCURL_HDR})
+    include_directories(${LIBZ_HDR})
+endif()
 message("- OpenCV Include Path ${OPENCV_INC}")
 
 
@@ -110,6 +134,11 @@ target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBBOOSTER} ${OPENCV_CORE
 if(ANDROID_BUILD)
     target_link_libraries(ols log)
 endif()
+
+if(WITH_CURL)
+    target_link_libraries(ols ${LIBCURL} ${LIBZ})
+endif()
+
 
 if(LIBUVC)
     add_library(ols_driver_uvc SHARED src/uvc_camera.cpp)

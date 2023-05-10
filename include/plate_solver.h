@@ -19,6 +19,7 @@ namespace ols {
             double angle_to_target_deg;
         };
 
+        static std::string db_path();
         static void init(std::string const &db_path,std::string const &path_to_astap_cli,double time_limit_sec = 5.0,std::string const &temp_dir=std::string());
         static void set_image(cv::Mat img,int dynamic_range);
         static Result solve_last_image( std::string const &jpeg_with_marks,

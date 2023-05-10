@@ -10,6 +10,7 @@
 #include "common_utils.h"
 #include "plate_solver.h"
 #include "plate_solver_ctl_app.h"
+#include "astap_db_download_app.h"
 
 namespace ols {
 
@@ -133,6 +134,7 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
 #endif    
     config["file_server"]["enable"]=true;
     config["file_server"]["document_root"]=document_root;
+    config.set("file_server.check_symlink",false);
     config["file_server"]["alias"][0]["url"] = "/data";
     config["file_server"]["alias"][0]["path"] = data_dir_;
     config["http"]["script"]="/api";
@@ -154,6 +156,9 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this),cppcms::mount_point("/camera((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(this,data_dir_,video_generator_queue_),
                                             cppcms::mount_point("/stacker((/.*)?)",1),
+                                            cppcms::app::asynchronous);
+    web_service_->applications_pool().mount(cppcms::create_pool<AstapDBDownloadApp>(PlateSolver::db_path()),
+                                            cppcms::mount_point("/astap_db((/.*)?)",1),
                                             cppcms::app::asynchronous);
     web_service_->applications_pool().mount(stats_stream_app_,cppcms::mount_point("/updates",0));
     web_service_->applications_pool().mount(cppcms::create_pool<PlateSolverControlApp>(data_dir_),cppcms::mount_point("/plate_solver((/.*)?)",1));
