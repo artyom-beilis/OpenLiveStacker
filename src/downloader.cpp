@@ -1,7 +1,23 @@
 #include "downloader.h"
-#include <curl/curl.h>
+
 #include <string.h>
 #include "zlib.h"
+
+#ifdef WITH_CURL            
+#include <curl/curl.h>
+#elif defined(ANDROID_SUPPORT)
+extern "C" {
+    typedef int (*ols_external_downloader_type)(char const *url,void *callback_cookie,char *error_message_buffer,int error_message_buffer_size);
+    static ols_external_downloader_type ols_downloader = nullptr;
+    void ols_set_external_downloader(ols_external_downloader_type downloader)
+    {
+        ols_downloader = downloader;
+    }
+}
+
+#endif
+
+
 namespace ols {
 
     class UnZipper {
@@ -303,7 +319,7 @@ namespace ols {
             res = 0;
         }
         else {
-
+            #ifdef WITH_CURL            
             CURL *curl = curl_easy_init();
             curl_easy_setopt(curl,CURLOPT_URL,url.c_str());
             curl_easy_setopt(curl,CURLOPT_WRITEDATA,&unzipper);
@@ -316,6 +332,20 @@ namespace ols {
             }
             curl_easy_cleanup(curl);
             curl = 0;
+            #elif defined(ANDROID_SUPPORT)
+            if(ols_downloader == nullptr) {
+                error_message = "Internal error: downloader was not configured properly";
+                return false;    
+            }
+            char error_message_buffer[1024] ={};
+            res = ols_downloader(url.c_str(),&unzipper,error_message_buffer,sizeof(error_message_buffer));
+            if(res != 0) {
+                error_message = error_message_buffer;
+            }
+            #else
+            error_message = "OpenLiveStacker was build without download support, CURL needed";
+            return false;
+            #endif
             if(!unzipper.ok) {
                 error_message = unzipper.get_error();
                 return false;
@@ -324,3 +354,14 @@ namespace ols {
         return res == 0;
     }
 }
+
+
+#ifdef ANDROID_SUPPORT
+extern "C" {
+    int ols_on_data_ready(int uid,char *data,int size)
+    {
+        return ols::on_data_read(uid,data,size);
+    }
+}
+#endif
+

@@ -10,9 +10,7 @@
 #include "ctl_app.h"
 #include "server_sent_events.h"
 #include "util.h"
-#ifdef WITH_CURL            
 #include "downloader.h"
-#endif
 
 namespace ols {
     class AstapDBDownloadApp : public ControlAppBase {
@@ -60,7 +58,6 @@ namespace ols {
                 response_["error"] = "Already downloaded";
                 return;
             }
-#ifdef WITH_CURL            
             std::string url = content_.get<std::string>("url");
             cancel_ = 0;
             downloaded_files_ = 0;
@@ -80,10 +77,6 @@ namespace ols {
                 BOOSTER_INFO("stacker") << "DONE " << status <<" :" << error << std::endl;
                 self->set_completed(status,error);
             }));
-#else
-            response_["status"] = "fail";
-            response_["error"] = "OpenLiveStacker was build without download support (curl and zlib are required)";
-#endif            
         }
         void update(char const *file)
         {

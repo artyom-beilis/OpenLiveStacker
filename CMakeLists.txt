@@ -32,7 +32,6 @@ add_definitions(-DUSE_CV_SIMD)
 
 if(LIBCURL_HDR AND LIBZ_HDR AND LIBCURL AND LIBZ)
     set(WITH_CURL ON)
-    set(OLS_EXTRA src/downloader.cpp)
     add_definitions(-DWITH_CURL)
     message("-- ASTAP DB Download enabled")
 else()
@@ -127,6 +126,7 @@ add_library(ols SHARED
     src/util.cpp
     src/plate_solver.cpp
     src/server_sent_events.cpp
+    src/downloader.cpp
     ${OLS_EXTRA}
     )
 
