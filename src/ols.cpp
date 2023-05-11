@@ -24,6 +24,9 @@ OpenLiveStacker::OpenLiveStacker(std::string data_dir)
     make_dir(debug_dir_);
     make_dir(data_dir_ + "/stacked");
     make_dir(data_dir_ + "/calibration");
+    auto db_path=PlateSolver::db_path();
+    if(!db_path.empty())
+        make_dir(db_path);
     if(!exists(data_dir_ + "/calibration/index.json")) {
         std::ofstream f(data_dir_ + "/calibration/index.json");
         if(!f)

@@ -30,7 +30,7 @@ set(OLS_EXTRA )
 add_definitions(-DUSE_CV_SIMD)
 
 
-if(LIBCURL_HDR AND LIBZ_HDR AND LIBCURL AND LIBZ)
+if(LIBCURL_HDR AND LIBCURL)
     set(WITH_CURL ON)
     add_definitions(-DWITH_CURL)
     message("-- ASTAP DB Download enabled")
@@ -95,12 +95,12 @@ else()
 
 endif()
 
+message("- OpenCV Include Path ${OPENCV_INC}")
 include_directories(${OPENCV_INC})
 if(WITH_CURL)
     include_directories(${LIBCURL_HDR})
-    include_directories(${LIBZ_HDR})
 endif()
-message("- OpenCV Include Path ${OPENCV_INC}")
+include_directories(${LIBZ_HDR})
 
 
 if(ASI_CAMERA_HDR AND ASI_CAMERA_LIB)
@@ -130,7 +130,7 @@ add_library(ols SHARED
     ${OLS_EXTRA}
     )
 
-target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
+target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBZ} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
 if(ANDROID_BUILD)
     target_link_libraries(ols log)
 endif()

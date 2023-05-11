@@ -1190,6 +1190,7 @@ function setDownloadURL(db_id)
     if(db_id != '') {
         var base = 'https://downloads.sourceforge.net/project/astap-program/star_databases/';
         //var base = 'http://127.0.0.1:8080/media/';
+        //var base = 'http://10.0.0.8:8080/media/';
         url = `${base}/${db_id}_star_database.zip`;
     }
     document.getElementById('astap_download_url').value = url;
