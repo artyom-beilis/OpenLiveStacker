@@ -1252,8 +1252,8 @@ function setDownloadURL(db_id)
         var extra = '';
         if(db_id == 'w08')
             extra = '_mag08_astap';
-        //var base = 'https://downloads.sourceforge.net/project/astap-program/star_databases/';
-        var base = 'http://127.0.0.1:8080/media/';
+        var base = 'https://downloads.sourceforge.net/project/astap-program/star_databases/';
+        //var base = 'http://127.0.0.1:8080/media/';
         url = `${base}/${db_id}_star_database${extra}.zip`;
     }
     document.getElementById('astap_download_url').value = url;
