@@ -8,6 +8,8 @@ var g_prev_low = -1;
 var g_stacker_status = 'idle';
 var g_show_thumb_live = false;
 var g_stats = null;
+var g_solving = false;
+var g_solving_ui_open = false;
 
 
 function zoom(offset)
@@ -687,8 +689,10 @@ function onResize(ev)
     }
     var solved = document.getElementById('solver_result_image');
     if(solved) {
-        solved.style.width = Math.round(size[0] / 2) + 'px';
-        solved.style.height = Math.round(size[1] / 2) + 'px';
+        solved.style.width = size[0] + 'px';
+        solved.style.height = size[1] + 'px';
+        solved.style.marginLeft = size[2] + 'px';
+        solved.style.marginTop  = size[3] + 'px';
     }
 }
 
@@ -963,7 +967,12 @@ function recalcFOV()
 
 function showSolve(show)
 {
+    g_solving_ui_open = show;
     document.getElementById('plate_solve_div').style.display = show ? 'inline' : 'none';
+    document.getElementById('solver_auto_restart').checked = false;
+    if(!show) {
+        document.getElementById('solver_result').style.display = 'none';
+    }
 }
 
 
@@ -978,10 +987,11 @@ function toggleFS(fs)
 }
 
 
-function plateSolve()
+function plateSolveWithOpt(background)
 {
-    var ra,de,fov,rad,lat,non;
+    var req;
     try {
+        var ra,de,fov,rad,lat,non;
         ra = parseRA(document.getElementById('solver_ra').value);
         de = parseDEC(document.getElementById('solver_de').value);
         fov = parseFloat(document.getElementById('solver_fov').value);
@@ -992,34 +1002,72 @@ function plateSolve()
             lat = null;
         if(isNaN(lon))
             lon = null;
+        if(isNaN(ra) || ra==null || isNaN(de) || de==null || isNaN(fov) || isNaN(rad)) {
+            throw new Error('RA, DE, Radius and FOV are required');
+        }
+        req = {
+            "fov" : fov,
+            "ra"  : ra,
+            "de"  : de,
+            "rad" : rad,
+            "lat" : lat,
+            "lon" : lon
+        };
+        JSON.stringify(req); // check it is OK
     }
     catch(e) {
-        showError('Invalid Inputs' + e)
+        if(background) {
+            startSolvingIfNeeded();
+        }
+        else {
+            showError('Invalid Inputs' + e)
+        }
         return;
     }
-    document.getElementById('solver_config').style.display = 'none';
-    document.getElementById('solver_status_div').style.display = 'inline';
-    document.getElementById('solver_status').innerHTML = 'Waiting...';
-    document.getElementById('solver_result').style.display = 'none';
-    var req = {
-        "fov" : fov,
-        "ra"  : ra,
-        "de"  : de,
-        "rad" : rad,
-        "lat" : lat,
-        "lon" : lon
-    };
+    if(!background) {
+        document.getElementById('solver_config').style.display = 'none';
+        document.getElementById('solver_status_div').style.display = 'inline';
+        document.getElementById('solver_status').innerHTML = 'Waiting...';
+        document.getElementById('solver_result').style.display = 'none';
+    }
+    g_solving = true;
     restCall('post','/api/plate_solver',req,solveResult)
+}
+
+function plateSolve()
+{
+    plateSolveWithOpt(false);
+}
+
+function resolveOnTimer()
+{
+    plateSolveWithOpt(true);
+}
+
+function startSolvingIfNeeded()
+{
+    var on = document.getElementById('solver_auto_restart').checked;
+    if(on && g_solving_ui_open == true && g_solving == false) {
+        g_solving = true;
+        var timeout = parseFloat(document.getElementById('restart_solver_timeout').value);
+        if(isNaN(timeout) || timeout < 1.0)
+            timeout = 1;
+        setTimeout(resolveOnTimer,1000*timeout);
+    }
 }
 
 function formatAngle(deg,as_hours)
 {
+    var sep;
+    var sep2;
     if(as_hours) {
         deg = deg / 15;
-        sep = "h";
+        sep = ":";
+        sep2 = ":";
     }
     else {
         sep = "\u00b0";
+        sep2 = "'";
     }
 	var direction = deg >= 0 ? '+' : '-';
 	deg = Math.abs(deg);
@@ -1027,9 +1075,9 @@ function formatAngle(deg,as_hours)
 	var min = 60*(deg - ideg);
 	var imin = Math.floor(min);
 	var sec = 60*(min - imin);
-    var msg = direction + ideg + sep + imin + "'";
+    var msg = direction + ideg + sep + imin + sep2;
     if(as_hours)
-	    msg += Math.floor(sec) + "''";
+	    msg += Math.floor(sec);
     return msg;
 }
 
@@ -1037,7 +1085,7 @@ function formatTableRow(a)
 {
     var res = '<tr>';
     for(var i=0;i<a.length;i++) {
-        res += '<td>' + a[i] + '</td>';
+        res += '<td class="solver_results">' + a[i] + '</td>';
     }
     res += '</tr>\n';
     return res;
@@ -1045,6 +1093,9 @@ function formatTableRow(a)
 
 function solveResult(v)
 {
+    g_solving = false;
+    if(!g_solving_ui_open)
+        return;
     var status, jpeg = null;
     if(v.solved) {
         jpeg = v.result_image + '?' + Date.now();
@@ -1054,15 +1105,22 @@ function solveResult(v)
         var delta_ra_deg = v.delta_ra.toFixed(2) + "\u00b0";
         var delta_de_dms = formatAngle(v.delta_de,false);
         var delta_de_deg = v.delta_de.toFixed(2) + "\u00b0";
-        status += '<table>'
-        status += formatTableRow(['∆RA',delta_ra_dms,delta_ra_deg,delta_ra_hms,'∆DEC',delta_ra_dms,delta_ra_deg]);
+        var delta_az_dms = 'N/A';
+        var delta_az_deg = 'N/A';
+        var delta_alt_dms = 'N/A';
+        var delta_alt_deg = 'N/A';
+
         if(v.delta_az) {
-            var delta_az_dms = formatAngle(v.delta_az,false);
-            var delta_az_deg = v.delta_az.toFixed(2) + "\u00b0";
-            var delta_alt_dms = formatAngle(v.delta_alt,false);
-            var delta_alt_deg = v.delta_alt.toFixed(2) + "\u00b0";
-            status += formatTableRow(['∆ALT',delta_alt_dms,delta_alt_deg,'&nbsp;','∆AZ',delta_az_dms,delta_az_deg]);
+            delta_az_dms = formatAngle(v.delta_az,false);
+            delta_az_deg = v.delta_az.toFixed(2) + "\u00b0";
+            delta_alt_dms = formatAngle(v.delta_alt,false);
+            delta_alt_deg = v.delta_alt.toFixed(2) + "\u00b0";
         }
+        status += '<table class="solver_results" style="border:1px solid; table-layout: fixed; width:80%; ">'
+        status += formatTableRow(['unit','∆RA','∆DEC','∆ALT','∆AZ']);
+        status += formatTableRow(["h:m:s d°m'",delta_ra_hms,delta_de_dms,'&nbsp;','&nbsp;'])
+        status += formatTableRow(["d°m'",delta_ra_dms,delta_de_dms,delta_alt_dms,delta_az_dms])
+        status += formatTableRow(["degree",delta_ra_deg,delta_de_deg,delta_alt_deg,delta_az_deg])
         status += '</table>'
         if(!v.delta_az) {
             status += 'for ∆Alt/∆AZ provide geolocation in settings';
@@ -1076,12 +1134,15 @@ function solveResult(v)
         document.getElementById('solver_result_image').src = jpeg;
     }
     document.getElementById('solver_result').style.display = jpeg ? 'inline' : 'none';
+    startSolvingIfNeeded();
 }
 
 function solverRestart()
 {
     document.getElementById('solver_status_div').style.display='none';
     document.getElementById('solver_config').style.display='inline';
+    document.getElementById('solver_result').style.display = 'none';
+    document.getElementById('solver_auto_restart').checked = false;
 }
 
 function selectAstapConfig()
@@ -1188,9 +1249,12 @@ function setDownloadURL(db_id)
 {
     var url = ''
     if(db_id != '') {
-        var base = 'https://downloads.sourceforge.net/project/astap-program/star_databases/';
-        //var base = 'http://127.0.0.1:8080/media/';
-        url = `${base}/${db_id}_star_database.zip`;
+        var extra = '';
+        if(db_id == 'w08')
+            extra = '_mag08_astap';
+        //var base = 'https://downloads.sourceforge.net/project/astap-program/star_databases/';
+        var base = 'http://127.0.0.1:8080/media/';
+        url = `${base}/${db_id}_star_database${extra}.zip`;
     }
     document.getElementById('astap_download_url').value = url;
 }

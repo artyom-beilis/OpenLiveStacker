@@ -18,6 +18,7 @@
     button:disabled {
         color:#800000;
     }
+    .solver_results { background-color: transparent; }
     .nowr { white-space: nowrap; }
     .slider { width: 100%; }
     .val_input { width: 15mm; }
@@ -62,6 +63,10 @@
     #live_stream_video_div {
         overflow-x:scroll;
         overflow-y:scroll;
+        padding:0;
+        margin:0;
+    }
+    #solver_result {
         padding:0;
         margin:0;
     }

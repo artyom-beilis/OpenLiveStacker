@@ -34,8 +34,6 @@ namespace ols {
             catch(...) {}
         }
 
-        int files_in_db = 1476;
-
         void cancel()
         {
             BOOSTER_INFO("stacker") << "Aborting download";
@@ -58,6 +56,7 @@ namespace ols {
                 response_["error"] = "Already downloaded";
                 return;
             }
+            files_in_db_ = files_in_db(id);
             std::string url = content_.get<std::string>("url");
             cancel_ = 0;
             downloaded_files_ = 0;
@@ -108,7 +107,7 @@ namespace ols {
             }
             else {
                 v["downloaded"]=downloaded_files_;
-                v["expected"] = files_in_db;
+                v["expected"] = files_in_db_;
                 v["last_file"] = last_file_;
             }
             ss << v;
@@ -141,7 +140,7 @@ namespace ols {
         void status()
         {
             response_["downloading"] = bool(thread_);
-            char const *dbs[] = {"d05","d20","d50"};
+            char const *dbs[] = {"d05","d20","d50","g05","w08"};
             int N = 0;
             response_["db"] = cppcms::json::array();
             for(char const *db:dbs) {
@@ -153,12 +152,56 @@ namespace ols {
             response_["has_db"] = N > 0;
         }
 
+        int files_in_db(std::string const &prefix)
+        {
+            char code = prefix.c_str()[0];
+            int N = -1;
+            switch(code) {
+            case 'd':
+                N = 1476;
+                break;
+            case 'g':
+                N = 290;
+                break;
+            case 'w':
+                N = 1;
+                break;
+            }
+            return N;
+        }
+
         bool check(std::string const &prefix)
         {
-            char const *names[] = {
+            char const *d_names[] = {
                 "_2713.1476", "_1509.1476", "_1964.1476","_0802.1476","_3601.1476","_3407.1476"
             };
-            for(char const *name :names) {
+            char const *g_names[] = {
+                "_0810.290","_0813.290", "_0924.290", "_1602.290", "_1801.290"
+            };
+            char const *w_names[] = { "_0101.001"};
+            
+            int N;
+            char const **names;
+            char code = prefix.c_str()[0];
+            switch(code) {
+            case 'd':
+                names = d_names;
+                N = sizeof(d_names)/sizeof(d_names[0]);
+                break;
+            case 'g':
+                names = g_names;
+                N = sizeof(g_names)/sizeof(g_names[0]);
+                break;
+            case 'w':
+                names = w_names;
+                N = sizeof(w_names)/sizeof(w_names[0]);
+                break;
+            default:
+                return false;
+            }
+
+            for(int i=0;i<N;i++) {
+                char const *name = names[i];
                 if(!exists(data_dir_ +"/" + prefix + name)) {
                     return false;
                 }
@@ -171,6 +214,7 @@ namespace ols {
         std::string data_dir_;
         std::unique_ptr<std::thread> thread_;
         int downloaded_files_;
+        int files_in_db_;
         std::string last_file_;
         std::atomic<int> cancel_;
         std::shared_ptr<sse::state_stream> stream_;
