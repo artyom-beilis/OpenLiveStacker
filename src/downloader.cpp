@@ -295,6 +295,13 @@ namespace ols {
         {
             return static_cast<UnZipper*>(stream)->input(ptr,size,nmemb);
         }
+#ifdef ANDROID_SUPPORT
+        int ols_downloader_jna_write(void *cookie,char *buffer, int size) 
+        {
+            return ols_downloader_write_data(buffer,1,size,cookie);
+        }
+#endif        
+                
     }
         
 
@@ -355,13 +362,4 @@ namespace ols {
     }
 }
 
-
-#ifdef ANDROID_SUPPORT
-extern "C" {
-    int ols_on_data_ready(int uid,char *data,int size)
-    {
-        return ols::on_data_read(uid,data,size);
-    }
-}
-#endif
 

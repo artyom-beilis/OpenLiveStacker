@@ -9,7 +9,9 @@ Addtional copyrights:
 Exceptions to GPLv3 license:
 ----------------------------
 
-Camera drivers and other astronomy gear drivers
-are considered "System Libraries" for the purpose
-of copying and licensing.
+Following libraries are considered "System Libraries"
+for purpose of copying and licensing:
+
+- Camera drivers and other astronomy gear drivers
+- OpenSSL
 
