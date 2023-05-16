@@ -116,6 +116,9 @@ namespace ols {
         bayer_gb
     };
 
+    std::string bayer_type_to_str(CamBayerType bayer);
+    CamBayerType bayer_type_from_str(std::string const &s);
+
     std::string stream_type_to_str(CamStreamType s);
     CamStreamType stream_type_from_str(std::string s);
 

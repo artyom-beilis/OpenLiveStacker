@@ -81,6 +81,28 @@ static char const *option_names[] = {
     "Auto Exp.", "Auto WB", "Exp.", "WB", "WB Red", "WB Blue", "Gain", "Gamma", "Bright.", "Contr.", "Temp.", "Cooler Tgt.", "Cooler", "Fan","Cooler Pwr."
 };
 
+std::string bayer_type_to_str(CamBayerType bayer)
+{
+    switch(bayer) {
+    case bayer_na: return "NA";
+    case bayer_rg: return "RGGB";
+    case bayer_gr: return "GRBG";
+    case bayer_bg: return "BGGR";
+    case bayer_gb: return "GBRG";
+    };
+    throw CamError("Invalid format");
+}
+
+CamBayerType bayer_type_from_str(std::string const &bayer)
+{
+    if(bayer == "NA") return bayer_na;
+    if(bayer == "RGGB") return bayer_rg;
+    if(bayer == "GRBG") return bayer_gr;
+    if(bayer == "BGGR") return bayer_bg;
+    if(bayer == "GBRG") return bayer_gb;
+    throw CamError("Invalid bayer format " + bayer);
+}
+
 std::string cam_option_id_to_string_id(CamOptionId id)
 {
     size_t nid = id;

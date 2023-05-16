@@ -32,6 +32,7 @@ namespace ols {
         double timestamp;
         std::shared_ptr<VideoFrame> source_frame;
         std::shared_ptr<VideoFrame> jpeg_frame;
+        cv::Mat raw;
         cv::Mat frame;
         int frame_dr = 255;
         cv::Mat processed_frame;

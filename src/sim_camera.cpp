@@ -12,6 +12,7 @@
 #include "util.h"
 #include "tiffmat.h"
 #include <opencv2/imgcodecs.hpp>
+#include <cppcms/json.h>
 
 namespace ols {
     class SIMError : public CamError {
@@ -35,11 +36,29 @@ namespace ols {
             return dir_ + name;
         }
 
+        CamBayerType get_bayer()
+        {
+            std::ifstream data(dir_  + "/info.json");
+            if(!data)
+                return bayer_na;
+            cppcms::json::value v;
+            if(!v.load(data,true))
+                return bayer_na;
+            try {
+                return bayer_type_from_str(v.get("bayer","NA"));
+            }
+            catch(...) {
+                return bayer_na;
+            }
+
+        }
+
         void load_frames()
         {
             std::ifstream data(dir_  + "/log.txt");
             if(!data)
                 throw SIMError("Failed to read log file");
+            bayer_ = bayer_na;
             std::string str;
             while(std::getline(data,str)) {
                 size_t pos = str.find(',');
@@ -63,14 +82,20 @@ namespace ols {
                     height_ = img.rows;
                     if(is_jpeg_)
                         stream_ = stream_mjpeg;
+                    else if(img.elemSize1() == 1 && img.channels() == 2)
+                        stream_ = stream_yuv2;
                     else if(img.elemSize1() == 1 && img.channels() == 3)
                         stream_ = stream_rgb24;
                     else if(img.elemSize1() == 2 && img.channels() == 3)
                         stream_ = stream_rgb48;
-                    else if(img.elemSize1() == 1 && img.channels() == 1)
-                        stream_ = stream_mono8;
-                    else if(img.elemSize1() == 2 && img.channels() == 1)
-                        stream_ = stream_mono16;
+                    else if(img.elemSize1() == 1 && img.channels() == 1) {
+                        bayer_ = get_bayer();
+                        stream_ = bayer_ == bayer_na ? stream_mono8 : stream_raw8;
+                    }
+                    else if(img.elemSize1() == 2 && img.channels() == 1) {
+                        bayer_ = get_bayer();
+                        stream_ = bayer_ == bayer_na ? stream_mono16 : stream_raw16;
+                    }
                     else
                         throw SIMError("Unsupported image format for " + path);
                 }
@@ -131,6 +156,7 @@ namespace ols {
             else {
                 img = load_tiff(frames_.at(index).second);
                 frm.data = img.data;
+                frm.bayer = bayer_;
                 frm.data_size = img.rows * img.cols * img.elemSize();
             }
 
@@ -295,6 +321,7 @@ namespace ols {
         int exposure_ = 1000;
         double gamma_ = 1.0;
         CamStreamType stream_ = stream_mjpeg;
+        CamBayerType  bayer_ = bayer_na;
         bool is_jpeg_ = true;
         int width_,height_;
 

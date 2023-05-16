@@ -84,6 +84,7 @@ namespace ols {
                         try {
                             frame->frame = cv::imdecode(buffer,cv::IMREAD_UNCHANGED);
                             frame->frame_dr = 255;
+                            frame->raw = frame->frame;
                         }
                         catch(std::exception const &e) {
                             BOOSTER_ERROR("stacker") << "Failed to extract jpeg";
@@ -98,6 +99,7 @@ namespace ols {
                     cv::Mat rgb;
                     cv::cvtColor(yuv2,rgb,cv::COLOR_YUV2BGR_YUYV);
                     frame->frame_dr = 255;
+                    frame->raw = yuv2;
                     handle_jpeg_stack(frame,rgb,false);
                 }
                 break;
@@ -105,6 +107,7 @@ namespace ols {
                 {
                     cv::Mat rgb(frame->format.height,frame->format.width,CV_8UC3,frame->source_frame->data());
                     frame->frame_dr = 255;
+                    frame->raw = rgb;
                     handle_jpeg_stack(frame,rgb,true);
                 }
                 break;
@@ -112,6 +115,7 @@ namespace ols {
                 {
                     cv::Mat rgb(frame->format.height,frame->format.width,CV_16UC3,frame->source_frame->data());
                     frame->frame_dr = 65535;
+                    frame->raw = rgb;
                     handle_jpeg_stack(frame,rgb,false);
                 }
                 break;
@@ -130,6 +134,7 @@ namespace ols {
                     }
                     frame->frame_dr = (bpp==1 ? 255 : 65535);
                     handle_jpeg_stack(frame,rgb,false);
+                    frame->raw = bayer;
                 }
                 break;
             case stream_mono8:
@@ -138,6 +143,7 @@ namespace ols {
                     cv::Mat mono(frame->format.height,frame->format.width,(bpp==1 ? CV_8UC1 : CV_16UC1),frame->source_frame->data());
                     frame->frame_dr = (bpp==1 ? 255 : 65535);
                     handle_jpeg_stack(frame,mono,true);
+                    frame->raw = mono;
                 }
                 break;
             case stream_error:

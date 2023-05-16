@@ -200,7 +200,13 @@ void OpenLiveStacker::set_plate_solving_image(data_pointer_type p)
     if(!frame)
         return;
     
-    PlateSolver::set_image(frame->frame,frame->frame_dr);
+    cv::Mat ps_frame;
+    if(frame->format.format == stream_yuv2) // unsupported by ASTAP
+        ps_frame = frame->frame;
+    else
+        ps_frame = frame->raw;
+    
+    PlateSolver::set_image(ps_frame,frame->frame_dr);
 }
 
 void OpenLiveStacker::run()

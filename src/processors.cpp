@@ -659,7 +659,7 @@ namespace ols {
             }
             else {
                 try {
-                    save_tiff(video->frame,base_name + ".tiff");
+                    save_tiff(video->raw,base_name + ".tiff");
                 }
                 catch(std::exception const &e){
                     BOOSTER_ERROR("stacker") << "Failed to save tiff to " << base_name << ".tiff: " << e.what();
@@ -668,6 +668,17 @@ namespace ols {
             std::ofstream log(log_file(),std::ofstream::app);
             log << counter_ <<"," << std::fixed << std::setprecision(3) << video->timestamp << std::endl;
             counter_++;
+            if(counter_ == 1) {
+                std::ifstream info_r(dirname_ + "/info.json");
+                cppcms::json::value v;
+                if(v.load(info_r,true)) {
+                    info_r.close();
+                    v["format"] = stream_type_to_str(video->format.format);
+                    v["bayer"] = bayer_type_to_str(video->bayer);
+                    std::ofstream info(dirname_ + "/info.json");
+                    v.save(info,cppcms::json::readable);
+                }
+            }
         }
         void handle_config(std::shared_ptr<StackerControl> ctl)
         {
