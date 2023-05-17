@@ -598,7 +598,11 @@ function showStackedVideo(stacked_on)
 
 function showStream(name)
 {
-    document.getElementById('video').innerHTML = `<div id="live_stream_video_div"><img id="live_stream_video" alt="streaming video" src="/api/video/${name}" /></div>`;
+    var video = document.getElementById('live_stream_video');
+    if(video)
+        video.src = `/api/video/${name}`;
+    else
+        document.getElementById('video').innerHTML = `<div id="live_stream_video_div"><img id="live_stream_video" alt="streaming video" src="/api/video/${name}" /></div>`;
     onResize(null);
 }
 
@@ -613,14 +617,21 @@ function showThumbLive(v)
     var thumb_video = document.getElementById('thumb_video');
     g_show_thumb_live = v;
     var live_button = document.getElementById('stacking_ui_live');
+    var mjpeg = document.getElementById('thumb_stream_video');
     if(v) {
-        thumb_video.innerHTML = `<img id="thumb_stream_video" alt="streaming video" src="/api/video/live" />`;
+        if(mjpeg)
+            mjpeg.src = "/api/video/live";
+        else
+            thumb_video.innerHTML = `<img id="thumb_stream_video" alt="streaming video" src="/api/video/live" />`;
         thumb.style.display = 'inline';
         live_button.innerHTML = 'X';
         onResize(null);
     }
     else {
-        thumb_video.innerHTML ='';
+        if(mjpeg)
+            mjpeg.src = '/media/invalid.jpeg';
+        else 
+            thumb_video.innerHTML ='';
         thumb.style.display = 'none';
         live_button.innerHTML = 'L';
     }
