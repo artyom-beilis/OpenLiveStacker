@@ -11,7 +11,8 @@
 namespace ols {
     class VideoGeneratorApp : public cppcms::application {
     public:
-        int frame_rate_ = 10;
+        int refresh_new_frame_delay_ms_ = 100;
+        int refresh_deylay_ms_ = 1000;
 
         std::string boundary = "092345910257012374590237592375935734--";
         VideoGeneratorApp(cppcms::service &srv,std::string const &type) : cppcms::application(srv),type_(type),
@@ -86,9 +87,10 @@ namespace ols {
                 streams_.insert(ctx);
             }
         }
-        void send_updated_frame()
+        void send_updated_frame(bool new_frame=false)
         {
             last_update_ = booster::ptime::now();
+            is_new_ = new_frame;
             auto send_to = streams_;
             for(auto ctx : send_to) {
                 serve(ctx);
@@ -96,9 +98,12 @@ namespace ols {
         }
         void handle_timer()
         {
-            booster::ptime delay = booster::ptime::milliseconds(1000/frame_rate_);
-            timer_.expires_from_now(delay);
-            if(frame_ && (booster::ptime::now() - last_update_) >= delay)
+            booster::ptime min_delay = booster::ptime::milliseconds(refresh_new_frame_delay_ms_);
+            timer_.expires_from_now(min_delay);
+            booster::ptime force_refresh = booster::ptime::milliseconds(refresh_deylay_ms_);
+
+            booster::ptime limit = is_new_ ? min_delay : force_refresh;
+            if(frame_ && (booster::ptime::now() - last_update_) >= limit)
                 send_updated_frame();
             timer_.async_wait([=](booster::system::error_code const &) {
                 handle_timer();
@@ -112,7 +117,7 @@ namespace ols {
             frame_ = frame;
             frame_counter_++;
             BOOSTER_INFO("stacker") << type_ << " frame " << frame_counter_ << " arrived";
-            send_updated_frame();
+            send_updated_frame(true);
         }
         std::set<std::shared_ptr<cppcms::http::context>> streams_;
         std::shared_ptr<VideoFrame> frame_;
@@ -120,6 +125,7 @@ namespace ols {
         std::string type_;
         booster::aio::deadline_timer timer_;
         booster::ptime last_update_;
+        bool is_new_ = false;
     };
 } // namespace
 
