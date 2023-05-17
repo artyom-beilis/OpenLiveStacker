@@ -72,11 +72,9 @@ int main(int argc,char **argv)
             driver_opt = cfg.get("sim.path","");
         }
         else if(driver == "wdir") {
-            int w = cfg.get<int>("wdir.width");
-            int h = cfg.get<int>("wdir.height");
-            std::string dir = cfg.get<std::string>("wdir.path");
-            std::string format = cfg.get<std::string>("wdir.format");
-            driver_opt=format + "@" + std::to_string(w) + "x" + std::to_string(h) + ":" + dir;
+            std::ostringstream ss;
+            ss<<cfg["wdir"];
+            driver_opt = ss.str();
         }
 
         char const *driver_opt_ptr = nullptr;

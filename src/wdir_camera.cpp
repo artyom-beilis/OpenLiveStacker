@@ -17,6 +17,7 @@
 #include <opencv2/imgproc.hpp>
 #include <booster/log.h>
 #include <booster/regex.h>
+#include <cppcms/json.h>
 
 #ifdef WITH_LIBRAW
 #include <libraw/libraw.h>
@@ -35,25 +36,34 @@ namespace ols {
 
     class WDIRCamera : public Camera {
     public:
-        WDIRCamera(std::string const &dir,int width,int height,int bpp,bool mono) 
+        WDIRCamera(std::string const &dir,int width,int height,CamStreamType stream,CamBayerType bayer = bayer_na) 
             : dir_(dir),
               width_(width),
               height_(height),
-              bpp_(bpp),
-              mono_(mono)
+              stream_(stream),
+              bayer_(bayer)
         {
             stream_active_ = 0;
-            if(bpp > 8) {
-                if(mono)
-                    stream_ = stream_mono16;
-                else
-                    stream_ = stream_rgb48;
-            }
-            else {
-                if(mono)
-                    stream_ = stream_mono8;
-                else
-                    stream_ = stream_rgb24;
+            switch(stream_) {
+            case stream_mono16:
+            case stream_mono8:
+                bpp_ = stream_ == stream_mono8 ? 8 : 16;
+                mono_ = true;
+                raw_ = false;
+                break;
+            case stream_rgb24:
+            case stream_rgb48:
+                bpp_ = stream_ == stream_rgb24 ? 8 : 16;
+                mono_ = false;
+                raw_ = false;
+                break;
+            case stream_raw16:
+                bpp_ = 16;
+                mono_ = false;
+                raw_ = true;
+                break;
+            default:
+                throw WDIRError("Unsupported stream format " + stream_type_to_str(stream));
             }
         }
 
@@ -113,7 +123,7 @@ namespace ols {
             }
             return res;
         }
-        cv::Mat load_libraw(std::string const &path)
+        std::pair<cv::Mat,CamBayerType> load_libraw(std::string const &path)
         {
             cv::Mat img;
             LibRaw raw;
@@ -123,7 +133,6 @@ namespace ols {
             {
                 throw WDIRError("Failed to open or read " + path + ": " + libraw_strerror(code));
             }
-#if 1
             #if 0
             printf("%p raw=%dx%d act=%dx%d stride_bytes %d pat=%s\n",raw.imgdata.rawdata.raw_image,
                     raw.imgdata.sizes.raw_height,raw.imgdata.sizes.raw_width,
@@ -137,53 +146,14 @@ namespace ols {
             }
             cv::Mat raw_image(raw.imgdata.sizes.raw_height,raw.imgdata.sizes.raw_width,CV_16UC1,raw.imgdata.rawdata.raw_image,raw.imgdata.sizes.raw_pitch);
             int scale = 65535 / raw.imgdata.color.maximum;
-            std::string bayer = index2color(raw);
-            int pat_code = -1;
-            if(bayer == "RGGB")
-                pat_code = cv::COLOR_BayerBG2BGR; // COLOR_BayerRGGB2BGR = COLOR_BayerBG2BGR
-            else if(bayer == "GRBG")
-                pat_code = cv::COLOR_BayerGB2BGR; // COLOR_BayerGRBG2BGR = COLOR_BayerGB2BGR
-            else if(bayer == "BGGR")
-                pat_code = cv::COLOR_BayerRG2BGR; // COLOR_BayerBGGR2BGR = COLOR_BayerRG2BGR
-            else if(bayer == "GBRG")
-                pat_code = cv::COLOR_BayerGR2BGR; // COLOR_BayerGBRG2BGR = COLOR_BayerGR2BGR
-            else
-                throw WDIRError("Unsupported bayer pattern " + bayer + " in file:" + path);
-            cv::cvtColor(raw_image,img,pat_code);
+            std::string bayer_name = index2color(raw);
+            CamBayerType bayer = bayer_type_from_str(bayer_name);
             if(scale != 1)
-                img = img.mul(cv::Scalar::all(scale));
-
-#else           
-            auto params = raw.output_params_ptr();
-            params->use_auto_wb = 0;
-            params->no_auto_bright = 1;
-            params->gamm[0] = params->gamm[1] = 1.0f;
-            if(raw.imgdata.color.maximum > 255)
-                params->output_bps = 16;
+                img = raw_image.mul(cv::Scalar::all(scale));
             else
-                params->output_bps = 8;
-            
+                img = raw_image.clone();
 
-            if((code = raw.dcraw_process()) != LIBRAW_SUCCESS) {
-                throw WDIRError("Failed to process " + path + ": " + libraw_strerror(code));
-            }
-            int w=0,h=0,c=0,bpp=0;
-            raw.get_mem_image_format(&w,&h,&c,&bpp);
-            if(c!=1 && c!=3)
-                throw WDIRError("Expecting mono or color, but got channesl=" + std::to_string(c) + " in raw file:" + path);
-            if(bpp!=8 && bpp!=16)
-                throw WDIRError("Expecting 8 bit or 16 bit, bit got bits=" + std::to_string(bpp) + " in raw file:" + path);
-            int cv_type;
-            if(bpp == 8)
-                cv_type = c == 1 ? CV_8UC1 : CV_8UC3;
-            else
-                cv_type = c == 1 ? CV_16UC1 : CV_16UC3;
-            img.create(h,w,cv_type);
-            if((code = raw.copy_mem_image(img.data,img.step[0],1))!=LIBRAW_SUCCESS) {
-                throw WDIRError("Failed to read image data for " + path + ": " + libraw_strerror(code));
-            }
-#endif            
-            return img;
+            return std::make_pair(img,bayer);
         }
 #endif
 
@@ -191,6 +161,7 @@ namespace ols {
         {
             CamFrame frm;
             frm.unix_timestamp = timestamp();
+            frm.bayer = bayer_;
             struct stat st;
             if(stat(fname.c_str(),&st)!=0) {
                 BOOSTER_INFO("stacker") << "Failed to stat " << fname;
@@ -200,13 +171,16 @@ namespace ols {
                 BOOSTER_INFO("stacker") << "Not regular file, skipping:" << fname;
                 return;
             }
-            
+
             cv::Mat img;
             if(ends_with(fname,".tiff") || ends_with(fname,".tif"))
                 img = load_tiff(fname);
 #ifdef WITH_LIBRAW
-            else if(ends_with(fname,".dng") || ends_with(fname,".raw"))
-                img = load_libraw(fname);
+            else if(ends_with(fname,".dng") || ends_with(fname,".raw")) {
+                auto res = load_libraw(fname);
+                img = res.first; 
+                frm.bayer  = res.second;
+            }
 #endif                
             else
                 img = cv::imread(fname);
@@ -214,12 +188,16 @@ namespace ols {
                 BOOSTER_INFO("stacker") << "Image size is not correct";
                 return;
             }
-            if(int(img.elemSize() / img.elemSize1()) != (mono_ ? 1 : 3)) {
-                BOOSTER_INFO("stack") << "file color space invalid, skpiing" << fname;
+            if(int(img.elemSize() / img.elemSize1()) != ((mono_ || raw_) ? 1 : 3)) {
+                BOOSTER_INFO("stack") << "file color space invalid, skpiing: " << fname;
                 return;
             }
             if(int(img.elemSize1()) != (bpp_ + 7) / 8) {
-                BOOSTER_INFO("stack") << "file depth invalid, skpiing" << fname;
+                BOOSTER_INFO("stack") << "file depth invalid, skippng: " << fname;
+                return;
+            }
+            if(raw_ && frm.bayer == bayer_na) {
+                BOOSTER_INFO("stack") << "No bayer pattern info for raw image, skipping: " << fname;
                 return;
             }
             frm.data = img.data;
@@ -346,12 +324,15 @@ namespace ols {
     private:
         std::string dir_;
         int width_,height_;
+        CamStreamType stream_;
+        CamBayerType bayer_;
+
         int bpp_;
         bool mono_;
+        bool raw_;
 
         std::atomic<int> stream_active_;
         int frame_counter_ = 0;
-        CamStreamType stream_;
         // protected by mutex
         std::mutex lock_;
         frame_callback_type callback_; 
@@ -367,49 +348,30 @@ namespace ols {
         {
             return {"Directory Watcher"};
         }
-        void parse_path(std::string &dir,int &bpp,bool &mono,int &width,int &height)
+        void parse_params(std::string &dir,CamStreamType &stream,CamBayerType &bayer,int &width,int &height)
         {
-            booster::regex r("^(.*)@(\\d+)x(\\d+):(.*)$");
-            booster::smatch m;
-            if(!booster::regex_match(watch_info,m,r)) {
-                throw WDIRError("Invalid format");
-            }
-            std::string type = m[1];
-            width = atoi(m[2].str().c_str());
-            height= atoi(m[3].str().c_str());
-            dir = m[4];
-
-            if(type == "rgb48") {
-                mono = false;
-                bpp = 16;
-            }
-            else if(type == "rgb24") {
-                mono = false;
-                bpp = 8;
-            }
-            else if(type == "mono16") {
-                mono = true;
-                bpp = 16;
-            }
-            else if(type == "mono8") {
-                mono = true;
-                bpp = 8;
-            }
-            else {
-                throw WDIRError("Invalid stream format: `" + type + "'");
-            }
-
+            cppcms::json::value v;
+            std::istringstream ss(watch_info);
+            if(!v.load(ss,true))
+                throw WDIRError("Parsing of inputs failed");
+            dir = v.get<std::string>("path");
+            stream  = stream_type_from_str(v.get<std::string>("format"));
+            bayer = bayer_type_from_str(v.get<std::string>("bayer","NA"));
+            width = v.get<int>("width");
+            height = v.get<int>("height");
         }
         virtual std::unique_ptr<Camera> open_camera(int id,CamErrorCode &e) 
         {
             try {
                 if(id!=0)
                     throw WDIRError("No such camera " + std::to_string(id));
-                int bpp,width,height;
-                bool mono;
+                int width,height;
                 std::string dir;
-                parse_path(dir,bpp,mono,width,height);
-                std::unique_ptr<Camera> cam(new WDIRCamera(dir,width,height,bpp,mono));
+                CamStreamType stream;
+                CamBayerType bayer;
+
+                parse_params(dir,stream,bayer,width,height);
+                std::unique_ptr<Camera> cam(new WDIRCamera(dir,width,height,stream,bayer));
                 return cam;
             }
             catch(std::exception const &err) {
