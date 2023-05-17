@@ -99,8 +99,9 @@ namespace ols {
                     cv::Mat rgb;
                     cv::cvtColor(yuv2,rgb,cv::COLOR_YUV2BGR_YUYV);
                     frame->frame_dr = 255;
-                    frame->raw = yuv2;
                     handle_jpeg_stack(frame,rgb,false);
+                    // use unpacked since there is no native YUYV tiff format
+                    frame->raw = frame->frame;
                 }
                 break;
             case stream_rgb24:

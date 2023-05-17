@@ -669,14 +669,22 @@ namespace ols {
             log << counter_ <<"," << std::fixed << std::setprecision(3) << video->timestamp << std::endl;
             counter_++;
             if(counter_ == 1) {
-                std::ifstream info_r(dirname_ + "/info.json");
                 cppcms::json::value v;
+                std::ifstream info_r(dirname_ + "/info.json");
                 if(v.load(info_r,true)) {
                     info_r.close();
                     v["format"] = stream_type_to_str(video->format.format);
                     v["bayer"] = bayer_type_to_str(video->bayer);
                     std::ofstream info(dirname_ + "/info.json");
-                    v.save(info,cppcms::json::readable);
+                    if(!info) {
+                        BOOSTER_ERROR("stacker") << "Failed to update JSON info from "<< dirname_ << "/info.json";
+                    }
+                    else {
+                        v.save(info,cppcms::json::readable);
+                    }
+                }
+                else {
+                    BOOSTER_ERROR("stacker") << "Failed to read JSON info from "<< dirname_ << "/info.json";
                 }
             }
         }
