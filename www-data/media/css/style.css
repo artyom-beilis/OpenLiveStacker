@@ -6,6 +6,7 @@
         -ms-overflow-style: none;
     }
     ::-webkit-scrollbar {
+        height: 0;
         width: 0;
     }
     body, td { font-size: 5mm ; color:red ; font-family: sans; background-color:black }
@@ -104,4 +105,24 @@
             margin: auto;
             text-align: center;
     }
+    #video {
+        position:absolute;
+        left:0;
+        top:0;
+        bottom:0;
+        right:0;
+        padding:0 0 0 0;
+        z-index:-2;
+    }
+    .config_div {
+        position:absolute;
+        left:10mm;
+        top:12mm;
+        right:10mm;
+        bottom:12mm;
+        z-index:2;
+        padding: 2mm 2mm 2mm 2mm;
+        border: 1px solid red;
+        overflow:scroll;
+     }
 

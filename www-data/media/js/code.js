@@ -641,44 +641,27 @@ function showLiveVideo()
 {
     showStream('live');
 }
-/*
-function onResize(ev)
-{
-    var video = document.getElementById('live_stream_video');
-    var video_div = document.getElementById('live_stream_video_div');
-    var size = calcImgSize();
-    if(video) {
-        video.style.width = size[0] * global_zoom + 'px';
-        video.style.height = size[1] * global_zoom + 'px';
-        video.style.marginLeft = (size[2] - size[0] * (global_zoom - 1) / 2 ) + 'px';
-        video.style.marginTop  = (size[3] - size[1] * (global_zoom - 1) / 2 ) + 'px';
-    }
-    var thumb = document.getElementById('thumb_stream_video')
-    if(thumb) {
-        thumb.style.width = Math.round(size[0] / 4) + 'px';
-        thumb.style.height = Math.round(size[1] / 4) + 'px';
-        thumb.style.marginRight = '0px';
-        thumb.style.marginTop  = '0px';
-    }
-    var solved = document.getElementById('solver_result_image');
-    if(solved) {
-        solved.style.width = Math.round(size[0] / 2) + 'px';
-        solved.style.height = Math.round(size[1] / 2) + 'px';
-    }
-}
-*/
 
 function onResize(ev)
 {
     var video = document.getElementById('live_stream_video');
     var video_div = document.getElementById('live_stream_video_div');
     var size = calcImgSize();
+    console.log(JSON.stringify(size));
     if(video) {
         video_div.style.width  = size[0]+ 'px';
         video_div.style.height = size[1] + 'px';
         video_div.style.marginLeft = size[2] + 'px';
         video_div.style.marginTop  = size[3] + 'px';
-        
+       
+        if(global_zoom == 1) {
+            video_div.style.overflowX = 'hidden';
+            video_div.style.overflowY = 'hidden';
+        }
+        else {
+            video_div.style.overflowX = 'scroll';
+            video_div.style.overflowY = 'scroll';
+        }
         video.style.width  = size[0] * global_zoom + 'px';
         video.style.height = size[1] * global_zoom + 'px';
         var dx = size[0] * (global_zoom - 1) / 2;

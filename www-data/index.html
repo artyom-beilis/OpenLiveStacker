@@ -11,7 +11,7 @@
 <div id="solver_result" style="display:none; text-align:center;position:absolute; left:0; top:0; z-index:-1">
     <img alt="Solving result" src="" id="solver_result_image" />
 </div>
-<div id='video' style="position:absolute; left:0; top:0; z-index:-2"></div>
+<div id='video' ></div>
 <div id='thumb' style="display:none; position:absolute; right:0; top:0; z-index:-1;">
     <span id="thumb_video"><span>
 </div>
@@ -35,7 +35,7 @@
     <button class="comp_but" onclick="zoom(-1);">-</button>
     <span id="current_zoom"></span>
 </div>
-<div class="config_div" id="stack" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
+<div class="config_div" id="stack" style="display:none; background:black;">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showStack(false);">X</button>
     </span>
@@ -62,7 +62,7 @@
     <tr class="stack_opt" ><td><button onclick='startStack();'>Start</button></td><td>&nbsp;</td><td>&nbsp;</td></tr>
     </table>
 </div>
-<div class="config_div" id="pp_control" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background-color: transparent; border: 1px solid red ">
+<div class="config_div" id="pp_control" style="display:none; background-color: transparent; ">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showPP(false);">X</button>
     </span>
@@ -96,7 +96,7 @@
       </table>
     </div>
 </div>
-<div class="config_div" id="config" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background:black; border: 1px solid red ">
+<div class="config_div" id="config" style="display:none; background:black;">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showConfig(false);">X</button>
     </span>
@@ -139,7 +139,7 @@
     </p>
     </div>
 </div>
-<div class="config_div" id="plate_solve_div" style="display:none; position:absolute; left:5%; top:5%; z-index:2 ; padding: 1% 1% 1% 1%; width: 88%; background-color:transparent; border: 1px solid red ">
+<div class="config_div" id="plate_solve_div" style="display:none; background-color:transparent;">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showSolve(false);">X</button>
     </span>
