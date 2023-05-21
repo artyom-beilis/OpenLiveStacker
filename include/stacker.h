@@ -349,6 +349,7 @@ namespace ols {
             stretch.gamma = gamma_correction;
             stretch.gain = gscale;
             stretch.cut = - goffset * gscale;
+            stretch.auto_stretch = enable_stretch_;
             return std::make_pair(tmp,stretch);
         }
         

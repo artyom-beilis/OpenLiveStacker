@@ -153,8 +153,20 @@ function saveInputValue(id)
     if(!val)
         return;
     var st = getStoageValue();
-    st[id] = val.value;
-    setStorageValue(st);
+    var value = null;
+    if(val.tagName == 'INPUT') {
+        if(val.type=='checkbox')
+            value = val.checked;
+        else
+            value = val.value;
+    }
+    else if(val.tagName == 'SELECT') {
+        value = val.value;
+    }
+    if(value != null) {
+        st[id] = value;
+        setStorageValue(st);
+    }
 }
 
 function updateSavedInputs()
@@ -166,8 +178,17 @@ function updateSavedInputs()
         console.log("Loading " + id);
         var val = loadSavedInputValue(id);
         if(val!=null) {
-            el.value = val;
+            if(el.tagName == 'INPUT') {
+                if(el.type == 'checkbox')
+                    el.checked = val;
+                else
+                    el.value = val;
+            }
+            else if (el.tagName == 'SELECT') {
+                el.value = val;
+            }
             el.dispatchEvent(new Event("input"));
+            el.dispatchEvent(new Event("change"));
         }
         el.addEventListener('input',(e)=> { saveInputValue(e.currentTarget.id); });
     }
@@ -548,7 +569,7 @@ function calcImgSize()
 function updateCalibFramesById(data,elemid)
 {
     var sel = document.getElementById(elemid);
-    var selected = sel.value;
+    var selected = loadSavedInputValue(elemid);
     for(var i=sel.length-1;i>=0;i--) {
         sel.options.remove(i);
     }
@@ -571,7 +592,13 @@ function updateCalibFramesById(data,elemid)
         if(fid == selected)
             found=true;
     }
-    sel.value = selected;
+    if(found)
+        sel.value = selected;
+}
+
+function saveCalibValue(el)
+{
+    saveInputValue(el.id);
 }
 
 
@@ -718,6 +745,9 @@ function showStack(v)
 function showPP(v)
 {
 	document.getElementById('pp_control').style.display = v ? 'inline' : 'none';
+    if(v) {
+        restCall('get','/data/stretch.json',null,getAutoStretchState,setDefaultAutoStretchState);
+    }
 }
 
 function showConfig(v)
@@ -776,6 +806,22 @@ function updatePPSliders(data)
     g_prev_low = data.cut;
     g_prev_high = data.gain;
     updatePP();
+}
+
+function setDefaultAutoStretchState()
+{
+    document.getElementById('stack_auto_stretch').checked=true;
+    setDefaultPPSliders();
+}
+
+function getAutoStretchState(e)
+{
+    var as = 'auto_stretch' in e ? e.auto_stretch : true;
+    document.getElementById('stack_auto_stretch').checked=as;
+    document.getElementById('dynamic_parameters').style.display= as ? 'none' : 'inline';
+    if(!as) {
+        updatePPSliders(e);
+    }
 }
 
 function setDefaultPPSliders(e=null)
