@@ -374,6 +374,7 @@ namespace ols {
             s["gain"]   = stretch.gain;
             s["cut"]    = stretch.cut;
             s["gamma" ] = stretch.gamma;
+            s["auto_stretch"] = stretch.auto_stretch;
             std::string fname = data_dir_ + "/stretch.json";
             std::ofstream f(fname);
             if(!f) {

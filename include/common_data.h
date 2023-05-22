@@ -4,5 +4,6 @@ namespace ols {
         double cut = 0;
         double gain = 1.0;
         double gamma = 2.2;
+        bool auto_stretch = true;
     };
 }
