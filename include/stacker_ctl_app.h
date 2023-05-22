@@ -138,7 +138,7 @@ namespace ols {
         StackerStatsNotification(cppcms::service &srv):
             cppcms::application(srv)
         {
-            stream_ = sse::state_stream::create(srv.get_io_service());
+            stream_ = sse::bounded_event_queue::create(srv.get_io_service(),16);
         }
         void main(std::string /*url*/)
         {
@@ -148,31 +148,40 @@ namespace ols {
         {
             booster::intrusive_ptr<StackerStatsNotification> self = this;
             return [=](data_pointer_type p) {
-                std::shared_ptr<StatsData> data = std::dynamic_pointer_cast<StatsData>(p);
-                if(data) {
-                    self->stats_handler(data);
-                }
+                self->stats_handler(p);
             };
         }
         // thread safe method
-        void stats_handler(std::shared_ptr<StatsData> stats)
+        void stats_handler(data_pointer_type stats)
         {
             service().post([=](){
                 update_stats(stats);
             });
         }
-        void update_stats(std::shared_ptr<StatsData> data)
+        void update_stats(data_pointer_type p)
         {
-            cppcms::json::value stats;
-            stats["stacked"] = data->stacked;
-            stats["missed"] = data->missed;
-            stats["dropped"] = data->dropped;
+            std::shared_ptr<StatsData> data = std::dynamic_pointer_cast<StatsData>(p);
+            std::shared_ptr<ErrorNotificationData> error = std::dynamic_pointer_cast<ErrorNotificationData>(p);
             std::ostringstream ss;
-            ss << stats;
-            stream_->update(ss.str());
+            cppcms::json::value info;
+            if(data) {
+                info["type"] = "stats";
+                info["stacked"] = data->stacked;
+                info["missed"] = data->missed;
+                info["dropped"] = data->dropped;
+            }
+            else if(error) {
+                info["type"] = "error";
+                info["message"] = error->message;
+                info["source"] = error->source;
+            }
+            else 
+                return;
+            ss << info;
+            stream_->enqueue(ss.str());
         }
     private:
-        std::shared_ptr<sse::state_stream> stream_;
+        std::shared_ptr<sse::bounded_event_queue> stream_;
     };
 };
 

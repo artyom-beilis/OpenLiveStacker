@@ -49,6 +49,10 @@
         background: url(/media/img/cancel.png) no-repeat center center;
         background-size: 10mm 10mm;
     }
+    .error_background {
+        background: url(/media/img/error.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
     .settings_background {
         background: url(/media/img/settings.png) no-repeat center center;
         background-size: 10mm 10mm;

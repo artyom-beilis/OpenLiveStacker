@@ -10,6 +10,7 @@ var g_show_thumb_live = false;
 var g_stats = null;
 var g_solving = false;
 var g_solving_ui_open = false;
+var g_error_messages = {};
 
 
 function zoom(offset)
@@ -344,8 +345,11 @@ function changeStackerStatus(new_status)
     }
     else {
         if(g_stats) {
-            g_stats.close();
-            g_stats = null;
+            // make sure errors received on save
+            setTimeout(()=>{
+                g_stats.close();
+                g_stats = null;
+            },500);
         }
     }
     g_stacker_status = new_status;
@@ -353,7 +357,26 @@ function changeStackerStatus(new_status)
 
 function updateStackerStats(e) {
     var stats = JSON.parse(e);
-    document.getElementById('stats_info').innerHTML = stats.stacked + '/' + stats.missed + '/' + stats.dropped;
+    if(stats.type == 'stats') { 
+        document.getElementById('stats_info').innerHTML = stats.stacked + '/' + stats.missed + '/' + stats.dropped;
+    }
+    else if(stats.type == 'error') {
+        document.getElementById('error_notification').style.display='inline';
+        g_error_messages[stats.source] = stats.message;
+    }
+}
+
+function showErrorNotification()
+{
+    var msg = '';
+    for(key in g_error_messages) {
+        if(msg!='')
+            msg += '<br>';
+        msg += key + ": " + g_error_messages[key];
+    }
+    g_error_messages = {};
+    document.getElementById('error_notification').style.display='none';
+    showError(msg);
 }
 
 function loadFormats()

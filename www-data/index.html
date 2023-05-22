@@ -16,7 +16,7 @@
     <span id="thumb_video"><span>
 </div>
 <div id='stacking_ui_stats' style="position:absolute; right:0; bottom:0; display:none;">
-    <span id="stats_info"></span>
+    </span><span id="stats_info"></span>
 </div>
 <p id="open_camera"   style="display:inline" >Camera: <select id="camera_select"></select><button onclick="openCamera()">Open</button></p>
 <p id='std_controls' style="display:none;" >
@@ -28,8 +28,8 @@
     <button style="display:none" id="stacking_ui_save" class="comp_but save_background" onclick="ctlStack('save');" >&nbsp;</button>
     <button style="display:none" id="stacking_ui_cancel" class="comp_but cancel_background" onclick="ctlStack('cancel');" >&nbsp;</button>
     <button style="display:none" id="stacking_ui_pp" class="comp_but stretch_background" onclick="showPP(true);" >&nbsp;</button>
+    <button style="display:none" id="error_notification" class="comp_but error_background" onclick='showErrorNotification();'>&nbsp;</button></p>
     <button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
-</p>
 <div id='zoom_controls' style="display:none; position: absolute; bottom: 1mm; left: 1mm">
     <button class="comp_but" onclick="zoom(+1);">+</button>
     <button class="comp_but" onclick="zoom(-1);">-</button>

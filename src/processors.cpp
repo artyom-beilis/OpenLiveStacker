@@ -16,11 +16,26 @@
 #include "simd_utils.h"
 
 namespace ols {
+    void send_message(queue_pointer_type q,std::string const &id,std::string const &err)
+    {
+        if(q) {
+            std::shared_ptr<ErrorNotificationData> p(new ErrorNotificationData());
+            p->source = id;
+            p->message = err;
+            q->push(p);
+        }
+    }
+
+    void send_message(queue_pointer_type q,std::string const &id,std::exception const &e)
+    {
+        send_message(q,id,e.what());
+    }
+
     class PreProcessor {
     public:
         constexpr static int gamma_table_size = 128;
-        PreProcessor(queue_pointer_type in,queue_pointer_type out) :
-            in_(in),out_(out)
+        PreProcessor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type err) :
+            in_(in),out_(out),err_(err)
         {
         }
         void run()
@@ -233,7 +248,10 @@ namespace ols {
                 double minV,maxV;
                 cv::minMaxLoc(gray_flats,&minV,&maxV);
                 if(minV <= 0 || maxV / minV > 100) {
-                    BOOSTER_ERROR("stacker") << " Flats have too grate min/max range, suspecting collection issue - disableing flats minValue=" << minV << " maxValue="<<maxV;
+                    std::ostringstream ss;
+                    ss << "Flats have too grate min/max range, suspecting collection issue - disableing flats minValue=" << minV << " maxValue="<<maxV;
+                    BOOSTER_ERROR("stacker") << ss.str();
+                    send_message(err_,"flats",ss.str());
                     return;
                 }
                 gray_flats = maxV/gray_flats;
@@ -245,7 +263,10 @@ namespace ols {
                 apply_flats_=true;
             }
             catch(std::exception const &e) {
-                BOOSTER_ERROR("stacker") << "Failed to load flats from " << flats_path << " and dark flats from " << dark_flats_path << ": " << e.what();
+                std::ostringstream ss;
+                ss <<  "Failed to load flats from " << flats_path << " and dark flats from " << dark_flats_path << ": " << e.what();
+                BOOSTER_ERROR("stacker") << ss.str();
+                send_message(err_,"flats",ss.str());
                 apply_flats_ = false;
             }
         }
@@ -266,12 +287,15 @@ namespace ols {
                 }
             }
             catch(std::exception const &e) {
-                BOOSTER_ERROR("stacker") << "Failed to load darks from " << darks_path << ": " << e.what();
+                std::ostringstream ss;
+                ss << "Failed to load darks from " << darks_path << ": " << e.what();
+                send_message(err_,"darks",ss.str());
+                BOOSTER_ERROR("stacker") << ss.str();
                 apply_darks_ = false;
             }
         }
 
-        queue_pointer_type in_,out_;
+        queue_pointer_type in_,out_,err_;
         int width_,height_;
         bool mono_;
         int channels_;
@@ -289,9 +313,9 @@ namespace ols {
         bool apply_flats_;
     };
 
-    std::thread start_preprocessor(queue_pointer_type in,queue_pointer_type out)
+    std::thread start_preprocessor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type err)
     {
-        std::shared_ptr<PreProcessor> p(new PreProcessor(in,out));
+        std::shared_ptr<PreProcessor> p(new PreProcessor(in,out,err));
         return std::thread([=]() { p->run(); });
     }
     
@@ -331,7 +355,13 @@ namespace ols {
                 }
                 auto config_ptr = std::dynamic_pointer_cast<StackerControl>(data_ptr);
                 if(config_ptr) {
-                    handle_config(config_ptr);
+                    try {
+                        handle_config(config_ptr);
+                    }
+                    catch(std::exception const &e) {
+                        send_message(stats_,"Config",e);
+                        BOOSTER_ERROR("stacker") << "Config change error:" <<e.what();
+                    }
                 }
                 if(out_)
                     out_->push(data_ptr);
@@ -481,6 +511,7 @@ namespace ols {
                     stats_->push(stats);
             }
             catch(std::exception const &e) {
+                send_message(stats_,"Stacking",e);
                 BOOSTER_ERROR("stacker") << "Stacking Failed:" << e.what();
             }
             return std::make_pair(res,ps);
@@ -508,6 +539,7 @@ namespace ols {
             bool found=false;
             if(!db.load(indx,true)) {
                 BOOSTER_ERROR("stacker") << "Error parsing " << db_path << " darks DB file " << std::endl;
+                send_message(stats_,"save calibration","Error parsing calibrarion index file:" + db_path);
                 db = cppcms::json::value();
                 db[0] = setup;
                 found = true;
@@ -614,8 +646,9 @@ namespace ols {
 
     class DebugSaver {
     public:
-        DebugSaver(queue_pointer_type in,std::string output_dir) :
+        DebugSaver(queue_pointer_type in,queue_pointer_type err,std::string output_dir) :
             in_(in),
+            err_(err),
             out_(output_dir),
             counter_(0),
             save_(false)
@@ -631,12 +664,23 @@ namespace ols {
                 }
                 auto video_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
                 if(save_ && video_ptr) {
-                    handle_video(video_ptr);
+                    try {
+                        handle_video(video_ptr);
+                    }
+                    catch(std::exception const &e) {
+                        send_message(err_,"debug save",e);
+                    }
                     continue;
                 }
                 auto config_ptr = std::dynamic_pointer_cast<StackerControl>(data_ptr);
                 if(config_ptr) {
-                    handle_config(config_ptr);
+                    try {
+                        handle_config(config_ptr);
+                    }
+                    catch(std::exception const &e) {
+                        send_message(err_,"debug config",e);
+                    }
+
                 }
             }
         }
@@ -654,6 +698,7 @@ namespace ols {
                 f.write((char*)video->source_frame->data(),video->source_frame->size());
                 if(!f) {
                     BOOSTER_ERROR("stacker") << "Failed to save jpeg to " << base_name << ".jpeg ";
+                    send_message(err_,"save jpeg","Failed to save jpeg to "  + base_name + ".jpeg");
                 }
                 f.close();
             }
@@ -662,6 +707,7 @@ namespace ols {
                     save_tiff(video->raw,base_name + ".tiff");
                 }
                 catch(std::exception const &e){
+                    send_message(err_,"save tiff",e.what());
                     BOOSTER_ERROR("stacker") << "Failed to save tiff to " << base_name << ".tiff: " << e.what();
                 }
             }
@@ -678,6 +724,7 @@ namespace ols {
                     std::ofstream info(dirname_ + "/info.json");
                     if(!info) {
                         BOOSTER_ERROR("stacker") << "Failed to update JSON info from "<< dirname_ << "/info.json";
+                        send_message(err_,"update info","Failed to update JSON info from " + dirname_ + "/info.json");
                     }
                     else {
                         v.save(info,cppcms::json::readable);
@@ -685,6 +732,7 @@ namespace ols {
                 }
                 else {
                     BOOSTER_ERROR("stacker") << "Failed to read JSON info from "<< dirname_ << "/info.json";
+                    send_message(err_,"read info","Failed to read info from " + dirname_ + "/info.json");
                 }
             }
         }
@@ -757,16 +805,16 @@ namespace ols {
         }
     private:
 
-        queue_pointer_type in_;
+        queue_pointer_type in_,err_;
         std::string out_;
         std::string dirname_;
         int counter_;
         bool save_;
     };
 
-    std::thread start_debug_saver(queue_pointer_type in,std::string debug_dir)
+    std::thread start_debug_saver(queue_pointer_type in,queue_pointer_type err,std::string debug_dir)
     {
-        std::shared_ptr<DebugSaver> p(new DebugSaver(in,debug_dir));
+        std::shared_ptr<DebugSaver> p(new DebugSaver(in,err,debug_dir));
         return std::thread([=]() { p->run(); });
     }
 
