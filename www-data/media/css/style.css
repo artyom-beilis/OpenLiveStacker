@@ -95,6 +95,7 @@
         border: 1px solid red;
         margin: 1mm 1mm 1mm 1mm;
         padding: 1mm 1mm 1mm 1mm;
+        background: black;
     }
     .alert_div {
             display:none;

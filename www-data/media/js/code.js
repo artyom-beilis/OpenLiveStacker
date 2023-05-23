@@ -11,6 +11,7 @@ var g_stats = null;
 var g_solving = false;
 var g_solving_ui_open = false;
 var g_error_messages = {};
+var g_profile_cam_opts = null;
 
 
 function zoom(offset)
@@ -1324,7 +1325,7 @@ function setDownloadURL(db_id)
 
 function selectConfig(cfg)
 {
-    var cfgs = ['astap','camera'];
+    var cfgs = ['astap','camera','profiles'];
     for(var i=0;i<cfgs.length;i++) {
         var obj = document.getElementById('config_tab_' + cfgs[i]);
         if(cfgs[i] == cfg) {
@@ -1337,8 +1338,173 @@ function selectConfig(cfg)
     if(cfg=='astap') {
         selectAstapConfig();
     }
+    else if(cfg=='profiles') {
+        selectProfile();
+    }
 }
 
+function getProfiles()
+{
+    var storage = window.localStorage;
+    var data = storage.getItem('ols_profiles');
+    if(!data)
+        data = [];
+    else
+        data = JSON.parse(data);
+    return data;
+}
+
+function saveProfiles(data)
+{
+    var storage = window.localStorage;
+    storage.setItem('ols_profiles',JSON.stringify(data));
+}
+
+function selectProfile()
+{
+    document.getElementById('profile_selection').style.display='block';
+    document.getElementById('profile_prepare').style.display='none';
+    var data = getProfiles();
+    var sel = document.getElementById('profile_select');
+    for(var i=sel.length-1;i>=0;i--) {
+        sel.options.remove(i);
+    }
+    for(var i=-1;i<data.length;i++) {
+        var option = document.createElement("option");
+        if(i==-1) {
+            option.text = '--- select ---';
+            option.value = '-1';
+            option.selected = true;
+        }
+        else {
+            option.text = data[i].name;
+            option.value = '' + i;
+        }
+        sel.add(option);
+    }
+}
+
+function profileDeleteSelected()
+{
+    var data = getProfiles();
+    var sel = document.getElementById('profile_select');
+    try {
+        var id = parseInt(sel.value);
+        if(id < 0 || id>=data.length)
+            return;
+        data.splice(id,1);
+        saveProfiles(data);
+        selectProfile();
+    }
+    catch(e) { showError(e); }
+}
+
+function profileApply()
+{
+    var data = getProfiles();
+    var sel = document.getElementById('profile_select');
+    try {
+        var id = parseInt(sel.value);
+        if(id < 0 || id >= data.length)
+            return;
+        var opts = data[id].camera_options;
+        var darks = data[id].darks;
+        if(darks!=null) {
+            var dselect = document.getElementById('stack_darks');
+            dselect.value = darks;
+            saveCalibValue(dselect);
+        }
+        restCall('post','/api/camera/options',opts,
+            (e)=>{ loadControls(); },
+            (e)=>{ 
+                showError(e);
+                loadControls(); 
+            }
+        );
+    }
+    catch(e) {
+        console.log(e);
+        showError("Select Profile");
+    }
+}
+
+function deleteProfOpt(id)
+{
+    for(var i=0;i<g_profile_cam_opts.length;i++) {
+        if(g_profile_cam_opts[i].id == id) {
+            g_profile_cam_opts.splice(i,1);
+            break;
+        }
+    }
+    var el = document.getElementById('prof_opt_' + id);
+    if(el)
+        el.parentNode.removeChild(el);
+}
+
+function newProfileOptions(ctls)
+{
+    g_profile_cam_opts = [];
+    var res = '';
+    var has_ae = false;
+    var has_awb = false;
+    for(var i=0;i<ctls.length;i++) {
+        var ctl = ctls[i];
+        if(ctl.read_only)
+            continue;
+        if(ctl.option_id == 'auto_wb' && ctl.cur == 1)
+            has_awb = true;
+        if(ctl.option_id == 'auto_exp' && ctl.cur == 1)
+            has_ae = true;
+        if((ctl.option_id == 'exp' || ctl.option_id == 'gain') && has_ae)
+            continue;
+        if((ctl.option_id == 'wb' || ctl.option_id == 'wb_r' || ctl.option_id == 'wb_b') && has_awb)
+            continue;
+        var str = `<li id="prof_opt_${ctl.option_id}">${ctl.name}: ${ctl.cur} <button onclick="deleteProfOpt('${ctl.option_id}');">del</button></li>\n`;
+        res = res + str;
+        g_profile_cam_opts.push({"id":ctl.option_id, "value": ctl.cur});
+    }
+    document.getElementById('profile_items').innerHTML = res;
+}
+
+function profileNew()
+{
+    document.getElementById('profile_selection').style.display='none';
+    document.getElementById('profile_prepare').style.display='block';
+    document.getElementById('new_profile_name').value = '';
+    restCall('get','/data/calibration/index.json',null,(data)=>{
+        updateCalibFramesById(data,'profile_darks');
+    });
+    restCall('get','/api/camera/options',null,newProfileOptions);
+}
+
+function profileSave()
+{
+    var data = getProfiles();
+    var name = document.getElementById('new_profile_name').value.trim();
+    if(name == '') {
+        showError('Profile Name is Empty');
+        return;
+    }
+
+    var prof = {
+        "name" : name,
+        "camera_options" : g_profile_cam_opts,
+        "darks" : document.getElementById('profile_darks').value
+    };
+    if(prof.darks == 'N/A' || prof.darks == '')
+        prof.darks = null;
+    for(var i=0;i<data.length;i++) {
+        if(data[i].name == name) {
+            data[i] = prof;
+            prof = null;
+            break;
+        }
+    }
+    if(prof)
+        data.push(prof);
+    saveProfiles(data);
+    selectProfile();
+}
 
 
 window.onload = (event) => {

@@ -35,7 +35,7 @@
     <button class="comp_but" onclick="zoom(-1);">-</button>
     <span id="current_zoom"></span>
 </div>
-<div class="config_div" id="stack" style="display:none; background:black;">
+<div class="config_div" id="stack" style="display:none; background-color:black;">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showStack(false);">X</button>
     </span>
@@ -94,13 +94,16 @@
         </tr>
         </tbody>
       </table>
-    </div>
-</div>
-<div class="config_div" id="config" style="display:none; background:black;">
+    </div></div>
+<div class="config_div" id="config" style="display:none; background-color:transparent;">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showConfig(false);">X</button>
     </span>
-    <p><button onclick="selectConfig('camera');">Camera</button><button onclick="selectConfig('astap');">ASTAP</button><p>
+    <p>
+        <button onclick="selectConfig('camera');">Camera</button>
+        <button onclick="selectConfig('profiles');">Profiles</button>
+        <button onclick="selectConfig('astap');">ASTAP</button>
+    <p>
     <div id="config_tab_camera" class="config_tab" >
         <p>Format: <select id="stream_format"></select> <span class="nowr">FR Lim.<input id="stream_max_framerate" class="val_input saved_input" type="number" step="1" value="10" /></span> <button onclick="startStream()" >Stream</button></p>
         <p>
@@ -122,21 +125,43 @@
         </tbody>
         </table>
     </div>
+    
+    <div id="config_tab_profiles" class="config_tab" style="display:none" >
+        <div id="profile_selection">
+            <p>
+                <button onclick="profileApply();">Apply</button> <select style="width:40%" id="profile_select" ></select> 
+            </p>
+            <p>
+                <button onclick="profileNew();">New</button>
+                <button onclick="profileDeleteSelected()">Delete</button>
+            </p>
+        </div>
+        <div id="profile_prepare">
+            <p>Name: <input class="val_input" id="new_profile_name" type="text" /></p>
+            <ul id="profile_items"></ul>
+            <p>Darks:<select id="profile_darks" ></select></p>
+            <p>
+                <button onclick="profileSave();">Save</button>
+                <button onclick="selectProfile();">Cancel</button>
+            </p>
+        </div>
+    </div>
+
     <div id="config_tab_astap" class="config_tab" style="display:none">
-    <p>Ready databases: <span id="astap_ready_list">None</span></p>
-    <p>DB:
-        <select id="astap_download_db" onchange="switchASTAPURL();">
-            <option value="d05" >D05, 10&deg;&gt;FOV&gt;0.6&deg;, 98MB </option>
-            <option value="d20" >D20, 10&deg;&gt;FOV&gt;0.3&deg;, 382MB</option>
-            <option value="d50" >D50, 10&deg;&gt;FOV&gt;0.2&deg;, 860MB</option>
-            <option value="g05" >G05, 20&deg;&gt;FOV&gt;3.0&deg;, 97MB </option>
-            <option value="w08" >W08, FOV&gt;20&deg;, 0.3MB </option>
-        </select></p>
-    <p>URL: <input id="astap_download_url" type="text" value="" style="width:50%" /></p>
-    <p>
-        <button id='download_start' onclick='downloadStart()'>Download</button><button id='download_stop' onclick='downloadStop()'>Cancel</button>
-        <span id='download_status'></span>
-    </p>
+        <p>Ready databases: <span id="astap_ready_list">None</span></p>
+        <p>DB:
+            <select id="astap_download_db" onchange="switchASTAPURL();">
+                <option value="d05" >D05, 10&deg;&gt;FOV&gt;0.6&deg;, 98MB </option>
+                <option value="d20" >D20, 10&deg;&gt;FOV&gt;0.3&deg;, 382MB</option>
+                <option value="d50" >D50, 10&deg;&gt;FOV&gt;0.2&deg;, 860MB</option>
+                <option value="g05" >G05, 20&deg;&gt;FOV&gt;3.0&deg;, 97MB </option>
+                <option value="w08" >W08, FOV&gt;20&deg;, 0.3MB </option>
+            </select></p>
+        <p>URL: <input id="astap_download_url" type="text" value="" style="width:50%" /></p>
+        <p>
+            <button id='download_start' onclick='downloadStart()'>Download</button><button id='download_stop' onclick='downloadStop()'>Cancel</button>
+            <span id='download_status'></span>
+        </p>
     </div>
 </div>
 <div class="config_div" id="plate_solve_div" style="display:none; background-color:transparent;">

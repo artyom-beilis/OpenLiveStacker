@@ -23,6 +23,7 @@ namespace ols {
             dispatcher().map("GET","/status/?",&CameraControlApp::status,this);
             dispatcher().map("POST","/stream/?",&CameraControlApp::stream,this);
             dispatcher().map("GET","/options/?",&CameraControlApp::options,this);
+            dispatcher().map("POST","/options/?",&CameraControlApp::set_options,this);
             dispatcher().map("POST","/option/(\\w+)",&CameraControlApp::set_opt,this,1);
             dispatcher().map("GET","/option/(\\w+)",&CameraControlApp::get_opt,this,1);
         }
@@ -68,6 +69,19 @@ namespace ols {
             CamErrorCode e;
             cam_->cam().set_parameter(opt,value,e);
             e.check();
+        }
+        void set_options()
+        {
+            cppcms::json::array const &opts = content_.array();
+            for(cppcms::json::value const &opt: opts) {
+                double value = opt.get<double>("value");
+                std::string opt_id = opt.get<std::string>("id");
+                CamOptionId cam_opt = cam_option_id_from_string_id(opt_id);
+                guard g(cam_->lock());
+                CamErrorCode e;
+                cam_->cam().set_parameter(cam_opt,value,e);
+                e.check();
+            }
         }
         void options()
         {
