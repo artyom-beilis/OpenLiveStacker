@@ -1408,6 +1408,7 @@ function selectProfile()
         }
         sel.add(option);
     }
+    loadCalibFrames();
 }
 
 function profileDeleteSelected()
