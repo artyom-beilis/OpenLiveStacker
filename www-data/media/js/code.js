@@ -12,6 +12,7 @@ var g_solving = false;
 var g_solving_ui_open = false;
 var g_error_messages = {};
 var g_profile_cam_opts = null;
+var g_solver_result = null;
 
 
 function zoom(offset)
@@ -1155,45 +1156,70 @@ function formatTableRow(a)
     return res;
 }
 
-function solveResult(v)
+function updateSolverTable()
 {
-    g_solving = false;
-    if(!g_solving_ui_open)
+    if(g_solver_result == null)
         return;
-    var status, jpeg = null;
+    var v=g_solver_result;
     if(v.solved) {
-        jpeg = v.result_image + '?' + Date.now();
+        g_solver_result = v;
         status = 'Distance to target ' + v.distance_to_target.toFixed(2) + '°';
-        var delta_ra_hms = formatAngle(v.delta_ra,true);
-        var delta_ra_dms = formatAngle(v.delta_ra,false);
-        var delta_ra_deg = v.delta_ra.toFixed(2) + "\u00b0";
-        var delta_de_dms = formatAngle(v.delta_de,false);
-        var delta_de_deg = v.delta_de.toFixed(2) + "\u00b0";
-        var delta_az_dms = 'N/A';
-        var delta_az_deg = 'N/A';
-        var delta_alt_dms = 'N/A';
-        var delta_alt_deg = 'N/A';
-
-        if(v.delta_az) {
-            delta_az_dms = formatAngle(v.delta_az,false);
-            delta_az_deg = v.delta_az.toFixed(2) + "\u00b0";
-            delta_alt_dms = formatAngle(v.delta_alt,false);
-            delta_alt_deg = v.delta_alt.toFixed(2) + "\u00b0";
+        var opt = document.getElementById('solver_units').value;
+        var warn = '';
+        var v0,v1;
+        var u0,u1;
+        if(opt.substring(0,2) == 'az') {
+            u0 = '∆ALT';
+            u1 = '∆AZ';
+            if(v.delta_az) {
+                if(opt=='az_dd_dd') {
+                    v0 = v.delta_alt.toFixed(2) + "\u00b0";
+                    v1 = v.delta_az.toFixed(2) + "\u00b0";
+                }
+                else {
+                    v0 = formatAngle(v.delta_alt,false);
+                    v1 = formatAngle(v.delta_az,false);
+                }
+            }
+            else {
+                warn = 'for ∆Alt/∆AZ provide geolocation in settings';
+                v0='N/A';
+                v1='N/A';
+            }
+        }
+        else {
+            u0 = '∆RA';
+            u1 = '∆DEC'
+            if(opt=='rd_dd_dd') {
+                v0 = v.delta_ra.toFixed(2) + "\u00b0";
+                v1 = v.delta_de.toFixed(2) + "\u00b0";
+            }
+            else {
+                v0 = formatAngle(v.delta_ra,(opt == 'rd_hm_dm'));
+                v1 = formatAngle(v.delta_de,false);
+            }
         }
         status += '<table class="solver_results" style="border:1px solid; table-layout: fixed; width:80%; ">'
-        status += formatTableRow(['unit','∆RA','∆DEC','∆ALT','∆AZ']);
-        status += formatTableRow(["h:m:s d°m'",delta_ra_hms,delta_de_dms,'&nbsp;','&nbsp;'])
-        status += formatTableRow(["d°m'",delta_ra_dms,delta_de_dms,delta_alt_dms,delta_az_dms])
-        status += formatTableRow(["degree",delta_ra_deg,delta_de_deg,delta_alt_deg,delta_az_deg])
+        status += formatTableRow([u0,v0]);
+        status += formatTableRow([u1,v1]);
         status += '</table>'
-        if(!v.delta_az) {
-            status += 'for ∆Alt/∆AZ provide geolocation in settings';
-        }
+        status += warn;
     }
     else {
         status = v.error;
     }
     document.getElementById('solver_status').innerHTML = status;
+}
+
+function solveResult(v)
+{
+    g_solving = false;
+    g_solver_result = null;
+    if(!g_solving_ui_open)
+        return;
+    g_solver_result = v;
+    updateSolverTable();
+    var jpeg = v.solved ? v.result_image + '?' + Date.now() : null;
     if(jpeg) {
         document.getElementById('solver_result_image').src = jpeg;
     }

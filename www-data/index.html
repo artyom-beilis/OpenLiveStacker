@@ -183,6 +183,15 @@
         <p><button onclick="plateSolve();" >Solve</button></p>
     </div>
     <div id="solver_status_div" style="display:none;" >
+        <p>
+            <select id="solver_units" class="saved_input" onchange='updateSolverTable();'>
+                <option value="az_dd_dd" selected>Alt/Az d.d°</option>
+                <option value="az_dm_dm" >Alt/Az d°m'</option>
+                <option value="rd_dd_dd" >RA/DE d.d°</option>
+                <option value="rd_dm_dm" >RA/DE d°m'</option>
+                <option value="rd_hm_dm" >RA/DE h:m:s, d°m'</option>
+            </select>
+        </p>
         <p>Status: <span id="solver_status"></span></p>
         <p><button onclick="solverRestart();" >Restart</button><input id="solver_auto_restart" type="checkbox" onchange="startSolvingIfNeeded();" /> <label for="solver_auto_restart">Continuous resolving every </label><input class="val_input saved_input" type="number" min="1" max="5" step="1" value="1" id="restart_solver_timeout" />s</p>
     </div>
