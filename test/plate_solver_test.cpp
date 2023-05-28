@@ -65,7 +65,7 @@ int main(int argc,char **argv)
             img = ols::load_tiff(img_path);
         else
             img = cv::imread(img_path);
-        auto r=ps.solve_and_mark(img,img.elemSize1() == 1 ? 255 : 65535,
+        auto r=ps.solve_and_mark(img,true,
                                  output_jpeg,
                                  fov,ra,de,radius);
         std::cout << "From " << r.center_col <<"x"<<r.center_row << " -> " << r.target_col << "x" << r.target_row << " total " << r.angle_to_target_deg << " deg" << std::endl;

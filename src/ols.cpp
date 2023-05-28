@@ -15,6 +15,8 @@
 namespace ols {
 
 std::atomic<int> OpenLiveStacker::received_;
+std::atomic<int> CameraControlApp::live_stretch_;
+std::atomic<int> CameraControlApp::defaults_configured_;
 
 OpenLiveStacker::OpenLiveStacker(std::string data_dir)
 {
@@ -156,7 +158,7 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     stats_stream_app_ = new StackerStatsNotification(*web_service_);
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
     web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
-    web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this),cppcms::mount_point("/camera((/.*)?)",1));
+    web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this,video_generator_queue_),cppcms::mount_point("/camera((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(this,data_dir_,video_generator_queue_),
                                             cppcms::mount_point("/stacker((/.*)?)",1),
                                             cppcms::app::asynchronous);
@@ -206,7 +208,7 @@ void OpenLiveStacker::set_plate_solving_image(data_pointer_type p)
     else
         ps_frame = frame->raw;
     
-    PlateSolver::set_image(ps_frame,frame->frame_dr);
+    PlateSolver::set_image(ps_frame,frame->live_is_stretched);
 }
 
 void OpenLiveStacker::run()

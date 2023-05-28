@@ -13,9 +13,10 @@ namespace ols {
     class CameraControlApp : public ControlAppBase {
     public:
         typedef std::unique_lock<std::recursive_mutex> guard;
-        CameraControlApp(cppcms::service &srv,CameraInterface *cam) : 
+        CameraControlApp(cppcms::service &srv,CameraInterface *cam,queue_pointer_type video_gen_queue) : 
             ControlAppBase(srv),
-            cam_(cam)
+            cam_(cam),
+            generator_queue_(video_gen_queue)
         {
             dispatcher().map("GET","/?",&CameraControlApp::list_cameras,this);
             dispatcher().map("POST","/?",&CameraControlApp::start_stop,this);
@@ -26,6 +27,7 @@ namespace ols {
             dispatcher().map("POST","/options/?",&CameraControlApp::set_options,this);
             dispatcher().map("POST","/option/(\\w+)",&CameraControlApp::set_opt,this,1);
             dispatcher().map("GET","/option/(\\w+)",&CameraControlApp::get_opt,this,1);
+            external_set_defaults();
         }
 
         void status()
@@ -55,7 +57,7 @@ namespace ols {
             {
                 guard g(cam_->lock());
                 CamErrorCode e;
-                auto res = cam_->cam().get_parameter(opt,true,e);
+                auto res = is_external_option(opt) ? external_option_get(opt,e) : cam_->cam().get_parameter(opt,true,e);
                 e.check();
                 val = res.cur_val;
             }
@@ -67,7 +69,10 @@ namespace ols {
             CamOptionId opt = cam_option_id_from_string_id(id);
             guard g(cam_->lock());
             CamErrorCode e;
-            cam_->cam().set_parameter(opt,value,e);
+            if(is_external_option(opt))
+                external_option_set(opt,value,e);
+            else
+                cam_->cam().set_parameter(opt,value,e);
             e.check();
         }
         void set_options()
@@ -79,7 +84,62 @@ namespace ols {
                 CamOptionId cam_opt = cam_option_id_from_string_id(opt_id);
                 guard g(cam_->lock());
                 CamErrorCode e;
-                cam_->cam().set_parameter(cam_opt,value,e);
+                if(is_external_option(cam_opt))
+                    external_option_set(cam_opt,value,e);
+                else
+                    cam_->cam().set_parameter(cam_opt,value,e);
+                e.check();
+            }
+        }
+        void external_options(std::vector<CamOptionId> &params)
+        {
+            params.insert(params.begin(),opt_live_stretch);
+        }
+        CamParam external_option_get(CamOptionId opt,CamErrorCode &e)
+        {
+            CamParam r;
+            switch(opt) {
+            case opt_live_stretch:
+                r.option = opt;
+                r.type = type_bool;
+                r.step_size = 1;
+                r.min_val = 0;
+                r.max_val = 1;
+                r.step_size = 1;
+                r.def_val = 0;
+                r.cur_val = live_stretch_;
+                break;
+            default:
+               e=CamErrorCode("Internal error - non-extra option"); 
+            }
+            return r;
+        }
+        void external_option_set(CamOptionId opt,double value,CamErrorCode &e)
+        {
+            switch(opt) {
+            case opt_live_stretch:
+                if(value !=0 && value!=1) {
+                    e=CamErrorCode("Invalid option value"); 
+                    return;
+                }
+                live_stretch_ = int(value);
+                break;
+            default:
+               e=CamErrorCode("Internal error - non-extra option"); 
+               return;
+            }
+            generator_queue_->push(data_pointer_type(new LiveControl(opt,value)));
+        }
+        void external_set_defaults()
+        {
+            if(defaults_configured_++ != 0)
+                return;
+            CamOptionId opts[] = { opt_live_stretch };
+            CamErrorCode e;
+            for(CamOptionId opt : opts) {
+                auto res = external_option_get(opt,e);
+                e.check();
+                external_option_set(opt,res.def_val,e);
                 e.check();
             }
         }
@@ -91,9 +151,10 @@ namespace ols {
                 auto &cam = cam_->cam();
                 CamErrorCode e;
                 auto opts = cam.supported_options(e);
+                external_options(opts);
                 e.check();
                 for(auto opt:opts) {
-                    CamParam param = cam.get_parameter(opt,e);
+                    CamParam param = is_external_option(opt) ? external_option_get(opt,e) : cam.get_parameter(opt,e);
                     e.check();
                     params.push_back(param);
                 }
@@ -187,6 +248,9 @@ namespace ols {
             }
         }
         CameraInterface *cam_;
+        queue_pointer_type generator_queue_;
         std::map<std::string,CamStreamFormat> formats_;
+        static std::atomic<int> live_stretch_;
+        static std::atomic<int> defaults_configured_;
     };
 }

@@ -1,5 +1,7 @@
 #include "video_generator.h"
+#include "live_stretch.h"
 #include <booster/log.h>
+#include <booster/posix_time.h>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <iostream>
@@ -24,11 +26,21 @@ namespace ols {
             std::vector<unsigned char> buf;
 
             cv::Mat normalized;
-            double factor = 255.0 / frame->frame_dr;
-            if(frame->frame_dr == 255 && image.elemSize1() == 1) {
+            frame->live_is_stretched = false;
+            if(live_auto_stretch_) {
+                auto now = booster::ptime::now();
+                if(cached_factor_ < 1.0 || booster::ptime::to_number(now - cached_factor_updated_) > 0) {
+                    cached_factor_ = -1.0;
+                    cached_factor_updated_ = now;
+                }
+                live_stretch(image,cached_factor_,normalized);
+                frame->live_is_stretched = true;
+            }
+            else if(frame->frame_dr == 255 && image.elemSize1() == 1) {
                 normalized = image;
             }
             else {
+                double factor = 255.0 / frame->frame_dr;
                 image.convertTo(normalized,image.channels() == 3 ? CV_8UC3: CV_8UC1,factor);
             }
 
@@ -78,13 +90,17 @@ namespace ols {
                 {
                     frame->jpeg_frame = frame->source_frame;
                     // decode jpeg if needed
-                    if(stacking_active_ || plate_solving_out_) {
+                    if(stacking_active_ || plate_solving_out_ || live_auto_stretch_) {
                         size_t len = frame->jpeg_frame->size();
                         cv::Mat buffer(1,len,CV_8UC1,frame->jpeg_frame->data());
                         try {
                             frame->frame = cv::imdecode(buffer,cv::IMREAD_UNCHANGED);
                             frame->frame_dr = 255;
                             frame->raw = frame->frame;
+                            if(live_auto_stretch_) {
+                                // can forward jpeg as is since it need to be stretched
+                                handle_jpeg_stack(frame,frame->frame,true);
+                            }
                         }
                         catch(std::exception const &e) {
                             BOOSTER_ERROR("stacker") << "Failed to extract jpeg";
@@ -212,8 +228,23 @@ namespace ols {
                     debug_out_->push(data_ptr);
                     continue;
                 }
+                auto live_ptr = std::dynamic_pointer_cast<LiveControl>(data_ptr);
+                if(live_ptr){
+                    handle_live_ctl(live_ptr);
+                }
                 
                 BOOSTER_ERROR("stacker") << "Invalid data for video generator";
+            }
+        }
+        void handle_live_ctl(std::shared_ptr<LiveControl> ctl)
+        {
+            switch(ctl->opt) {
+            case opt_live_stretch:
+                live_auto_stretch_ = int(ctl->value);
+                cached_factor_ = -1.0;
+                break;
+            default:
+                BOOSTER_ERROR("OLS") << "Internal error invaid live option";
             }
         }
     private:
@@ -221,6 +252,9 @@ namespace ols {
         bool stacking_active_ = false;
         bool stacking_in_process_ = false;
         bool debug_active_ = false;
+        bool live_auto_stretch_ = true;
+        float cached_factor_ = -1;
+        booster::ptime cached_factor_updated_;
     };
 
     std::thread start_generator(queue_pointer_type input,

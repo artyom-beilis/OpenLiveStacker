@@ -1,6 +1,7 @@
 #include "plate_solver.h"
 #include "tiffmat.h"
 #include "util.h"
+#include "live_stretch.h"
 
 #include <cmath>
 #include <fstream>
@@ -149,7 +150,7 @@ namespace ols {
     }
 
     PlateSolver::Result PlateSolver::solve_and_mark(
-            cv::Mat &img,int dr,
+            cv::Mat &img,bool do_stretch,
             std::string const &jpeg_with_marks,
             double fov_deg,
             double target_ra_deg,
@@ -165,8 +166,13 @@ namespace ols {
             img = tmp;
         }
         cv::Mat img8bit;
-        double factor = 255.0 / dr;
-        img.convertTo(img8bit,CV_8UC3,factor);
+        if(do_stretch) {
+            live_stretch(img,img8bit);
+        }
+        else {
+            double factor = img.elemSize1() == 1 ? 1.0 :  (255.0 / 65535.0);
+            img.convertTo(img8bit,CV_8UC3,factor);
+        }
         cv::arrowedLine(img8bit,
                         cv::Point(r.center_col,r.center_row),
                         cv::Point(r.target_col,r.target_row),
@@ -274,12 +280,12 @@ namespace ols {
         return instance_->db_;
     }
     
-    void PlateSolver::set_image(cv::Mat img,int dynamic_range)
+    void PlateSolver::set_image(cv::Mat img,bool do_stretch)
     {
         cv::Mat img_copy = img.clone();
         std::unique_lock<std::mutex> g(img_lock_);
         image_.reset(new cv::Mat(img_copy));
-        image_dr_ = dynamic_range;
+        do_stretch_ = do_stretch;
     }
 
     PlateSolver::Result PlateSolver::solve_last_image( std::string const &jpeg_with_marks,
@@ -289,19 +295,19 @@ namespace ols {
                                         double rad)
     {
         cv::Mat img;
-        int dr;
+        bool do_stretch;
         {
             std::unique_lock<std::mutex> g(img_lock_);
             if(!image_)
                 throw std::runtime_error("No image was set");
             img = *image_;
-            dr = image_dr_;
+            do_stretch = do_stretch_;
         }
         {
             std::unique_lock<std::mutex> g(lock_);
             if(!instance_)
                 throw std::runtime_error("plate solver is not ready");
-            return instance_->solve_and_mark(img,dr,jpeg_with_marks,fov,ra,de,rad);
+            return instance_->solve_and_mark(img,do_stretch,jpeg_with_marks,fov,ra,de,rad);
         }
     }
 
@@ -310,7 +316,7 @@ namespace ols {
     std::mutex PlateSolver::img_lock_;
     std::unique_ptr<PlateSolver> PlateSolver::instance_;
     std::unique_ptr<cv::Mat> PlateSolver::image_;
-    int PlateSolver::image_dr_;
+    bool PlateSolver::do_stretch_;
 
 
 }

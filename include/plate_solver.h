@@ -21,7 +21,7 @@ namespace ols {
 
         static std::string db_path();
         static void init(std::string const &db_path,std::string const &path_to_astap_cli,double time_limit_sec = 5.0,std::string const &temp_dir=std::string());
-        static void set_image(cv::Mat img,int dynamic_range);
+        static void set_image(cv::Mat img,bool stretch);
         static Result solve_last_image( std::string const &jpeg_with_marks,
                                         double fov_deg,
                                         double target_ra_deg,
@@ -33,7 +33,7 @@ namespace ols {
 
         void set_tempdir(std::string const &p);
         
-        Result solve_and_mark(  cv::Mat &img,int dynamic_range,
+        Result solve_and_mark(  cv::Mat &img,bool do_stretch,
                                 std::string const &jpeg_with_marks,
                                 double fov_deg,
                                 double target_ra_deg,
@@ -60,7 +60,7 @@ namespace ols {
         static std::mutex img_lock_;
         static std::unique_ptr<PlateSolver> instance_;
         static std::unique_ptr<cv::Mat> image_;
-        static int image_dr_;
+        static bool do_stretch_;
     };
 
 } // namespace ols

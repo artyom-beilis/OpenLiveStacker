@@ -75,10 +75,10 @@ std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)
 }
 
 static char const *option_string_ids[] = {
-    "auto_exp", "auto_wb", "exp", "wb", "wb_r", "wb_b", "gain", "gamma", "brightness","contrast", "temperature", "cooler_target","cooler_on", "fan_on", "cooler_power"
+    "auto_exp", "auto_wb", "exp", "wb", "wb_r", "wb_b", "gain", "gamma", "brightness","contrast", "temperature", "cooler_target","cooler_on", "fan_on", "cooler_power","live_stretch"
 };
 static char const *option_names[] = {
-    "Auto Exp.", "Auto WB", "Exp.", "WB", "WB Red", "WB Blue", "Gain", "Gamma", "Bright.", "Contr.", "Temp.", "Cooler Tgt.", "Cooler", "Fan","Cooler Pwr."
+    "Auto Exp.", "Auto WB", "Exp.", "WB", "WB Red", "WB Blue", "Gain", "Gamma", "Bright.", "Contr.", "Temp.", "Cooler Tgt.", "Cooler", "Fan","Cooler Pwr.","Auto Str."
 };
 
 std::string bayer_type_to_str(CamBayerType bayer)

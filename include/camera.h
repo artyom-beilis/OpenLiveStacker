@@ -63,8 +63,11 @@ namespace ols {
         opt_cooler_on,
         opt_fan_on,
         opt_cooler_power_perc,
+        opt_live_stretch,
         opt_count
     };
+
+    inline bool is_external_option(CamOptionId opt) { return opt >= opt_live_stretch; }
 
     //int str_to_enum(std::string const &name,char const **names,size_t names_size);
     //std::string enum_to_str(int v,char const **names,size_t names_size);

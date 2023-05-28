@@ -43,7 +43,19 @@ namespace ols {
         int frame_dr = 255;
         cv::Mat processed_frame;
         StretchInfo stretch;
+        bool live_is_stretched = false;
         int dropped = 0;
+    };
+
+    struct LiveControl : public QueueData {
+        LiveControl(CamOptionId o=opt_count,double v=0) :
+            opt(o),
+            value(v)
+        {
+        }
+        CamOptionId opt;
+        double value;
+        virtual ~LiveControl() {}
     };
 
     struct StackerControl : public QueueData {
