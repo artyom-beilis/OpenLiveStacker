@@ -741,11 +741,6 @@ function onResize(ev)
     var solved_div = document.getElementById('solver_result_image_div');
     if(solved) {
         setVideoScale(solved,solved_div,size);
-        /*
-        solved.style.width = size[0] + 'px';
-        solved.style.height = size[1] + 'px';
-        solved.style.marginLeft = size[2] + 'px';
-        solved.style.marginTop  = size[3] + 'px';*/
     }
 }
 
@@ -764,6 +759,21 @@ function startStream()
         recalcFOV();
     });
     showConfig(false);
+}
+
+function openConfigTab(name)
+{
+    var tabCtl = {
+        config: showConfig,
+        stack : showStack,
+        pp:     showPP,
+        solve:  showSolve
+    };
+    for(var n in tabCtl) {
+        if(n != name)
+            tabCtl[n](false);
+    }
+    tabCtl[name](true);
 }
 
 function showStack(v)
