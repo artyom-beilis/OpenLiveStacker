@@ -65,7 +65,7 @@
         padding:0;
         margin:0;
     }
-    #live_stream_video_div {
+    #live_stream_video_div, #solver_result_image_div {
         overflow-x:scroll;
         overflow-y:scroll;
         padding:0;
