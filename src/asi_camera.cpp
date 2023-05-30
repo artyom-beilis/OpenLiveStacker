@@ -121,7 +121,18 @@ namespace ols {
                     if(info_.MaxWidth % bin == 0 && info_.MaxHeight % bin == 0) {
                         fmt.width = info_.MaxWidth / bin;
                         fmt.height = info_.MaxHeight / bin;
+                        fmt.bin = bin;
                         res.push_back(fmt);
+                        for(int scale = 2;scale < 8;scale++) {
+                            int newW = (info_.MaxWidth / bin) / scale / 8 * 8;
+                            int newH = (info_.MaxHeight / bin) / scale / 8 * 8; // actually can be /2 * 2 but for symmetry of square frames I keep it this way
+                            if(std::min(newW,newH) < 480)
+                                break;
+                            fmt.width = newW;
+                            fmt.height = newH;
+                            fmt.bin = bin;
+                            res.push_back(fmt);
+                        }
                     }
                 }
             }
@@ -189,21 +200,20 @@ namespace ols {
                 e = "Invalid format";
                 return;
             }
-            int bin_w = info_.MaxWidth / format.width;
-            int bin_h = info_.MaxHeight / format.height;
-            if(bin_w != bin_h || bin_w < 1 || info_.MaxWidth % bin_w != 0 || info_.MaxWidth % bin_h !=0) {
-                e = "Invalid frame dimensions";
+            if(format.width*format.bin > info_.MaxWidth || format.height * format.bin > info_.MaxHeight) {
+                e = "Unsupported binning/size combination";
                 return;
             }
+
             int bin = 0;
             for(auto supported_bin : info_.SupportedBins) {
-                if(supported_bin == bin_w || supported_bin == 0) {
+                if(supported_bin == format.bin || supported_bin == 0) {
                     bin = supported_bin;
                     break;
                 }
             }
             if(bin <=0) {
-                e = "Unsupported image binning " + std::to_string(bin_w);
+                e = "Unsupported image binning " + std::to_string(format.bin);
                 return;
             }
 

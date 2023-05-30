@@ -133,7 +133,8 @@ namespace ols {
     struct CamStreamFormat {
         CamStreamType format;
         int width,height;
-        float framerate; // -1 for unknown
+        int bin = 1;
+        float framerate = 1.0f; // -1 for unknown
     };
 
     std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt);

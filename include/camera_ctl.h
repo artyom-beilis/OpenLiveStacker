@@ -235,9 +235,13 @@ namespace ols {
                 std::string fmt_name = stream_type_to_str(fmt.format);
                 v[i]["width"] = fmt.width;
                 v[i]["height"] = fmt.height;
+                v[i]["bin"] = fmt.bin;
                 v[i]["format"] = fmt_name;
                 v[i]["framerate"] = fmt.framerate;
                 std::string name = fmt_name + ":" + std::to_string(fmt.width) + "x" + std::to_string(fmt.height);
+                if(fmt.bin>1) {
+                    name += ":B" + std::to_string(fmt.bin);
+                }
                 if(fmt.framerate > 0) {
                     std::ostringstream ss;
                     ss << "@" <<  std::fixed << std::setprecision(1) << fmt.framerate;
