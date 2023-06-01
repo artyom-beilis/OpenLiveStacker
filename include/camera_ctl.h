@@ -240,7 +240,7 @@ namespace ols {
                 v[i]["framerate"] = fmt.framerate;
                 std::string name = fmt_name + ":" + std::to_string(fmt.width) + "x" + std::to_string(fmt.height);
                 if(fmt.bin>1) {
-                    name += ":B" + std::to_string(fmt.bin);
+                    name += ":bin" + std::to_string(fmt.bin);
                 }
                 if(fmt.framerate > 0) {
                     std::ostringstream ss;
