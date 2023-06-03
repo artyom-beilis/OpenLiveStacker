@@ -1,7 +1,8 @@
 
 var global_width = 0;
-var global_download_progress = null;
 var global_height = 0;
+var global_bin = 0;
+var global_download_progress = null;
 var global_zoom = 1.0;
 var g_prev_high = -1;
 var g_prev_low = -1;
@@ -287,6 +288,7 @@ function checkOpenStatus(st)
     else if(st.status == 'streaming') {
         global_width = st.width;
         global_height = st.height;
+        global_bin = st.bin;
         loadFormats();
         loadControls();
         showConfig(false);
@@ -754,6 +756,7 @@ function startStream()
         restCall('post','/api/camera/stream',{op:'start',format_id:format_id, max_framerate: max_fr },(r)=>{
         global_width = r.width;
         global_height = r.height;
+        global_bin = r.bin;
         showLiveVideo();
         changeStackerStatus('idle');
         recalcFOV();
@@ -1036,7 +1039,7 @@ function recalcFOV()
         var FL = parseFloat(document.getElementById('solver_focal_length').value);
         if(isNaN(pixel_size) || isNaN(FL))
             return;
-        var fov = global_height * pixel_size * 1e-3 / FL * 180 / 3.14159;
+        var fov = global_height * global_bin * pixel_size * 1e-3 / FL * 180 / 3.14159;
         fov = fov.toFixed(3);
         console.log('Setting FOV ' + fov);
         document.getElementById('solver_fov').value = fov;

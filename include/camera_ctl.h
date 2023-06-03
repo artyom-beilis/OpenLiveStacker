@@ -45,6 +45,7 @@ namespace ols {
                     CamStreamFormat format = cam_->stream_format();
                     response_["width"]=format.width;
                     response_["height"]=format.height;
+                    response_["bin"]=format.bin;
                 }
                 break;
             }
@@ -213,6 +214,7 @@ namespace ols {
                 response_["status"]="ok";
                 response_["width"]=p->second.width;
                 response_["height"]=p->second.height;
+                response_["bin"]=p->second.bin;
             }
             else {
                 throw CamError("Invalid operation " + op);
