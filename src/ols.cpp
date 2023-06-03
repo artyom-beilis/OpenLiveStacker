@@ -231,7 +231,13 @@ void OpenLiveStacker::run()
                                               stacker_stats_queue_,
                                               plate_solving_queue_,
                                               data_dir_));
-    web_service_->run();
+    try {
+        web_service_->run();
+    }
+    catch(...) {
+        stop();
+        throw;
+    }
     stop();
     
 }
