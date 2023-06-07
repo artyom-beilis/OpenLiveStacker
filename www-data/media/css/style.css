@@ -19,6 +19,16 @@
     button:disabled {
         color:#800000;
     }
+
+    input[type=text], input[type=number], select {
+        border: 2px solid red;
+        border-radius:2mm;
+        font-size: 4mm;
+        color:red;
+        background-color:black;
+    }
+
+    
     .solver_results { background-color: transparent; }
     .nowr { white-space: nowrap; }
     .slider { width: 100%; }
