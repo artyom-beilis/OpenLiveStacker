@@ -507,6 +507,8 @@ namespace ols {
                     }
                     stats->stacked = stacker_->stacked_count();
                     stats->missed  = stacker_->total_count() - stats->stacked;
+                    if(stats->stacked>0)
+                        stats->histogramm = std::move(stacker_->get_histogramm());
                 }
                 if(stats_)
                     stats_->push(stats);

@@ -169,6 +169,7 @@ namespace ols {
                 info["stacked"] = data->stacked;
                 info["missed"] = data->missed;
                 info["dropped"] = data->dropped;
+                info["histogramm"] = data->histogramm;
             }
             else if(error) {
                 info["type"] = "error";

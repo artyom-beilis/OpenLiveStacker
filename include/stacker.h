@@ -24,6 +24,9 @@ namespace ols {
         float high_per_=99.99f;
         double gamma_limit_ = 4.0;
         double mean_target_ = 0.25;
+        static constexpr int hist_bins=1024;
+        int counters_[hist_bins];
+        
 
         Stacker(int width,int height,int channels,int roi_x=-1,int roi_y=-1,int roi_size = -1,int exp_multiplier=1) : 
             frames_(0),
@@ -125,6 +128,12 @@ namespace ols {
         int stacked_count()
         {
             return fully_stacked_count_;
+        }
+
+        std::vector<int> get_histogramm()
+        {
+            std::vector<int> res(counters_,counters_+hist_bins);
+            return res;
         }
        
         cv::Mat get_raw_stacked_image()
@@ -308,23 +317,14 @@ namespace ols {
                 scale_rgb_and_clip(tmp,scale[0],scale[1],scale[2]);
                 wb_apply = std::chrono::high_resolution_clock::now();
             }
-            else {
-                float scale = 1.0f;
-                double maxv;
-                cv::minMaxLoc(tmp(fully_stacked_area_),nullptr,&maxv);
-                if(maxv > 0)
-                    scale = 1.0f/maxv;
-                wb_coeff = std::chrono::high_resolution_clock::now();
-                scale_mono_and_clip(tmp,scale);
-                wb_apply = std::chrono::high_resolution_clock::now();
-            }
             double gscale=1.0;
             double goffset = 0.0;
             double mean = 0.5;
             float gamma_correction = 1.0f;
 
+            int N = calc_hist(tmp(fully_stacked_area_));
             if(enable_stretch_) {
-                stretch(tmp(fully_stacked_area_),gscale,goffset,mean);
+                stretch(N,gscale,goffset,mean);
                 gamma_correction = cv::max(1.0,cv::min(gamma_limit_,log(mean)/log(mean_target_)));
                 BOOSTER_INFO("stacker") << "Stretch mean " << mean << "-> gamma=" << gamma_correction;
             }
@@ -401,12 +401,10 @@ namespace ols {
             return added;
         }
     private:
-        void stretch(cv::Mat img,double &scale,double &offset,double &mean)
+        int calc_hist(cv::Mat img)
         {
-            static constexpr int hist_bins = 1<<10;
-            int counters[hist_bins]={};
+            memset(counters_,0,sizeof(counters_));
             int N=img.rows*img.cols;
-            
             if(channels_ == 3) {
                 for(int r=0;r<img.rows;r++) {
                     float *p = (float*)(img.data + img.step[0] * r);
@@ -415,7 +413,7 @@ namespace ols {
                         float G = *p++;
                         float B = *p++;
                         unsigned Y = unsigned((0.3f * R + 0.6f * G + 0.1f * B) * (hist_bins-1));
-                        counters[Y]++;
+                        counters_[Y]++;
                     }
                 }
             }
@@ -424,15 +422,19 @@ namespace ols {
                     float *p = (float*)(img.data + img.step[0] * r);
                     for(int c=0;c<img.cols;c++) {
                         unsigned Y = (hist_bins-1) * *p++;
-                        counters[Y]++;
+                        counters_[Y]++;
                     }
                 }
             }
+            return N;
+        }
+        void stretch(int N,double &scale,double &offset,double &mean)
+        {
 
             int sum=N;
             int hp=-1;
             for(int i=hist_bins-1;i>=0;i--) {
-                sum-=counters[i];
+                sum-=counters_[i];
                 if(sum*100.0f/N <= high_per_) {
                     hp = i;
                     break;
@@ -441,13 +443,13 @@ namespace ols {
             int end = hp / 2;
             int max_diff = 0;
             for(int i=0;i<end-1;i++) {
-                int diff = counters[i+1] - counters[i];
+                int diff = counters_[i+1] - counters_[i];
                 max_diff = std::max(diff,max_diff);
             }
             int lp = 0;
             for(int i=0;i<end-1;i++) {
                 lp = i;
-                int diff = counters[i+1] - counters[i];
+                int diff = counters_[i+1] - counters_[i];
                 if(diff * 10 >= max_diff)
                     break;
             }
@@ -457,15 +459,15 @@ namespace ols {
             mean = 0;
             int total = 0;
             for(int i=0;i<lp;i++) {
-                total += counters[i];
+                total += counters_[i];
             }
             for(int i=lp;i<=hp;i++) {
-                mean += (i - lp) / (hist_bins - 1.0) * counters[i] * scale;
-                total += counters[i];
+                mean += (i - lp) / (hist_bins - 1.0) * counters_[i] * scale;
+                total += counters_[i];
             }
             for(int i=hp+1;i<hist_bins;i++) {
-                mean += counters[i] * scale;
-                total += counters[i];
+                mean += counters_[i] * scale;
+                total += counters_[i];
             }
             mean = mean / total;
             BOOSTER_INFO("stacker") << "Scale " << scale << " offset=" << (-offset) << " relative cut =" << (-offset*scale) ;
@@ -496,8 +498,6 @@ namespace ols {
                     scale[i] = 1.0;
             }
             BOOSTER_INFO("stacker") << "WB " << scale[0]<<"," << scale[1] << "," << scale[2];
-            for(int i=0;i<3;i++)
-                scale[i] /= maxV;
         }
 
 

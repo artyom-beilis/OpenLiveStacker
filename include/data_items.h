@@ -23,6 +23,7 @@ namespace ols {
         int stacked = 0;
         int missed = 0;
         int dropped = 0;
+        std::vector<int> histogramm;
         virtual ~StatsData() {}
     };
 
