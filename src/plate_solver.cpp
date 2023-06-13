@@ -80,16 +80,17 @@ namespace ols {
         double y0 = get(vals,"CRPIX2");
         double ra0 = get(vals,"CRVAL1");
         double de0 = get(vals,"CRVAL2");
-        double cd1 = get(vals,"CDELT1");
-        double cd2 = get(vals,"CDELT2");
-        double angle = get(vals,"CROTA2")/180 * M_PI; 
-        double ca = std::cos(angle);
-        double sa = std::sin(angle);
         double delta_ra = (ra - ra0)*std::cos(de0/180*M_PI);
         double delta_de = de - de0;
+        double c11 = get(vals,"CD1_1");
+        double c12 = get(vals,"CD1_2");
+        double c21 = get(vals,"CD2_1");
+        double c22 = get(vals,"CD2_2");
+
+        double D=1.0/(c11*c22 - c12*c21);
         double Mi[2][2] = {
-            {ca/cd1,-sa/cd2},
-            {sa/cd1,ca/cd2}
+            { c22*D, -c12*D},
+            {-c21*D,  c11*D}
         };
         double xt = Mi[0][0] * delta_ra + Mi[0][1] * delta_de + x0;
         double yt = Mi[1][0] * delta_ra + Mi[1][1] * delta_de + y0;
