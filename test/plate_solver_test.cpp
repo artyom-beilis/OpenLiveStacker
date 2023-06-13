@@ -59,7 +59,7 @@ int main(int argc,char **argv)
     
     
     try {
-        ols::PlateSolver ps(db,astap,5.0);
+        ols::PlateSolver ps(db,astap);
         cv::Mat img;
         if(img_path.find(".tiff")!=std::string::npos)
             img = ols::load_tiff(img_path);
@@ -67,7 +67,7 @@ int main(int argc,char **argv)
             img = cv::imread(img_path);
         auto r=ps.solve_and_mark(img,true,
                                  output_jpeg,
-                                 fov,ra,de,radius);
+                                 fov,ra,de,radius,5.0);
         std::cout << "From " << r.center_col <<"x"<<r.center_row << " -> " << r.target_col << "x" << r.target_row << " total " << r.angle_to_target_deg << " deg" << std::endl;
     }
     catch(std::exception const &e) {

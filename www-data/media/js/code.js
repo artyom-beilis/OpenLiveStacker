@@ -1076,19 +1076,20 @@ function plateSolveWithOpt(background)
 {
     var req;
     try {
-        var ra,de,fov,rad,lat,non;
+        var ra,de,fov,rad,lat,non,timeout;
         ra = parseRA(document.getElementById('solver_ra').value);
         de = parseDEC(document.getElementById('solver_de').value);
         fov = parseFloat(document.getElementById('solver_fov').value);
         rad = parseFloat(document.getElementById('solver_radius').value);
+        timeout = parseFloat(document.getElementById('solver_timeout').value);
         lat = parseFloat(getVal("lat"));
         lon = parseFloat(getVal("lon"));
         if(isNaN(lat))
             lat = null;
         if(isNaN(lon))
             lon = null;
-        if(isNaN(ra) || ra==null || isNaN(de) || de==null || isNaN(fov) || isNaN(rad)) {
-            throw new Error('RA, DE, Radius and FOV are required');
+        if(isNaN(ra) || ra==null || isNaN(de) || de==null || isNaN(fov) || isNaN(rad) || isNaN(timeout)) {
+            throw new Error('RA, DE, Radius, Timeout and FOV are required');
         }
         req = {
             "fov" : fov,
@@ -1096,7 +1097,8 @@ function plateSolveWithOpt(background)
             "de"  : de,
             "rad" : rad,
             "lat" : lat,
-            "lon" : lon
+            "lon" : lon,
+            "timeout" : timeout
         };
         JSON.stringify(req); // check it is OK
     }

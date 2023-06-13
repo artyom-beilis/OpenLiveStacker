@@ -54,7 +54,7 @@ extern "C" {
             std::string astap_exe = driver_dir + std::string("/libastap_cli.so");
             std::string astap_db = data_path + std::string("/db");
             std::string astap_tmp = data_path + std::string("/debug");
-            ols::PlateSolver::init(astap_db,astap_exe,10.0,astap_tmp);
+            ols::PlateSolver::init(astap_db,astap_exe,astap_tmp);
 
             g_stacker.reset(new ols::OpenLiveStacker(data_path));
             g_stacker->http_port = http_port;

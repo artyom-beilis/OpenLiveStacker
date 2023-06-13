@@ -20,16 +20,17 @@ namespace ols {
         };
 
         static std::string db_path();
-        static void init(std::string const &db_path,std::string const &path_to_astap_cli,double time_limit_sec = 5.0,std::string const &temp_dir=std::string());
+        static void init(std::string const &db_path,std::string const &path_to_astap_cli,std::string const &temp_dir=std::string());
         static void set_image(cv::Mat img,bool stretch);
         static Result solve_last_image( std::string const &jpeg_with_marks,
                                         double fov_deg,
                                         double target_ra_deg,
                                         double target_de_deg,
-                                        double search_radius_deg);
+                                        double search_radius_deg,
+                                        double timeout);
 
 
-        PlateSolver(std::string const &db_path,std::string const &path_to_astap_cli,double time_limit_sec = 5.0);
+        PlateSolver(std::string const &db_path,std::string const &path_to_astap_cli);
 
         void set_tempdir(std::string const &p);
         
@@ -38,22 +39,23 @@ namespace ols {
                                 double fov_deg,
                                 double target_ra_deg,
                                 double target_de_deg,
-                                double search_radius_deg);
+                                double search_radius_deg,
+                                double timeout);
             
 
         Result solve(   std::string const &img_path,
                         double fov_deg,
                         double target_ra_deg,
                         double target_de_deg,
-                        double search_radius_deg);
+                        double search_radius_deg,
+                        double timeout);
     private:
         std::string trim(std::string const &s);
         Result make_result(std::string const &path,double ra,double de);
         double get(std::map<std::string,double> const &vals,std::string const &name);
         std::map<std::string,double> parse_ini(std::string const &path,std::string &error);
-        int run(std::vector<std::string> &opts,std::string ini_path);
+        int run(std::vector<std::string> &opts,std::string ini_path,double timeout);
         std::string db_,exe_;
-        double timeout_;
         std::string temp_dir_;
 
         static std::mutex lock_;

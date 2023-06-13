@@ -23,10 +23,9 @@
 #include <booster/log.h>
 
 namespace ols {
-    PlateSolver::PlateSolver(std::string const &db_path,std::string const &astap,double limit) :
+    PlateSolver::PlateSolver(std::string const &db_path,std::string const &astap) :
         db_(db_path),
         exe_(astap),
-        timeout_(limit),
         temp_dir_("/tmp")
     {
         if(exe_.empty())
@@ -36,7 +35,7 @@ namespace ols {
     {
         temp_dir_ = p;
     }
-    PlateSolver::Result PlateSolver::solve(std::string const &img_path,double fov,double ra,double de,double rad)
+    PlateSolver::Result PlateSolver::solve(std::string const &img_path,double fov,double ra,double de,double rad,double timeout)
     {
         std::vector<std::string> cmd = {
             exe_,
@@ -53,7 +52,7 @@ namespace ols {
         }
         std::string res_file = temp_dir_ + "/ols_astap_output.ini";
         std::remove(res_file.c_str());
-        int status = run(cmd,res_file);
+        int status = run(cmd,res_file,timeout);
         switch(status) {
         case 0: break;
         case 1: 
@@ -155,11 +154,12 @@ namespace ols {
             double fov_deg,
             double target_ra_deg,
             double target_de_deg,
-            double search_radius_deg)
+            double search_radius_deg,
+            double timeout)
     {
         std::string tiff = temp_dir_ + "/ols_astap_input.tiff";
         save_tiff(img,tiff);
-        auto r = solve(tiff,fov_deg,target_ra_deg,target_de_deg,search_radius_deg);
+        auto r = solve(tiff,fov_deg,target_ra_deg,target_de_deg,search_radius_deg,timeout);
         if(img.channels() != 3) {
             cv::Mat tmp;
             cv::cvtColor(img,tmp,cv::COLOR_GRAY2BGR);
@@ -183,7 +183,7 @@ namespace ols {
     }
 
 
-    int PlateSolver::run(std::vector<std::string> &opts,std::string ini_path)
+    int PlateSolver::run(std::vector<std::string> &opts,std::string ini_path,double timeout_sec)
     {
         std::vector<char *> args;
         std::ostringstream cmd;
@@ -231,7 +231,7 @@ namespace ols {
             throw std::system_error(errno,std::generic_category(),"Failed to create process"); 
         }
         else {
-            int N = int(timeout_ * 10);
+            int N = int(timeout_sec * 10);
             int status = 0;
             bool wait_done = false;
             bool timeout = false;
@@ -257,7 +257,7 @@ namespace ols {
             if(!wait_done)
                 throw std::runtime_error("Failed to wait for process");
             if(timeout)
-                throw std::runtime_error("Execution took too much time, current limit is " + std::to_string(timeout_) +"s");
+                throw std::runtime_error("Execution took too much time, current limit is " + std::to_string(timeout_sec) +"s");
             if(!WIFEXITED(status))
                 throw std::runtime_error("Execution of the astap process failed");
             return WEXITSTATUS(status);
@@ -265,10 +265,10 @@ namespace ols {
     }
 
 
-    void PlateSolver::init(std::string const &db_path,std::string const &path_to_astap_cli,double time_limit_sec,std::string const &temp_dir)
+    void PlateSolver::init(std::string const &db_path,std::string const &path_to_astap_cli,std::string const &temp_dir)
     {
         std::unique_lock<std::mutex> g(lock_);
-        instance_.reset(new PlateSolver(db_path,path_to_astap_cli,time_limit_sec));
+        instance_.reset(new PlateSolver(db_path,path_to_astap_cli));
         if(!temp_dir.empty())
             instance_->set_tempdir(temp_dir);
     }
@@ -292,7 +292,8 @@ namespace ols {
                                         double fov,
                                         double ra,
                                         double de,
-                                        double rad)
+                                        double rad,
+                                        double timeout)
     {
         cv::Mat img;
         bool do_stretch;
@@ -307,7 +308,7 @@ namespace ols {
             std::unique_lock<std::mutex> g(lock_);
             if(!instance_)
                 throw std::runtime_error("plate solver is not ready");
-            return instance_->solve_and_mark(img,do_stretch,jpeg_with_marks,fov,ra,de,rad);
+            return instance_->solve_and_mark(img,do_stretch,jpeg_with_marks,fov,ra,de,rad,timeout);
         }
     }
 
