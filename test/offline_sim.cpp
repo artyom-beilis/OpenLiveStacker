@@ -7,6 +7,7 @@
 #include <iostream>
 #include <fstream>
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
 
 namespace ols {
@@ -83,6 +84,18 @@ namespace ols {
                     if(ext == "tiff") {
                         img = load_tiff(path);
                         dr = (1ll << (8*img.elemSize1())) - 1;
+                        if(bayer_ != bayer_na) {
+                            cv::Mat rgb;
+                            switch(bayer_) {
+                            case bayer_rg:  cv::cvtColor(img,rgb,cv::COLOR_BayerBG2BGR); break; // COLOR_BayerRGGB2BGR = COLOR_BayerBG2BGR
+                            case bayer_gr:  cv::cvtColor(img,rgb,cv::COLOR_BayerGB2BGR); break; // COLOR_BayerGRBG2BGR = COLOR_BayerGB2BGR
+                            case bayer_bg:  cv::cvtColor(img,rgb,cv::COLOR_BayerRG2BGR); break; // COLOR_BayerBGGR2BGR = COLOR_BayerRG2BGR
+                            case bayer_gb:  cv::cvtColor(img,rgb,cv::COLOR_BayerGR2BGR); break; // COLOR_BayerGBRG2BGR = COLOR_BayerGR2BGR
+                            default:
+                                BOOSTER_ERROR("stacker") << "Invalid bayer patter";
+                            }
+                            img = rgb;
+                        }
                     }
                     else {
                         img = cv::imread(path);
@@ -128,6 +141,7 @@ namespace ols {
             cfg.stretch_high = v.get<double>("stretch_high");
             cfg.stretch_gamma = v.get<double>("stretch_gamma");
             cfg.remove_satellites = v.get("remove_satellites",cfg.remove_satellites);
+            bayer_ = bayer_type_from_str(v.get<std::string>("bayer","NA"));
 
             if(!cfg.calibration)
                 cfg.output_path =  output_dir_ + "/" + cfg.name;
@@ -142,6 +156,7 @@ namespace ols {
         queue_pointer_type input_queue_      = std::shared_ptr<queue_type>(new queue_type(10));
         queue_pointer_type stacker_queue_    = std::shared_ptr<queue_type>(new queue_type(10));
         StackerControl cfg_;
+        CamBayerType bayer_;
     };
 }
 
