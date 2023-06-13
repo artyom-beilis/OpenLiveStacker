@@ -27,7 +27,6 @@ find_library(LIBZ z)
 
 set(WITH_SSE OFF)
 set(OLS_EXTRA )
-add_definitions(-DUSE_CV_SIMD)
 
 
 if(LIBCURL_HDR AND LIBCURL)
@@ -52,6 +51,9 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
         if(${ANDROID_ABI} STREQUAL "x86")
             set(NO_SSE4 ON)
         endif()
+        add_definitions(-DUSE_CV_SIMD)
+    elseif(${ANDROID_ABI} STREQUAL "arm64-v8a") # No simd for armeabi-v7a
+        add_definitions(-DUSE_CV_SIMD)
     endif()
 else()
     message("CPU: ${CMAKE_SYSTEM_PROCESSOR}")
