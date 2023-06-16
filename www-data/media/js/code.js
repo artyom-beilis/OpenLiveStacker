@@ -1015,10 +1015,16 @@ function startStack()
 function updateRADE(name)
 {
     updateRADEFor(name,'stack');
+    updateRADEFor(name,'solver');
+    document.getElementById('solver_object').value = name;
+    saveInputValue('solver_object');
 }
 function updateSolverRADE(name)
 {
     updateRADEFor(name,'solver');
+    updateRADEFor(name,'stack');
+    document.getElementById('stack_object').value = name;
+    saveInputValue('stack_object')
 }
 
 function updateRADEFor(name,target_id)
