@@ -26,12 +26,14 @@
     <button style="display:none" id="stacking_ui_stack" class="comp_but" onclick="openConfigTab('stack');">≡</button>
     <button style="display:none" id="stacking_ui_solve" class="comp_but solve_background" onclick="openConfigTab('solve');">&nbsp;</button>
     <button style="display:none" id="stacking_ui_pause" class="comp_but pause_background" onclick="ctlStack('pause');">&nbsp;</button>
-    <button style="display:none" id="stacking_ui_resume" class="comp_but resume_background" onclick="ctlStack('resume');">&nbsp;</button>
+    <button style="display:none" id="stacking_ui_resume" class="comp_but resume_background" onclick="resumeStack();">&nbsp;</button>
     <button style="display:none" id="stacking_ui_cancel" class="comp_but cancel_background" onclick="ctlStack('cancel');" >&nbsp;</button>
     <button style="display:none" id="stacking_ui_save" class="comp_but save_background" onclick="ctlStack('save');" >&nbsp;</button>
     <button style="display:none" id="stacking_ui_pp" class="comp_but stretch_background" onclick="openConfigTab('pp');" >&nbsp;</button>
-    <button style="display:none" id="error_notification" class="comp_but error_background" onclick='showErrorNotification();'>&nbsp;</button></p>
-    <button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
+    <button style="display:none" id="error_notification" class="comp_but error_background" onclick='showErrorNotification();'>&nbsp;</button>
+</p>
+<button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
+<p id="short_message"></p>
 <div id='zoom_controls' style="display:none; position: absolute; bottom: 1mm; left: 1mm">
     <button class="comp_but" onclick="zoom(+1);">+</button>
     <button class="comp_but" onclick="zoom(-1);">-</button>
@@ -42,6 +44,11 @@
         <button class="incdec_but" onclick="showStack(false);">X</button>
     </span>
     <table>
+    <tr class="stack_opt" >
+        <td><button onclick='startStack();'>Start</button></td>
+        <td>&nbsp;</td>
+        <td>&nbsp;</td>
+    </tr>
     <tr class="dso_config stack_opt" ><td>Object ID</td><td><input class="saved_input val_input" oninput="updateRADE(this.value)" id="stack_object" type="text" value="" ></td><td>for example: M31, NGC457</td></tr>
     <tr><td><span class="dso_config">Extra </span> Name</td><td><input class="val_input saved_input" id="stack_name" type="text" value="" ></td><td>&nbsp;</td></tr>
     <tr>
@@ -61,7 +68,13 @@
     <tr class="dso_config stack_opt" ><td>Flats</td><td colspan="2"><select id="stack_flats" onchange="saveCalibValue(this);"></select></td></tr>
     <tr class="dso_config stack_opt" ><td>Dark Flats</td><td colspan="2"><select id="stack_dark_flats" onchange="saveCalibValue(this); "></select></td></tr>
     <tr class="stack_opt" ><td>Save All Frames</td><td><input class="saved_input" id="stack_save_data" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr class="stack_opt" ><td><button onclick='startStack();'>Start</button></td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr class="stack_opt" >
+        <td>Delay (s)</td>
+        <td>
+            <input class="saved_input val_input" id="start_delay" value="0" min="0" max="10" type="number" />
+        </td>
+        <td>&nbsp;</td>
+    </tr>
     </table>
 </div>
 <div class="config_div" id="pp_control" style="display:none; background-color: transparent; ">

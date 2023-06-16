@@ -815,8 +815,32 @@ function getPVal(name)
     return document.getElementById('stack_' + name).value * 0.001;
 }
 
+function getStartDelay()
+{
+    var val = parseFloat(document.getElementById('start_delay').value);
+    if(isNaN(val) || val < 0)
+        return 0.0;
+    if(val > 10)
+        return 10;
+    return val;
+}
+
+function resumeStack()
+{
+    var delay = getStartDelay();
+    if(delay == 0) {
+        ctlStack('resume');
+    }
+    else {
+        showNotification('Resuming',delay,true,()=>{ctlStack('resume');});
+    }
+}
+
 function ctlStack(status)
 {
+    if(status == 'save') {
+        showNotification('Saving',1,false);
+    }
     restCall('post','/api/stacker/control',{operation:status},(s)=> {
         if(status == 'cancel') {
             changeStackerStatus('idle');
@@ -1006,10 +1030,21 @@ function startStack()
         flats : flats,
         dark_flats : dark_flats
     };
-    restCall('post','/api/stacker/start',config,(e)=>{
-        changeStackerStatus('stacking');
-        showStack(false);
-    });
+
+    var delay = getStartDelay();
+    var doStackFunc = ()=> {
+        restCall('post','/api/stacker/start',config,(e)=>{
+            changeStackerStatus('stacking');
+            showStack(false);
+        });
+    };
+    if(delay == 0) {
+        doStackFunc();
+    }
+    else {
+        document.getElementById('stack').style.display = 'none';
+        showNotification('Stacking',delay,true,doStackFunc);
+    }
 }
 
 function updateRADE(name)
@@ -1519,6 +1554,34 @@ function newProfileOptions(ctls)
         g_profile_cam_opts.push({"id":ctl.option_id, "value": ctl.cur});
     }
     document.getElementById('profile_items').innerHTML = res;
+}
+
+function showNotification(message,time=3.0,countdown=false,func=null)
+{
+    var el = document.getElementById('short_message');
+    if(time <= 0.001) {
+        el.innerHTML = '';
+        if(func!=null) {
+            func();
+        }
+        return;
+    }
+    if(time > 0 && message != null) {
+        var msg = message;
+        if(countdown)
+            msg += ' in ' + time.toFixed(1) + 's';
+        el.innerHTML = msg;
+    }
+    if(countdown) {
+        setTimeout(()=> {
+            showNotification(message,time - 0.2,true,func)
+        },200);
+    }
+    else {
+        setTimeout(() =>  {
+            showNotification(null,0,false,func);
+        },time * 1000);
+    }
 }
 
 function profileNew()
