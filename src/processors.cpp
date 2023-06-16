@@ -434,15 +434,16 @@ namespace ols {
             cv::minMaxLoc(m2,nullptr,&max_v);
             cv::Mat res;
             m2.convertTo(res,channels_ == 3 ? CV_16UC3 : CV_16UC1,65535/max_v);
-            std::cerr << "Channels to 16bit" << channels_ << std::endl;
             return res;
         }
 
         void save_stacked_image_and_send()
         {
-            std::string path = output_path_ + "_stacked.jpeg";
-            std::string ipath = output_path_ + "_stacked.txt";
-            std::string tpath = output_path_ + "_stacked.tiff";
+            version_++;
+            std::string base_name = output_path_ + "_stacked_v" + std::to_string(version_);
+            std::string path = base_name + ".jpeg";
+            std::string ipath = base_name + ".txt";
+            std::string tpath = base_name + ".tiff";
             save_tiff(to16bit(stacker_->get_raw_stacked_image()),tpath);
             auto frames = generate_output_frame(stacker_->get_stacked_image(),false);
             auto frame = frames.first;
@@ -566,6 +567,7 @@ namespace ols {
                 width_ = ctl->width;
                 height_ = ctl->height;
                 mono_ = ctl->mono;
+                version_ = 0;
                 channels_ = mono_ ? 1 : 3;
                 cv_type_ = mono_ ? CV_32FC1 : CV_32FC3;
                 calibration_ = ctl->calibration;
@@ -605,11 +607,9 @@ namespace ols {
             case StackerControl::ctl_save:
                 if(stacker_) {
                     save_stacked_image_and_send();
-                    stacker_.reset();
                 }
                 else if(calibration_) {
                     save_calibration();
-                    calibration_ = false;
                 }
                 break;
             case StackerControl::ctl_update:
@@ -629,6 +629,7 @@ namespace ols {
         std::string data_dir_;
         int width_,height_;
         bool mono_;
+        int version_;
         int channels_,cv_type_;
         bool calibration_=false;
         std::string output_path_,name_;

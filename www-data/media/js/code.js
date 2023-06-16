@@ -818,7 +818,7 @@ function getPVal(name)
 function ctlStack(status)
 {
     restCall('post','/api/stacker/control',{operation:status},(s)=> {
-        if(status == 'save' || status == 'cancel') {
+        if(status == 'cancel') {
             changeStackerStatus('idle');
         }
         else if(status == 'resume') {

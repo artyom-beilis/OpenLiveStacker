@@ -45,7 +45,6 @@ namespace ols {
             }
             else if(op == "save") {
                 cmd->op = StackerControl::ctl_save;
-                status_ = "idle";
             }
             else if(op == "resume") {
                 cmd->op = StackerControl::ctl_resume;
