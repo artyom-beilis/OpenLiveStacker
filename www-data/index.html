@@ -214,7 +214,10 @@
 </div>
 <div class="alert_div" id="error_alert" style=" ">
 <p id="error_message">No error</p>
-<p><button onclick="hideError();">Ok</button></p>
+<p>
+    <button onclick="confirmError();" id="confirm_message_button" >Ok</button>
+    <button onclick="hideError();" id="confirm_cancel_button" >Cancel</button>
+</p>
 </div>
 <script src="/media/js/jsdb.js"></script>
 <script src="/media/js/code.js"></script>

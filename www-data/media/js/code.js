@@ -10,10 +10,12 @@ var g_stacker_status = 'idle';
 var g_show_thumb_live = false;
 var g_stats = null;
 var g_solving = false;
+var g_since_saved_s = 0;
 var g_solving_ui_open = false;
 var g_error_messages = {};
 var g_profile_cam_opts = null;
 var g_solver_result = null;
+var g_confirm_callback = null;
 
 
 function zoom(offset)
@@ -30,13 +32,40 @@ function zoom(offset)
     onResize(null);
 }
 
+function requestConfirmation(message,callback)
+{
+    showAlertDialog(message,callback);
+}
+
 function showError(message)
+{
+    showAlertDialog(message,null);
+}
+
+function showAlertDialog(message,confirm_callback)
 {
     document.getElementById('error_message').innerHTML = message;
     document.getElementById('error_alert').style.display = 'inline';
+    var cancel = document.getElementById('confirm_cancel_button');
+    g_confirm_callback = confirm_callback;
+    if(confirm_callback!=null) {
+        cancel.style.display='inline';
+    }
+    else {
+        cancel.style.display='none';
+    }
 }
-function hideError(message)
+function confirmError()
 {
+    var callback = g_confirm_callback;
+    hideError();
+    if(callback!=null)
+        callback();
+}
+
+function hideError()
+{
+    g_confirm_callback = null;
     document.getElementById('error_alert').style.display = 'none';
 }
 
@@ -374,6 +403,7 @@ function changeStackerStatus(new_status)
             setTimeout(()=>{
                 g_stats.close();
                 g_stats = null;
+                g_since_saved_s = 0;
             },500);
         }
     }
@@ -384,6 +414,7 @@ function updateStackerStats(e) {
     var stats = JSON.parse(e);
     if(stats.type == 'stats') { 
         document.getElementById('stats_info').innerHTML = stats.stacked + '/' + stats.missed + '/' + stats.dropped;
+        g_since_saved_s = stats.since_saved_s;
     }
     else if(stats.type == 'error') {
         document.getElementById('error_notification').style.display='inline';
@@ -836,10 +867,16 @@ function resumeStack()
     }
 }
 
-function ctlStack(status)
+function ctlStack(status,confirm_may_be_needed=true)
 {
     if(status == 'save') {
         showNotification('Saving',1,false);
+    }
+    if(status == 'cancel' && g_since_saved_s >= 60 && confirm_may_be_needed) {
+        requestConfirmation(`You have collected ${g_since_saved_s.toFixed(1)}s of unsaved data. Are you sure you want to discard it?`,()=>{
+            ctlStack('cancel',false);
+        });
+        return;
     }
     restCall('post','/api/stacker/control',{operation:status},(s)=> {
         if(status == 'cancel') {
