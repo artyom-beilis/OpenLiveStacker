@@ -5,6 +5,7 @@
 #include "video_frame.h"
 #include "camera.h"
 #include "common_data.h"
+#include <map>
 
 namespace ols {
     struct QueueData {
@@ -23,6 +24,7 @@ namespace ols {
         int stacked = 0;
         int missed = 0;
         int dropped = 0;
+        double since_saved_s = 0;
         std::vector<int> histogramm;
         virtual ~StatsData() {}
     };
@@ -73,6 +75,8 @@ namespace ols {
         std::string output_path; /// identification of stacking
         std::string name;
         bool save_inputs = false;
+        std::string format;
+        int bin=1;
         int width = 0;
         int height = 0;
         bool mono = false; // is mono data
@@ -88,6 +92,8 @@ namespace ols {
         std::string darks_path; /// if darks applied darks frame
         std::string flats_path;
         std::string dark_flats_path;
+        std::string format_name;
+        std::map<CamOptionId,double> camera_config;
         
         bool auto_stretch = true; /// stretch parameters
         double stretch_low=0.5,stretch_high=0.5,stretch_gamma=0.5;

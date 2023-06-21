@@ -67,7 +67,6 @@ int main(int argc,char **argv)
         path = cfg.get("libdir","");
         astap_exe = cfg.get("astap.exe","astap_cli");
         astap_db = cfg.get("astap.db","");
-        double astap_timeout = cfg.get("astap.timeout",5.0);
         if(driver == "sim") {
             driver_opt = cfg.get("sim.path","");
         }
@@ -83,7 +82,7 @@ int main(int argc,char **argv)
         }
 
         ols::CameraDriver::load_driver(driver,path,driver_opt_ptr);
-        ols::PlateSolver::init(astap_db,astap_exe,astap_timeout);
+        ols::PlateSolver::init(astap_db,astap_exe);
         ols::OpenLiveStacker stacker;
         stacker.init(driver);
         stacker.run();

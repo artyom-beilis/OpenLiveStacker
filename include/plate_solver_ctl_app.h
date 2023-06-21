@@ -58,13 +58,15 @@ namespace ols {
             double ra  = content_.get<double>("ra");
             double de  = content_.get<double>("de");
             double rad = content_.get<double>("rad");
+            double timeout = content_.get<double>("timeout");
+            timeout = std::max(std::min(timeout,180.0),5.0);
             double constexpr invalid_geolocation = 1e6;
             double lat = content_.get<double>("lat",invalid_geolocation);
             double lon = content_.get<double>("lon",invalid_geolocation);
             std::string img = "/plate_solving_solution.jpeg";
             std::string jpeg = data_dir_ + img;
             try {
-                auto res = PlateSolver::solve_last_image(jpeg,fov,ra,de,rad);
+                auto res = PlateSolver::solve_last_image(jpeg,fov,ra,de,rad,timeout);
                 response_["solved"]=true;
                 response_["distance_to_target"] = res.angle_to_target_deg;
                 response_["result_image"] = "/data" + img;

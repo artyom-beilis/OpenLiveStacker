@@ -215,11 +215,11 @@ namespace ols {
                         stacking_active_ = false;
                         stacking_in_process_ = true;
                         break;
-                    case StackerControl::ctl_save:
                     case StackerControl::ctl_cancel:
                         stacking_active_ = false;
                         stacking_in_process_ = false;
                         break;
+                    case StackerControl::ctl_save:
                     case StackerControl::ctl_update:
                         break;
                     }

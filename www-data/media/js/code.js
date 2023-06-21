@@ -10,10 +10,12 @@ var g_stacker_status = 'idle';
 var g_show_thumb_live = false;
 var g_stats = null;
 var g_solving = false;
+var g_since_saved_s = 0;
 var g_solving_ui_open = false;
 var g_error_messages = {};
 var g_profile_cam_opts = null;
 var g_solver_result = null;
+var g_confirm_callback = null;
 
 
 function zoom(offset)
@@ -30,13 +32,40 @@ function zoom(offset)
     onResize(null);
 }
 
+function requestConfirmation(message,callback)
+{
+    showAlertDialog(message,callback);
+}
+
 function showError(message)
+{
+    showAlertDialog(message,null);
+}
+
+function showAlertDialog(message,confirm_callback)
 {
     document.getElementById('error_message').innerHTML = message;
     document.getElementById('error_alert').style.display = 'inline';
+    var cancel = document.getElementById('confirm_cancel_button');
+    g_confirm_callback = confirm_callback;
+    if(confirm_callback!=null) {
+        cancel.style.display='inline';
+    }
+    else {
+        cancel.style.display='none';
+    }
 }
-function hideError(message)
+function confirmError()
 {
+    var callback = g_confirm_callback;
+    hideError();
+    if(callback!=null)
+        callback();
+}
+
+function hideError()
+{
+    g_confirm_callback = null;
     document.getElementById('error_alert').style.display = 'none';
 }
 
@@ -374,6 +403,7 @@ function changeStackerStatus(new_status)
             setTimeout(()=>{
                 g_stats.close();
                 g_stats = null;
+                g_since_saved_s = 0;
             },500);
         }
     }
@@ -384,6 +414,7 @@ function updateStackerStats(e) {
     var stats = JSON.parse(e);
     if(stats.type == 'stats') { 
         document.getElementById('stats_info').innerHTML = stats.stacked + '/' + stats.missed + '/' + stats.dropped;
+        g_since_saved_s = stats.since_saved_s;
     }
     else if(stats.type == 'error') {
         document.getElementById('error_notification').style.display='inline';
@@ -815,10 +846,40 @@ function getPVal(name)
     return document.getElementById('stack_' + name).value * 0.001;
 }
 
-function ctlStack(status)
+function getStartDelay()
 {
+    var val = parseFloat(document.getElementById('start_delay').value);
+    if(isNaN(val) || val < 0)
+        return 0.0;
+    if(val > 10)
+        return 10;
+    return val;
+}
+
+function resumeStack()
+{
+    var delay = getStartDelay();
+    if(delay == 0) {
+        ctlStack('resume');
+    }
+    else {
+        showNotification('Resuming',delay,true,()=>{ctlStack('resume');});
+    }
+}
+
+function ctlStack(status,confirm_may_be_needed=true)
+{
+    if(status == 'save') {
+        showNotification('Saving',1,false);
+    }
+    if(status == 'cancel' && g_since_saved_s >= 60 && confirm_may_be_needed) {
+        requestConfirmation(`You have collected ${g_since_saved_s.toFixed(1)}s of unsaved data. Are you sure you want to discard it?`,()=>{
+            ctlStack('cancel',false);
+        });
+        return;
+    }
     restCall('post','/api/stacker/control',{operation:status},(s)=> {
-        if(status == 'save' || status == 'cancel') {
+        if(status == 'cancel') {
             changeStackerStatus('idle');
         }
         else if(status == 'resume') {
@@ -1006,19 +1067,36 @@ function startStack()
         flats : flats,
         dark_flats : dark_flats
     };
-    restCall('post','/api/stacker/start',config,(e)=>{
-        changeStackerStatus('stacking');
-        showStack(false);
-    });
+
+    var delay = getStartDelay();
+    var doStackFunc = ()=> {
+        restCall('post','/api/stacker/start',config,(e)=>{
+            changeStackerStatus('stacking');
+            showStack(false);
+        });
+    };
+    if(delay == 0) {
+        doStackFunc();
+    }
+    else {
+        document.getElementById('stack').style.display = 'none';
+        showNotification('Stacking',delay,true,doStackFunc);
+    }
 }
 
 function updateRADE(name)
 {
     updateRADEFor(name,'stack');
+    updateRADEFor(name,'solver');
+    document.getElementById('solver_object').value = name;
+    saveInputValue('solver_object');
 }
 function updateSolverRADE(name)
 {
     updateRADEFor(name,'solver');
+    updateRADEFor(name,'stack');
+    document.getElementById('stack_object').value = name;
+    saveInputValue('stack_object')
 }
 
 function updateRADEFor(name,target_id)
@@ -1076,19 +1154,20 @@ function plateSolveWithOpt(background)
 {
     var req;
     try {
-        var ra,de,fov,rad,lat,non;
+        var ra,de,fov,rad,lat,non,timeout;
         ra = parseRA(document.getElementById('solver_ra').value);
         de = parseDEC(document.getElementById('solver_de').value);
         fov = parseFloat(document.getElementById('solver_fov').value);
         rad = parseFloat(document.getElementById('solver_radius').value);
+        timeout = parseFloat(document.getElementById('solver_timeout').value);
         lat = parseFloat(getVal("lat"));
         lon = parseFloat(getVal("lon"));
         if(isNaN(lat))
             lat = null;
         if(isNaN(lon))
             lon = null;
-        if(isNaN(ra) || ra==null || isNaN(de) || de==null || isNaN(fov) || isNaN(rad)) {
-            throw new Error('RA, DE, Radius and FOV are required');
+        if(isNaN(ra) || ra==null || isNaN(de) || de==null || isNaN(fov) || isNaN(rad) || isNaN(timeout)) {
+            throw new Error('RA, DE, Radius, Timeout and FOV are required');
         }
         req = {
             "fov" : fov,
@@ -1096,7 +1175,8 @@ function plateSolveWithOpt(background)
             "de"  : de,
             "rad" : rad,
             "lat" : lat,
-            "lon" : lon
+            "lon" : lon,
+            "timeout" : timeout
         };
         JSON.stringify(req); // check it is OK
     }
@@ -1511,6 +1591,34 @@ function newProfileOptions(ctls)
         g_profile_cam_opts.push({"id":ctl.option_id, "value": ctl.cur});
     }
     document.getElementById('profile_items').innerHTML = res;
+}
+
+function showNotification(message,time=3.0,countdown=false,func=null)
+{
+    var el = document.getElementById('short_message');
+    if(time <= 0.001) {
+        el.innerHTML = '';
+        if(func!=null) {
+            func();
+        }
+        return;
+    }
+    if(time > 0 && message != null) {
+        var msg = message;
+        if(countdown)
+            msg += ' in ' + time.toFixed(1) + 's';
+        el.innerHTML = msg;
+    }
+    if(countdown) {
+        setTimeout(()=> {
+            showNotification(message,time - 0.2,true,func)
+        },200);
+    }
+    else {
+        setTimeout(() =>  {
+            showNotification(null,0,false,func);
+        },time * 1000);
+    }
 }
 
 function profileNew()

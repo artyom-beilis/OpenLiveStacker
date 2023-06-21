@@ -434,15 +434,44 @@ namespace ols {
             cv::minMaxLoc(m2,nullptr,&max_v);
             cv::Mat res;
             m2.convertTo(res,channels_ == 3 ? CV_16UC3 : CV_16UC1,65535/max_v);
-            std::cerr << "Channels to 16bit" << channels_ << std::endl;
             return res;
         }
 
+
+        void create_meta(std::ostream &m)
+        {
+            m << "Name           " << name_ << std::endl;
+            m << "Time           " << timestamp() << std::endl;
+            m << "Frames         " << stacker_->stacked_count() << std::endl;
+            m << "Integration (s)" << stacker_->stacked_count() * get_exp_s() << std::endl;
+            m << "Frame:"<<std::endl;
+            m << " - format " << stack_info_.format << std::endl;
+            m << " - width  " << stack_info_.width << std::endl;
+            m << " - height " << stack_info_.height << std::endl;
+            m << " - bin    " << stack_info_.bin << std::endl;
+            m << " - mono   " << stack_info_.mono << std::endl;
+            m << "Stackig:"<<std::endl;
+            m << " - remove_satellites  " << stack_info_.remove_satellites << std::endl;
+            m << " - derotate           " << stack_info_.derotate << std::endl;
+            m << " - derotate_mirror    " << stack_info_.derotate_mirror << std::endl;
+            m << "Target:" << std::endl;
+            m << " - RA " << stack_info_.ra << std::endl;
+            m << " - DE " << stack_info_.de << std::endl;
+            m << "Geolocation" << std::endl;
+            m << " - lat " << stack_info_.lat << std::endl;
+            m << " - lon " << stack_info_.lon << std::endl;
+            m << "Camera Settings:"<<std::endl;
+            for(auto op:stack_info_.camera_config) {
+                m << " - " << cam_option_id_to_name(op.first) << ": " << op.second << std::endl;
+            }
+        }
         void save_stacked_image_and_send()
         {
-            std::string path = output_path_ + "_stacked.jpeg";
-            std::string ipath = output_path_ + "_stacked.txt";
-            std::string tpath = output_path_ + "_stacked.tiff";
+            version_++;
+            std::string base_name = output_path_ + "_stacked_v" + std::to_string(version_);
+            std::string path = base_name + ".jpeg";
+            std::string ipath = base_name + ".txt";
+            std::string tpath = base_name + ".tiff";
             save_tiff(to16bit(stacker_->get_raw_stacked_image()),tpath);
             auto frames = generate_output_frame(stacker_->get_stacked_image(),false);
             auto frame = frames.first;
@@ -452,9 +481,7 @@ namespace ols {
             if(out_)
                 out_->push(frame);
             std::ofstream log(ipath);
-            log << "Object: " << name_ << "\n";
-            log << "When: " <<timestamp() << "\n";
-            log << "Stacked: " << stacker_->stacked_count() << std::endl;
+            create_meta(log);
         }
 
         std::string timestamp()
@@ -462,20 +489,39 @@ namespace ols {
             return ftime("%Y-%m-%d %H:%M:%S",time(nullptr));
         }
 
+        double get_exp_s()
+        {
+            return stack_info_.camera_config[opt_exp] * 1e-3; // ms to s
+        }
+
+        std::shared_ptr<StatsData> create_stats()
+        {
+            std::shared_ptr<StatsData> stats(new StatsData());
+            if(calibration_) {
+                stats->stacked = cframe_count_;
+                stats->since_saved_s = get_exp_s() * (cframe_count_ - saved_count_);
+            }
+            else {
+                stats->stacked = stacker_->stacked_count();
+                stats->missed  = stacker_->total_count() - stats->stacked;
+                stats->since_saved_s = get_exp_s() * (stacker_->stacked_count() - saved_count_) ;
+                if(stats->stacked>0)
+                    stats->histogramm = std::move(stacker_->get_histogramm());
+            }
+            stats->dropped = dropped_count_;
+            return stats;
+        }
 
         std::pair<std::shared_ptr<CameraFrame>,std::shared_ptr<CameraFrame> > handle_video(std::shared_ptr<CameraFrame> video)
         {
             std::shared_ptr<CameraFrame> res;
             std::shared_ptr<CameraFrame> ps;
-            std::shared_ptr<StatsData> stats(new StatsData());
 		    auto start = std::chrono::high_resolution_clock::now();
             try {
                 dropped_count_ += video->dropped;
-                stats->dropped = dropped_count_;
                 if(calibration_) {
                     cframe_ +=  video->processed_frame;
                     cframe_count_ ++;
-                    stats->stacked = cframe_count_;
                     res = video;
                     auto end = std::chrono::high_resolution_clock::now();
                     double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
@@ -505,13 +551,10 @@ namespace ols {
                         double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
                         BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms";
                     }
-                    stats->stacked = stacker_->stacked_count();
-                    stats->missed  = stacker_->total_count() - stats->stacked;
-                    if(stats->stacked>0)
-                        stats->histogramm = std::move(stacker_->get_histogramm());
                 }
-                if(stats_)
-                    stats_->push(stats);
+                if(stats_) {
+                    stats_->push(create_stats());
+                }
             }
             catch(std::exception const &e) {
                 send_message(stats_,"Stacking",e);
@@ -568,6 +611,8 @@ namespace ols {
                 width_ = ctl->width;
                 height_ = ctl->height;
                 mono_ = ctl->mono;
+                saved_count_ = 0;
+                version_ = 0;
                 channels_ = mono_ ? 1 : 3;
                 cv_type_ = mono_ ? CV_32FC1 : CV_32FC3;
                 calibration_ = ctl->calibration;
@@ -575,6 +620,7 @@ namespace ols {
                 name_ = ctl->name;
                 dropped_count_ = 0;
                 stacker_.reset();
+                stack_info_ = *ctl;
                 if(calibration_) {
                     cframe_ = cv::Mat(height_,width_,cv_type_);
                     cframe_.setTo(0);
@@ -607,11 +653,14 @@ namespace ols {
             case StackerControl::ctl_save:
                 if(stacker_) {
                     save_stacked_image_and_send();
-                    stacker_.reset();
+                    saved_count_ = stacker_->stacked_count();
                 }
                 else if(calibration_) {
                     save_calibration();
-                    calibration_ = false;
+                    saved_count_ = cframe_count_;
+                }
+                if(stats_) {
+                    stats_->push(create_stats());
                 }
                 break;
             case StackerControl::ctl_update:
@@ -631,6 +680,7 @@ namespace ols {
         std::string data_dir_;
         int width_,height_;
         bool mono_;
+        int version_;
         int channels_,cv_type_;
         bool calibration_=false;
         std::string output_path_,name_;
@@ -639,6 +689,8 @@ namespace ols {
         int dropped_count_ = 0;
         std::unique_ptr<Stacker> stacker_;
         bool restart_;
+        int saved_count_ = 0;
+        StackerControl stack_info_;
     };
 
     std::thread start_stacker(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,std::string data_dir)

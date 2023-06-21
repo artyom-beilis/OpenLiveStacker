@@ -45,7 +45,6 @@ namespace ols {
             }
             else if(op == "save") {
                 cmd->op = StackerControl::ctl_save;
-                status_ = "idle";
             }
             else if(op == "resume") {
                 cmd->op = StackerControl::ctl_resume;
@@ -75,6 +74,8 @@ namespace ols {
             cmd->op = StackerControl::ctl_init;
             auto format = cam_->stream_format();
             cmd->mono = is_mono_stream(format.format);
+            cmd->format = stream_type_to_str(cam_->stream_format().format);
+            cmd->bin = cam_->stream_format().bin;
             cmd->width = format.width;
             cmd->height = format.height;
             cmd->calibration = content_.get("type","dso") == "calibration";
@@ -89,12 +90,19 @@ namespace ols {
             else {
                 cmd->output_path = calibration_path_;
             }
+            cmd->source_gamma = 1.0;
             {
                 CamErrorCode e;
                 std::unique_lock<std::recursive_mutex> guard(cam_->lock());
-                cmd->source_gamma = cam_->cam().get_parameter(opt_gamma,true,e).cur_val;
-                if(e)
-                    cmd->source_gamma = 1.0;
+                auto opts = cam_->cam().supported_options(e);
+                e.check();
+                for(auto opt:opts) {
+                    CamParam param = cam_->cam().get_parameter(opt,true,e);
+                    e.check();
+                    cmd->camera_config[opt] = param.cur_val;
+                    if(opt == opt_gamma)
+                        cmd->source_gamma = param.cur_val;
+                }
             }
                 
             cmd->lat = content_.get("location.lat",cmd->lat);
@@ -169,6 +177,7 @@ namespace ols {
                 info["stacked"] = data->stacked;
                 info["missed"] = data->missed;
                 info["dropped"] = data->dropped;
+                info["since_saved_s" ] = data->since_saved_s;
                 info["histogramm"] = data->histogramm;
             }
             else if(error) {

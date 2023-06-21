@@ -7,11 +7,11 @@
     "wdir" : {
         "width" : 2028,
         "height": 1520,
-        "format" : "rgb48",
+        "format" : "raw16",
         "path" : "./wd"
     },
     "astap" : {
-        "exe": "astap_cli",
-        "db": "/opt/astap/astap"
+        "exe": "/home/artik/Packages/astap/astap_cli",
+        "db": "astapdb/db"
     }
 }
