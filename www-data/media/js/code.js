@@ -16,6 +16,8 @@ var g_error_messages = {};
 var g_profile_cam_opts = null;
 var g_solver_result = null;
 var g_confirm_callback = null;
+var g_histogram = null;
+var g_show_hist = false;
 
 
 function zoom(offset)
@@ -410,11 +412,61 @@ function changeStackerStatus(new_status)
     g_stacker_status = new_status;
 }
 
+function updateHistogram()
+{
+    var div = document.getElementById('hist_div')
+    if(!g_show_hist) {
+        div.style.display = 'none';
+        return;
+    }
+    else {
+        div.style.display = 'inline';
+    }
+    var canvas = document.getElementById('hist_canvas');
+    canvas.width  = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    var ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    var maxv=g_histogram.reduce((x,y)=>Math.max(x,y),0) + 1;
+    ctx.strokeStyle = "red";
+    ctx.setLineDash([]);
+    ctx.lineWidth(1);
+    ctx.beginPath();
+    ctx.moveTo(0,canvas.height-1);
+    for(var i=0;i<g_histogram.length;i++) {
+        var gain = getPVal("stretch_high");
+        var cut = getPVal("stretch_low");
+        var x = i*gain/g_histogram.length - cut;
+        var xp = x * canvas.width/2 + canvas.width / 4;
+        var yp = (maxv-g_histogram[i]) * canvas.height / maxv;
+        if(i==0)
+            ctx.moveTo(xp,yp);
+        else
+            ctx.lineTo(xp,yp);
+    }
+    ctx.stroke();
+    ctx.setLineDash([5,10]);
+    ctx.lineWidth(3);
+    ctx.beginPath();
+    ctx.moveTo(canvas.width/4,0)
+    ctx.lineTo(canvas.width/4,canvas.height);
+    ctx.moveTo(3*canvas.width/4,0)
+    ctx.lineTo(3*canvas.width/4,canvas.height);
+    ctx.stroke();
+
+}
+
 function updateStackerStats(e) {
     var stats = JSON.parse(e);
     if(stats.type == 'stats') { 
         document.getElementById('stats_info').innerHTML = stats.stacked + '/' + stats.missed + '/' + stats.dropped;
         g_since_saved_s = stats.since_saved_s;
+        if(stats.histogramm.length == 0)
+            g_histogram = null;
+        else {
+            g_histogram = stats.histogramm;
+            updateHistogram();
+        }
     }
     else if(stats.type == 'error') {
         document.getElementById('error_notification').style.display='inline';
@@ -928,6 +980,8 @@ function getAutoStretchState(e)
     if(!as) {
         updatePPSliders(e);
     }
+    g_show_hist = !as;
+    updateHistogram();
 }
 
 function setDefaultPPSliders(e=null)
@@ -942,6 +996,8 @@ function setDefaultPPSliders(e=null)
 function updateAutoPP()
 {
     var auto_pp = getBVal("auto_stretch");
+    g_show_hist = !auto_pp;
+    updateHistogram();
     if(auto_pp) {
         document.getElementById('dynamic_parameters').style.display='none';
         updatePP();

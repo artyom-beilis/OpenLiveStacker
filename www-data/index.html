@@ -84,6 +84,9 @@
     <p>
         Auto:<input id="stack_auto_stretch" checked type="checkbox" onchange='updateAutoPP()' >
     </p>
+    <div id="hist_div"> 
+        <canvas id="hist_canvas" width="1024" height="100" ></canvas>
+    </div>
     <div id="dynamic_parameters" style='display:none'>
       <table style='width:100%;'>
         <colgroup>
@@ -100,7 +103,7 @@
         <tr>
             <td class="slider_elem">H:</td>
             <td class="slider_elem"><span id="stack_stretch_high_disp">1.000</span></td>
-            <td class="slider_elem"><input type="range" min="1000" max="16000" value="1000" class="slider" id="stack_stretch_high" onchange='updatePPHigh()'><td>
+            <td class="slider_elem"><input type="range" min="1000" max="32000" value="1000" class="slider" id="stack_stretch_high" onchange='updatePPHigh()'><td>
         </tr>
         <tr>
             <td class="slider_elem">γ:</td>
