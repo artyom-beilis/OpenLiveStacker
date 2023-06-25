@@ -184,19 +184,19 @@
         <button class="incdec_but" onclick="showSolve(false);">X</button>
     </span>
     <div id="solver_config">
-        <p>
-            <span class="nowr">Pixel Size (μm) <input class="val_input saved_input" id="solver_pixel_size" type="number" step="0.01" value="" oninput='recalcFOV();' />,</span>
-            <span class="nowr">Focal Length (mm) <input class="val_input saved_input" id="solver_focal_length" type="number" value="" oninput='recalcFOV();' /></span>
-        </p>
-        <p>Vertical FOV (°) <input class="val_input" id="solver_fov" type="number" value="" step="0.001" /></p>
+        <p><button onclick="plateSolve();" >Solve</button></p>
         <p>Object <input class="val_input saved_input" id="solver_object" type="text" oninput='updateSolverRADE(this.value)'  value="" /> (M31, NGC457)</p>
         <p>
             <span class="nowr" >RA <input class="val_input" id="solver_ra" type="text" value="" />,</span>
             <span class="nowr" >DEC <input class="val_input" id="solver_de" type="text" value=""/></span>
         </p>
+        <p>
+            <span class="nowr">Pixel Size (μm) <input class="val_input saved_input" id="solver_pixel_size" type="number" step="0.01" value="" oninput='recalcFOV();' />,</span>
+            <span class="nowr">Focal Length (mm) <input class="val_input saved_input" id="solver_focal_length" type="number" value="" oninput='recalcFOV();' /></span>
+        </p>
+        <p>Vertical FOV (°) <input class="val_input" id="solver_fov" type="number" value="" step="0.001" /></p>
         <p>Radius (°) <input class="val_input saved_input" id="solver_radius" type="number" min="0.1" max="180.0" step="0.1" value="5.0" /></p>
         <p>Timeout (s) <input class="val_input saved_input" id="solver_timeout" type="number" min="5" max="120" step="5" value="10.0" /></p>
-        <p><button onclick="plateSolve();" >Solve</button></p>
     </div>
     <div id="solver_status_div" style="display:none;" >
         <p>
