@@ -427,18 +427,20 @@ function updateHistogram()
     canvas.height = canvas.offsetHeight;
     var ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    var maxv=g_histogram.reduce((x,y)=>Math.max(x,y),0) + 1;
+    var hist = Array.from(g_histogram,(x) => Math.log(x+1));
+    var maxv=hist.reduce((x,y)=>Math.max(x,y),0) + 1;
     ctx.strokeStyle = "red";
     ctx.setLineDash([]);
-    ctx.lineWidth(1);
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0,canvas.height-1);
-    for(var i=0;i<g_histogram.length;i++) {
-        var gain = getPVal("stretch_high");
-        var cut = getPVal("stretch_low");
-        var x = i*gain/g_histogram.length - cut;
+    var gain = getPVal("stretch_high");
+    var cut = getPVal("stretch_low");
+    var gamma = getPVal("stretch_gamma");
+    for(var i=0;i<hist.length;i++) {
+        var x = i*gain/hist.length - cut;
         var xp = x * canvas.width/2 + canvas.width / 4;
-        var yp = (maxv-g_histogram[i]) * canvas.height / maxv;
+        var yp = (maxv-hist[i]) * canvas.height / maxv;
         if(i==0)
             ctx.moveTo(xp,yp);
         else
@@ -446,12 +448,20 @@ function updateHistogram()
     }
     ctx.stroke();
     ctx.setLineDash([5,10]);
-    ctx.lineWidth(3);
+    ctx.lineWidth=3;
+    var med_pos = Math.pow(0.5,gamma);
+    var med_line_pos = canvas.width * (0.25 + med_pos * 0.5);
     ctx.beginPath();
     ctx.moveTo(canvas.width/4,0)
     ctx.lineTo(canvas.width/4,canvas.height);
     ctx.moveTo(3*canvas.width/4,0)
     ctx.lineTo(3*canvas.width/4,canvas.height);
+    ctx.moveTo(med_line_pos,0)
+    ctx.lineTo(med_line_pos,canvas.height);
+    ctx.moveTo(canvas.width/4,canvas.height)
+    for(var xv=0.01;xv<=1.0;xv+=0.01) {
+        ctx.lineTo(canvas.width * (0.25 + xv * 0.5),canvas.height * (1-Math.pow(xv,1/gamma)))
+    }
     ctx.stroke();
 
 }
@@ -1042,6 +1052,7 @@ function updatePP()
     setPPVal('gamma',config.stretch_gamma);
     restCall('post','/api/stacker/stretch',config,(e)=>{
     });
+    updateHistogram();
 }
 
 function startStack()
