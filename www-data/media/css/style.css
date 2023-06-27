@@ -140,12 +140,28 @@
         border: 1px solid red;
         overflow:scroll;
      }
-    
+   
+    .hctl {
+        font-size:4mm;
+        height:8mm;
+        width:18%;
+        padding:0;
+        margin:0 1% 0 1%;
+        border:1px solid red;
+    }
+
+    #hist_ctl {
+        position:absolute;
+        bottom:2mm;
+        left:2mm;
+        right:2mm;
+        height:10mm;
+    }
     #hist_div {
         position:absolute;
-        bottom:12mm;
-        left:10mm;
-        right:10mm;
+        bottom:15mm;
+        left:2mm;
+        right:2mm;
         height:30%;
     }
     #hist_canvas {

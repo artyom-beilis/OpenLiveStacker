@@ -18,7 +18,7 @@ var g_solver_result = null;
 var g_confirm_callback = null;
 var g_histogram = null;
 var g_show_hist = false;
-
+var g_hist_zoom = 'none';
 
 function zoom(offset)
 {
@@ -412,15 +412,64 @@ function changeStackerStatus(new_status)
     g_stacker_status = new_status;
 }
 
+function getHistTrans()
+{
+    var canvas = document.getElementById('hist_canvas');
+    var w = canvas.width;
+    var h = canvas.height;
+    var sp = getStretchParams();
+    // x_v = x_h * sp.gain - sp.cut
+    // x_h = (x_v + sp.cut) / sp.gain
+    var x0,x1;
+    if(g_hist_zoom == 'none') {
+        x0 = 0;
+        x1 = 1;
+    }
+    else if(g_hist_zoom == 'vis') {
+        x0 = sp.cut / sp.gain;
+        x1 = (1 + sp.cut)/sp.gain;
+    }
+    else if(g_hist_zoom == '0' || g_hist_zoom == '1' || g_hist_zoom = '0.5') {
+        var vis_center = 0.5;
+        if(g_hist_zoom == '0')
+            vis_center = 0;
+        else (g_hist_zoom == '1')
+            vis_center = 1;
+        else if(g_hist_zoom == '0.5')
+            vis_center = Math.pow(0.5,sp.gamma);
+        x0 = (vis_center - 0.05 + sp.cut) / sp.gain;
+        x1 = (vis_center + 0.05 + sp.cut) / sp.gain;
+    }
+    /// h2p = (x_h) => (x_h - x0)/(x1-x0) * w*0.5 + w*0.25
+    return {
+        h2p_a : 1.0/(x1-x0) * w*0.5,
+        h2p_b : -x0/(x1-x0) * w*0.5 + w*0.25,
+        y2p_a : 0.8*h;
+        y2p_b : 0.1*h;
+    };
+}
+
+function getStretchParams()
+{
+    return {
+        gain: getPVal("stretch_high"),
+        cut:  getPVal("stretch_low"),
+        gamma:getPVal("stretch_gamma")
+    };
+}
+
 function updateHistogram()
 {
     var div = document.getElementById('hist_div')
+    var bdiv = document.getElementById('hist_ctl')
     if(!g_show_hist) {
         div.style.display = 'none';
+        bdiv.style.display = 'none';
         return;
     }
     else {
         div.style.display = 'inline';
+        bdiv.style.display = 'inline';
     }
     var canvas = document.getElementById('hist_canvas');
     canvas.width  = canvas.offsetWidth;
@@ -837,6 +886,7 @@ function onResize(ev)
     if(solved) {
         setVideoScale(solved,solved_div,size);
     }
+    updateHistogram();
 }
 
 
