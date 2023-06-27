@@ -85,7 +85,7 @@
         Auto:<input id="stack_auto_stretch" checked type="checkbox" onchange='updateAutoPP()' >
     </p>
     <div id="hist_ctl">
-        <button id="hist_ctl_full" class="hctl" >all</button><button id="hist_ctl_valid" class="hctl">vis</button><button id="hist_ctl_black" class="hctl">⌕ 0</button><button id="hist_ctl_med" class="hctl">⌕ ½</button><button id="hist_ctl_white" class="hctl">⌕ 1</button>
+        <button id="hist_ctl_valid" onclick="hZoom('vis')" class="hctl">vis</button><button id="hist_ctl_full" class="hctl" onclick="hZoom('all')" >all</button><button onclick="hZoom('0')"id="hist_ctl_black" class="hctl">⌕ 0</button><button id="hist_ctl_med" class="hctl" onclick="hZoom('0.5')" >⌕ ½</button><button id="hist_ctl_white" class="hctl" onclick="hZoom('1')" >⌕ 1</button>
     </div>
     <div id="hist_div"> 
         <canvas id="hist_canvas" width="1024" height="100" ></canvas>

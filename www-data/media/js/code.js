@@ -18,7 +18,10 @@ var g_solver_result = null;
 var g_confirm_callback = null;
 var g_histogram = null;
 var g_show_hist = false;
-var g_hist_zoom = 'none';
+var g_hist_zoom = 'vis';
+var g_hist_move_line_id = -1;
+var g_hist_move_line_pos = -1;
+var g_hist_move_start_x = -1;
 
 function zoom(offset)
 {
@@ -269,6 +272,15 @@ function checkAndSetLocation(params)
     return false;
 }
 
+function setEventListeners()
+{
+    var canvas = document.getElementById('hist_canvas');
+    canvas.addEventListener('mousedown',(e)=>histEvent(e,'down'))
+    canvas.addEventListener('mouseup',(e)=>histEvent(e,'up'))
+    canvas.addEventListener('mouseout',(e)=>histEvent(e,'up'))
+    canvas.addEventListener('mousemove',(e)=>histEvent(e,'move'))
+}
+
 
 function run()
 {
@@ -281,6 +293,7 @@ function run()
             setGPS(pos.coords.latitude,pos.coords.longitude);
         });
     }
+    setEventListeners();
     updateSavedInputs();
 }
 
@@ -412,40 +425,121 @@ function changeStackerStatus(new_status)
     g_stacker_status = new_status;
 }
 
+function hZoom(value)
+{
+    g_hist_zoom = value;
+    updateHistogram();
+}
+
+function histEvent(e,type)
+{
+    var canvas = document.getElementById('hist_canvas');
+    var rect = canvas.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var tr = getHistTrans();
+    var pos = [ tr.x_black, tr.x_med, tr.x_white ];
+    if(type == 'down') {
+        var index = -1;
+        var maxDiff = -1;
+        for(let i=0;i<3;i++) {
+            let lineX = tr.getX(pos[i]);
+            let diff = Math.abs(lineX - x);
+            if(index == -1 || maxDiff > diff) {
+                index = i;
+                maxDiff = diff;
+            }
+        }
+        if(maxDiff > 0.1 * canvas.width) {
+            g_hist_move_line_id = -1;
+        }
+        else {
+            g_hist_move_line_id = index;
+            g_hist_move_line_pos = pos[index];
+            g_hist_move_start_x = x;
+        }
+    }
+    else if(type == 'move' && g_hist_move_line_id != -1) {
+        let delta = (x - g_hist_move_start_x) / tr.h2p_a;
+        g_hist_move_line_pos = pos[g_hist_move_line_id] + delta;
+    }
+    else if(type == 'up' && g_hist_move_line_id != -1) {
+        let delta = (x - g_hist_move_start_x) / tr.h2p_a;
+        pos[g_hist_move_line_id] += delta;
+        recalcStretch(pos[0],pos[1],pos[2]);
+        g_hist_move_line_id = -1;
+    }
+    updateHistogram();
+}
+
+function recalcStretch(black,med,white)
+{
+    if(black < 0)
+        black = 0;
+    if(white > 1)
+        white = 1;
+    if(black >= white)
+        return;
+    let medp = (med - black) / (white - black);
+    let medp_limit = Math.pow(0.5,8); // gamma=8 max
+    if(medp > 0.5)
+        medp = 0.5;
+    if(medp < medp_limit)
+        medp = medp_limit;
+    let gamma = Math.log(medp) / Math.log(0.5);
+    let gain = 1.0/(white - black);
+    let cut = black * gain; 
+    updatePPSliders({
+        gain:gain,
+        gamma: gamma,
+        cut:cut
+    });
+}
+
 function getHistTrans()
 {
     var canvas = document.getElementById('hist_canvas');
     var w = canvas.width;
     var h = canvas.height;
     var sp = getStretchParams();
+    var vis_gamma_x = Math.pow(0.5,sp.gamma);
     // x_v = x_h * sp.gain - sp.cut
     // x_h = (x_v + sp.cut) / sp.gain
     var x0,x1;
-    if(g_hist_zoom == 'none') {
+    var x_black = sp.cut / sp.gain;
+    var x_white = (1 + sp.cut)/sp.gain;
+    var x_med = x_black * (1.0 - vis_gamma_x) + x_white * vis_gamma_x;
+    if(g_hist_zoom == 'all') {
         x0 = 0;
         x1 = 1;
     }
     else if(g_hist_zoom == 'vis') {
-        x0 = sp.cut / sp.gain;
-        x1 = (1 + sp.cut)/sp.gain;
+        x0 = x_black;
+        x1 = x_white;
     }
-    else if(g_hist_zoom == '0' || g_hist_zoom == '1' || g_hist_zoom = '0.5') {
+    else if(g_hist_zoom == '0' || g_hist_zoom == '1' || g_hist_zoom == '0.5') {
+        var scale = 0.1;
         var vis_center = 0.5;
         if(g_hist_zoom == '0')
             vis_center = 0;
-        else (g_hist_zoom == '1')
+        else if(g_hist_zoom == '1')
             vis_center = 1;
         else if(g_hist_zoom == '0.5')
-            vis_center = Math.pow(0.5,sp.gamma);
-        x0 = (vis_center - 0.05 + sp.cut) / sp.gain;
-        x1 = (vis_center + 0.05 + sp.cut) / sp.gain;
+            vis_center = vis_gamma_x;
+        x0 = (vis_center - scale * 0.5 + sp.cut) / sp.gain;
+        x1 = (vis_center + scale * 0.5 + sp.cut) / sp.gain;
     }
     /// h2p = (x_h) => (x_h - x0)/(x1-x0) * w*0.5 + w*0.25
     return {
         h2p_a : 1.0/(x1-x0) * w*0.5,
         h2p_b : -x0/(x1-x0) * w*0.5 + w*0.25,
-        y2p_a : 0.8*h;
-        y2p_b : 0.1*h;
+        getX : function(x)  { return this.h2p_a * x + this.h2p_b; },
+        getY : function(y)  { return this.y2p_a * y + this.y2p_b; },
+        getXfromPix : function(x) { return (x - this.h2p_b) / this.h2p_a; },
+        y2p_a : -0.8*h,
+        y2p_b : 0.9*h,
+        x_black: x_black,
+        x_white : x_white,
+        x_med : x_med
     };
 }
 
@@ -472,24 +566,26 @@ function updateHistogram()
         bdiv.style.display = 'inline';
     }
     var canvas = document.getElementById('hist_canvas');
-    canvas.width  = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    if(canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+    }
     var ctx = canvas.getContext("2d");
+    var tr = getHistTrans(); 
+    var sp = getStretchParams();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     var hist = Array.from(g_histogram,(x) => Math.log(x+1));
     var maxv=hist.reduce((x,y)=>Math.max(x,y),0) + 1;
     ctx.strokeStyle = "red";
     ctx.setLineDash([]);
     ctx.lineWidth = 1;
+    
     ctx.beginPath();
-    ctx.moveTo(0,canvas.height-1);
-    var gain = getPVal("stretch_high");
-    var cut = getPVal("stretch_low");
-    var gamma = getPVal("stretch_gamma");
     for(var i=0;i<hist.length;i++) {
-        var x = i*gain/hist.length - cut;
-        var xp = x * canvas.width/2 + canvas.width / 4;
-        var yp = (maxv-hist[i]) * canvas.height / maxv;
+        let x = i * 1.0 / hist.length;
+        let y = hist[i]/maxv;
+        let xp = tr.getX(x);
+        let yp = tr.getY(y);
         if(i==0)
             ctx.moveTo(xp,yp);
         else
@@ -497,22 +593,42 @@ function updateHistogram()
     }
     ctx.stroke();
     ctx.setLineDash([5,10]);
+    ctx.strokeStyle = "#FFC000";
     ctx.lineWidth=3;
-    var med_pos = Math.pow(0.5,gamma);
-    var med_line_pos = canvas.width * (0.25 + med_pos * 0.5);
     ctx.beginPath();
-    ctx.moveTo(canvas.width/4,0)
-    ctx.lineTo(canvas.width/4,canvas.height);
-    ctx.moveTo(3*canvas.width/4,0)
-    ctx.lineTo(3*canvas.width/4,canvas.height);
-    ctx.moveTo(med_line_pos,0)
-    ctx.lineTo(med_line_pos,canvas.height);
-    ctx.moveTo(canvas.width/4,canvas.height)
-    for(var xv=0.01;xv<=1.0;xv+=0.01) {
-        ctx.lineTo(canvas.width * (0.25 + xv * 0.5),canvas.height * (1-Math.pow(xv,1/gamma)))
+    var black_p = tr.getX(tr.x_black); 
+    var white_p = tr.getX(tr.x_white); 
+    var med_p = tr.getX(tr.x_med); 
+    ctx.moveTo(black_p,0)
+    ctx.lineTo(black_p,canvas.height);
+    ctx.moveTo(white_p,0)
+    ctx.lineTo(white_p,canvas.height);
+    ctx.moveTo(med_p,0)
+    ctx.lineTo(med_p,canvas.height);
+    ctx.stroke();
+    ctx.lineWidth=1;
+    ctx.setLineDash([2,4]);
+    ctx.beginPath();
+    for(var i=0;i<=100;i++) {
+        let xv = i / 100.0;
+        let yv = Math.pow(xv,1/sp.gamma);
+        let xp = tr.getX(tr.x_black * (1-xv) + tr.x_white*xv);
+        let yp = tr.getY(yv);
+        if(i == 0)
+            ctx.moveTo(xp,yp);
+        else
+            ctx.lineTo(xp,yp);
     }
     ctx.stroke();
-
+    if(g_hist_move_line_id!=-1) {
+        ctx.beginPath();
+        ctx.setLineDash([3,3]);
+        ctx.strokeStyle = "green";
+        let line_x = tr.getX(g_hist_move_line_pos);
+        ctx.moveTo(line_x,0)
+        ctx.lineTo(line_x,canvas.height);
+        ctx.stroke();
+    }
 }
 
 function updateStackerStats(e) {
