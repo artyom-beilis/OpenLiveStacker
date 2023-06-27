@@ -279,6 +279,11 @@ function setEventListeners()
     canvas.addEventListener('mouseup',(e)=>histEvent(e,'up'))
     canvas.addEventListener('mouseout',(e)=>histEvent(e,'up'))
     canvas.addEventListener('mousemove',(e)=>histEvent(e,'move'))
+
+    canvas.addEventListener('touchstart',(e)=>histEvent(e.touches[0],'down'))
+    canvas.addEventListener('touchend',(e)=>histEvent(null,'end'))
+    canvas.addEventListener('touchcancel',(e)=>histEvent(null,'end'))
+    canvas.addEventListener('touchmove',(e)=>histEvent(e.touches[0],'move'))
 }
 
 
@@ -435,7 +440,10 @@ function histEvent(e,type)
 {
     var canvas = document.getElementById('hist_canvas');
     var rect = canvas.getBoundingClientRect();
-    var x = e.clientX - rect.left;
+    var x = null;
+    if(e!=null) {
+        x = e.clientX - rect.left;
+    }
     var tr = getHistTrans();
     var pos = [ tr.x_black, tr.x_med, tr.x_white ];
     if(type == 'down') {
@@ -465,6 +473,11 @@ function histEvent(e,type)
     else if(type == 'up' && g_hist_move_line_id != -1) {
         let delta = (x - g_hist_move_start_x) / tr.h2p_a;
         pos[g_hist_move_line_id] += delta;
+        recalcStretch(pos[0],pos[1],pos[2]);
+        g_hist_move_line_id = -1;
+    }
+    else if(type == 'end' && g_hist_move_line_id != -1) {
+        pos[g_hist_move_line_id] = g_hist_move_line_pos;
         recalcStretch(pos[0],pos[1],pos[2]);
         g_hist_move_line_id = -1;
     }
@@ -621,6 +634,7 @@ function updateHistogram()
     }
     ctx.stroke();
     if(g_hist_move_line_id!=-1) {
+        ctx.lineWidth=2;
         ctx.beginPath();
         ctx.setLineDash([3,3]);
         ctx.strokeStyle = "green";
@@ -1152,7 +1166,7 @@ function getAutoStretchState(e)
 {
     var as = 'auto_stretch' in e ? e.auto_stretch : true;
     document.getElementById('stack_auto_stretch').checked=as;
-    document.getElementById('dynamic_parameters').style.display= as ? 'none' : 'inline';
+    ////document.getElementById('dynamic_parameters').style.display= as ? 'none' : 'inline';
     if(!as) {
         updatePPSliders(e);
     }
@@ -1179,7 +1193,7 @@ function updateAutoPP()
         updatePP();
         return;
     }
-    document.getElementById('dynamic_parameters').style.display='inline';
+    //document.getElementById('dynamic_parameters').style.display='inline';
     restCall('get','/data/stretch.json',null,updatePPSliders,setDefaultPPSliders);
 }
 
