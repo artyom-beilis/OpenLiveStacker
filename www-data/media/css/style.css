@@ -148,6 +148,7 @@
         padding:0;
         margin:0 1% 0 1%;
         border:1px solid red;
+        user-select: none;
     }
 
     #hist_ctl {
