@@ -4,8 +4,6 @@ var global_height = 0;
 var global_bin = 0;
 var global_download_progress = null;
 var global_zoom = 1.0;
-var g_prev_high = -1;
-var g_prev_low = -1;
 var g_stacker_status = 'idle';
 var g_show_thumb_live = false;
 var g_stats = null;
@@ -22,6 +20,11 @@ var g_hist_zoom = 'vis';
 var g_hist_move_line_id = -1;
 var g_hist_move_line_pos = -1;
 var g_hist_move_start_x = -1;
+var g_stretch = {
+    gain:1,
+    cut:0,
+    gamma:2.2
+};
 
 function zoom(offset)
 {
@@ -473,7 +476,7 @@ function histEvent(e,type)
     else if(type == 'up' && g_hist_move_line_id != -1) {
         let delta = (x - g_hist_move_start_x) / tr.h2p_a;
         pos[g_hist_move_line_id] += delta;
-        recalcStretch(pos[0],pos[1],pos[2]);
+        recalcStretch(pos[0],pos[1],pos[2],g_hist_move_line_id);
         g_hist_move_line_id = -1;
     }
     else if(type == 'end' && g_hist_move_line_id != -1) {
@@ -484,7 +487,7 @@ function histEvent(e,type)
     updateHistogram();
 }
 
-function recalcStretch(black,med,white)
+function recalcStretch(black,med,white,index)
 {
     if(black < 0)
         black = 0;
@@ -492,15 +495,20 @@ function recalcStretch(black,med,white)
         white = 1;
     if(black >= white)
         return;
-    let medp = (med - black) / (white - black);
-    let medp_limit = Math.pow(0.5,8); // gamma=8 max
-    if(medp > 0.5)
-        medp = 0.5;
-    if(medp < medp_limit)
-        medp = medp_limit;
-    let gamma = Math.log(medp) / Math.log(0.5);
-    let gain = 1.0/(white - black);
-    let cut = black * gain; 
+    var gain = 1.0/(white - black);
+    if(gain > 32)
+        gain = 32;
+    var cut = black * gain; 
+    var gamma = g_stretch.gamma;
+    if(index == 1) { // change gamma IFF it is requested
+        let medp = (med - black) / (white - black);
+        let medp_limit = Math.pow(0.5,8); // gamma=8 max
+        if(medp > 0.5)
+            medp = 0.5;
+        if(medp < medp_limit)
+            medp = medp_limit;
+        gamma = Math.log(medp) / Math.log(0.5);
+    }
     updatePPSliders({
         gain:gain,
         gamma: gamma,
@@ -558,11 +566,7 @@ function getHistTrans()
 
 function getStretchParams()
 {
-    return {
-        gain: getPVal("stretch_high"),
-        cut:  getPVal("stretch_low"),
-        gamma:getPVal("stretch_gamma")
-    };
+    return g_stretch;
 }
 
 function updateHistogram()
@@ -612,12 +616,25 @@ function updateHistogram()
     var black_p = tr.getX(tr.x_black); 
     var white_p = tr.getX(tr.x_white); 
     var med_p = tr.getX(tr.x_med); 
+    var txt_p = tr.getY(1.0);
     ctx.moveTo(black_p,0)
     ctx.lineTo(black_p,canvas.height);
     ctx.moveTo(white_p,0)
     ctx.lineTo(white_p,canvas.height);
     ctx.moveTo(med_p,0)
     ctx.lineTo(med_p,canvas.height);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#FFC000'
+    ctx.font = '4mm Sans';
+    ctx.textAlign = 'right'
+    ctx.fillText('0',black_p,txt_p);
+    ctx.textAlign = 'center'
+    ctx.fillText('½',med_p,txt_p);
+    ctx.textAlign = 'left'
+    ctx.fillText('1',white_p,txt_p);
     ctx.stroke();
     ctx.lineWidth=1;
     ctx.setLineDash([2,4]);
@@ -1133,26 +1150,15 @@ function ctlStack(status,confirm_may_be_needed=true)
     });
 }
 
-function setPPVal(name,val)
-{
-    document.getElementById('stack_stretch_' + name + '_disp').innerHTML = val.toFixed(3);
-}
-
-
-
-function setPPSlider(name,val)
-{
-    document.getElementById('stack_stretch_' + name).value = Math.round(val*1000);
-    setPPVal(name,val);
-}
 
 function updatePPSliders(data)
 {
-    setPPSlider('low',data.cut);
-    setPPSlider('high',data.gain);
-    setPPSlider('gamma',data.gamma);
-    g_prev_low = data.cut;
-    g_prev_high = data.gain;
+    g_stretch.cut = data.cut;
+    g_stretch.gain = data.gain;
+    g_stretch.gamma = data.gamma;
+    document.getElementById('p_gain').innerHTML = data.gain.toFixed(2);
+    document.getElementById('p_cut').innerHTML = data.cut.toFixed(3);
+    document.getElementById('p_gamma').innerHTML = data.gamma.toFixed(1);
     updatePP();
 }
 
@@ -1166,7 +1172,7 @@ function getAutoStretchState(e)
 {
     var as = 'auto_stretch' in e ? e.auto_stretch : true;
     document.getElementById('stack_auto_stretch').checked=as;
-    ////document.getElementById('dynamic_parameters').style.display= as ? 'none' : 'inline';
+    document.getElementById('dynamic_parameters').style.display= as ? 'none' : 'inline';
     if(!as) {
         updatePPSliders(e);
     }
@@ -1193,43 +1199,21 @@ function updateAutoPP()
         updatePP();
         return;
     }
-    //document.getElementById('dynamic_parameters').style.display='inline';
+    document.getElementById('dynamic_parameters').style.display='inline';
     restCall('get','/data/stretch.json',null,updatePPSliders,setDefaultPPSliders);
 }
 
-function updatePPLow()
-{
-    g_prev_low = getPVal('stretch_low');
-    g_prev_high = getPVal("stretch_high");
-    updatePP();
-}
 
-function updatePPHigh()
-{
-    var new_high = getPVal("stretch_high");
-    if(g_prev_low != -1 && g_prev_high != -1) {
-        var new_low = Math.min(Math.max(g_prev_low,0.8),g_prev_low * (new_high / g_prev_high));
-        setPPSlider('low',new_low);
-    }
-    else {
-        g_prev_high = new_high;
-        g_prev_low = getPVal("stretch_low");
-    }
-    updatePP();
-}
 
 function updatePP()
 {
 
     var config={
         auto_stretch:       getBVal("auto_stretch"),
-        stretch_low:        getPVal('stretch_low'),
-        stretch_high:       getPVal('stretch_high'),
-        stretch_gamma:      getPVal('stretch_gamma'),
+        stretch_low:        g_stretch.cut,
+        stretch_high:       g_stretch.gain,
+        stretch_gamma:      g_stretch.gamma
     };
-    setPPVal('low',config.stretch_low);
-    setPPVal('high',config.stretch_high);
-    setPPVal('gamma',config.stretch_gamma);
     restCall('post','/api/stacker/stretch',config,(e)=>{
     });
     updateHistogram();
@@ -1298,9 +1282,9 @@ function startStack()
         image_flip:         getBVal("image_flip"),
         remove_satellites:  getBVal("remove_satellites"),
         auto_stretch:       getBVal("auto_stretch"),
-        stretch_low:        getPVal('stretch_low'),
-        stretch_high:       getPVal('stretch_high'),
-        stretch_gamma:      getPVal('stretch_gamma'),
+        stretch_low:        g_stretch.cut,
+        stretch_high:       g_stretch.gain,
+        stretch_gamma:      g_stretch.gamma,
         type:               type,
         location : {
             lat:            lat,

@@ -83,6 +83,9 @@
     </span>
     <p>
         Auto:<input id="stack_auto_stretch" checked type="checkbox" onchange='updateAutoPP()' >
+        <span id="dynamic_parameters" style='display:none'>
+            (<span id="p_gain"></span>·x-<span id="p_cut"></span>)<sup>1/<span id="p_gamma"></span></sup>
+        </span>
     </p>
     <div id="hist_ctl">
         <button id="hist_ctl_valid" onclick="hZoom('vis')" class="hctl">vis</button><button id="hist_ctl_full" class="hctl" onclick="hZoom('all')" >all</button><button onclick="hZoom('0')"id="hist_ctl_black" class="hctl">⌕ 0</button><button id="hist_ctl_med" class="hctl" onclick="hZoom('0.5')" >⌕ ½</button><button id="hist_ctl_white" class="hctl" onclick="hZoom('1')" >⌕ 1</button>
@@ -90,32 +93,7 @@
     <div id="hist_div"> 
         <canvas id="hist_canvas" width="1024" height="100" ></canvas>
     </div>
-    <div id="dynamic_parameters" style='display:none'>
-      <table style='width:100%;'>
-        <colgroup>
-            <col span="1" style="width: 5%;">
-            <col span="1" style="width: 5%;">
-            <col span="1" style="width: 90%;">
-        </colgroup>
-        <tbody>
-        <tr>
-            <td class="slider_elem">L:</td>
-            <td class="slider_elem"><span id="stack_stretch_low_disp">0.000</span></td>
-            <td class="slider_elem"><input type="range" min="0" max="1000" value="0" class="slider" id="stack_stretch_low" onchange='updatePPLow()'></td>
-        </tr>
-        <tr>
-            <td class="slider_elem">H:</td>
-            <td class="slider_elem"><span id="stack_stretch_high_disp">1.000</span></td>
-            <td class="slider_elem"><input type="range" min="1000" max="32000" value="1000" class="slider" id="stack_stretch_high" onchange='updatePPHigh()'><td>
-        </tr>
-        <tr>
-            <td class="slider_elem">γ:</td>
-            <td class="slider_elem"><span id="stack_stretch_gamma_disp">2.400</span></td>
-            <td class="slider_elem"><input type="range" min="1000" max="8000" value="2400" class="slider" id="stack_stretch_gamma" onchange='updatePP()'></td>
-        </tr>
-        </tbody>
-      </table>
-    </div></div>
+</div>
 <div class="config_div" id="config" style="display:none; background-color:transparent;">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showConfig(false);">X</button>
