@@ -481,7 +481,7 @@ function histEvent(e,type)
     }
     else if(type == 'end' && g_hist_move_line_id != -1) {
         pos[g_hist_move_line_id] = g_hist_move_line_pos;
-        recalcStretch(pos[0],pos[1],pos[2]);
+        recalcStretch(pos[0],pos[1],pos[2],g_hist_move_line_id);
         g_hist_move_line_id = -1;
     }
     updateHistogram();
