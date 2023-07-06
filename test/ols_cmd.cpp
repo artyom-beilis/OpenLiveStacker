@@ -84,6 +84,8 @@ int main(int argc,char **argv)
         ols::CameraDriver::load_driver(driver,path,driver_opt_ptr);
         ols::PlateSolver::init(astap_db,astap_exe);
         ols::OpenLiveStacker stacker;
+        stacker.http_ip = cfg.get("http.ip",stacker.http_ip);
+        stacker.http_port = cfg.get("http.port",stacker.http_port);
         stacker.init(driver);
         stacker.run();
         stacker.shutdown();

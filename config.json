@@ -11,7 +11,11 @@
         "path" : "./wd"
     },
     "astap" : {
-        "exe": "/home/artik/Packages/astap/astap_cli",
-        "db": "astapdb/db"
+        "exe": "astap_cli",
+        "db": "data/db"
+    },
+    "http": {
+        "ip":"0.0.0.0",
+        "port":8080
     }
 }
