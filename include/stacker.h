@@ -96,8 +96,8 @@ namespace ols {
         {
             enable_stretch_ = auto_stretch;
             
-            low_cut_  = std::min(1.0f,std::max(0.0f,low_index));
             high_cut_ = std::max(1.0f,std::min(32.0f,high_index));
+            low_cut_  = std::min(high_cut_ - 0.001f,std::max(0.0f,low_index));
             target_gamma_ = std::max(1.0f,std::min(8.0f,stretch_index));
         }
 
