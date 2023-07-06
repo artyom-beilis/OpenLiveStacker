@@ -482,8 +482,8 @@ namespace ols {
             }
         }
 
-        uvc_context_t *ctx_;
-        uvc_device_t **device_list_;
+        uvc_context_t *ctx_ = nullptr;
+        uvc_device_t **device_list_ = nullptr;
         std::vector<std::string> names_;
         std::vector<int> name_to_device_;
     };
@@ -535,7 +535,7 @@ namespace ols {
     private:
 
         int fd_;
-        uvc_context_t *ctx_;
+        uvc_context_t *ctx_ = nullptr;
     };
 
     bool AndroidUVCCameraDriver::usb_option_set;
