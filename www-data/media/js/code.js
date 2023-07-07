@@ -704,12 +704,18 @@ function loadFormats()
         for(var i=sel.length-1;i>=0;i--) {
             sel.options.remove(i);
         }
+        var saved_sel = loadSavedInputValue('stream_format');
+        var matched = false;
         for(var i=0;i<formats.length;i++) {
             var option = document.createElement("option");
-            option.text = formats[i].format_id
-            option.value = formats[i].format_id
+            option.text = formats[i].format_id;
+            option.value = formats[i].format_id;
+            if(formats[i].format_id == saved_sel)
+                matched = true;
             sel.add(option)
         }
+        if(matched)
+            sel.value = saved_sel;
     });
 }
 
@@ -1044,13 +1050,14 @@ function startStream()
     if(isNaN(max_fr))
         max_fr = 0;
         restCall('post','/api/camera/stream',{op:'start',format_id:format_id, max_framerate: max_fr },(r)=>{
-        global_width = r.width;
-        global_height = r.height;
-        global_bin = r.bin;
-        showLiveVideo();
-        changeStackerStatus('idle');
-        recalcFOV();
-    });
+            saveInputValue('stream_format');
+            global_width = r.width;
+            global_height = r.height;
+            global_bin = r.bin;
+            showLiveVideo();
+            changeStackerStatus('idle');
+            recalcFOV();
+        });
     showConfig(false);
 }
 
