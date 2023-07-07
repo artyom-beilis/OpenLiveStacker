@@ -169,14 +169,12 @@ function getStoageValue()
     var data = storage.getItem('ols_data');
     if(!data)
         return {};
-    console.log('Loaded:' + data);
     return JSON.parse(data);
 }
 
 function setStorageValue(obj)
 {
     var data = JSON.stringify(obj);
-    console.log('Saved:' + data);
     window.localStorage.setItem('ols_data',data);
 }
 
@@ -296,13 +294,13 @@ function run()
     console.log(params)
     checkParams(params);
     restCall("get","/api/camera",null,listCameras);
+    setEventListeners();
+    updateSavedInputs();
     if(!checkAndSetLocation(params) && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((pos)=>{
             setGPS(pos.coords.latitude,pos.coords.longitude);
         });
     }
-    setEventListeners();
-    updateSavedInputs();
 }
 
 
@@ -1245,9 +1243,11 @@ function startStack()
     var lat = parseFloat(getVal("lat"));
     var lon = parseFloat(getVal("lon"));
     var field_derotation = getBVal("field_derotation");
-    if(field_derotation) {
+    var type = getVal('type');
+    var calib = type != 'dso';
+    if(field_derotation && !calib) {
         if(isNaN(lat) || isNaN(lon)) {
-            showError('Need Geolocation for derotation support\n(see settings menu)');
+            showError('Need Geolocation for derotation support\n(see settings-general menu)');
             return;
         }
         if(ra==null || de==null) {
@@ -1263,8 +1263,6 @@ function startStack()
     var name = getVal('name').trim();
     var obj = getVal('object').trim();
 
-    var type = getVal('type');
-    var calib = type != 'dso';
     if(!calib) {
         if(name == '')
             name = obj;
@@ -1689,7 +1687,7 @@ function setDownloadURL(db_id)
 
 function selectConfig(cfg)
 {
-    var cfgs = ['astap','camera','profiles'];
+    var cfgs = ['astap','general','camera','profiles'];
     for(var i=0;i<cfgs.length;i++) {
         var obj = document.getElementById('config_tab_' + cfgs[i]);
         if(cfgs[i] == cfg) {
