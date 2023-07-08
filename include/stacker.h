@@ -362,8 +362,9 @@ namespace ols {
         {
             if(rollback_on_pause_ && fully_stacked_count_ > 1) {
                 prev_sum_.copyTo(sum_);
-                prev_frame_max_.copyTo(frame_max_);
-                fully_stacked_count_ --;
+                fully_stacked_count_ = prev_fully_stacked_count_;
+                if(remove_satellites_) 
+                    prev_frame_max_.copyTo(frame_max_);
             }
         }
         
@@ -760,6 +761,7 @@ namespace ols {
         {
             if(rollback_on_pause_ && fully_stacked_count_ >= 1) {
                 sum_.copyTo(prev_sum_);
+                prev_fully_stacked_count_ = fully_stacked_count_;
                 if(remove_satellites_) 
                     frame_max_.copyTo(prev_frame_max_);
             }
@@ -806,6 +808,7 @@ namespace ols {
         cv::Mat frame_max_;
         cv::Mat sum_;
         cv::Mat prev_sum_,prev_frame_max_;
+        int prev_fully_stacked_count_ = 0;
         cv::Mat darks_;
         cv::Mat darks_gamma_corrected_;
         bool darks_corrected_ = false;
