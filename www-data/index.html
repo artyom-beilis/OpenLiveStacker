@@ -130,6 +130,13 @@
         <p>
             <span class="nowr" >Lon:<input class="val_input saved_input" id="stack_lon" type="number" step="0.001"></span>
         </p>
+        <p>
+            <select id="font_size_ctl" class="saved_input" onchange="updateFontSize()">
+                <option value="-1" >Small</option>
+                <option value="0" selected  >Normal</option>
+                <option value="2" >Large</option>
+                <option value="4" >XLarge</option>
+            </select>
     </div>
     
     <div id="config_tab_profiles" class="config_tab" style="display:none" >

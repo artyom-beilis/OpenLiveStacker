@@ -1040,6 +1040,44 @@ function onResize(ev)
     updateHistogram();
 }
 
+function setFontSizeForElements(tags,fs)
+{
+    for(var i=0;i<tags.length;i++)
+        tags[i].style.fontSize = fs;
+}
+
+function setFontSizeForTag(tag,fs)
+{
+    setFontSizeForElements(document.getElementsByTagName(tag));
+}
+
+function setFontSizeForClass(klass,fs)
+{
+    setFontSizeForElements(document.getElementsByClassName(klass));
+}
+
+function updateFontSize()
+{
+    var delta = parseInt(document.getElementById('font_size_ctl').value);
+    var f5 = `${5+delta}mm`;
+    var f4 = `${4+delta}mm`;
+    var body = document.body;
+    body.style.fontSize = f5;
+    setFontSizeForTag('TR',f5);
+    setFontSizeForTag('BUTTON',f5);
+    setFontSizeForTag('SELECT',f4);
+    setFontSizeForClass('comp_but',f5);
+    setFontSizeForClass('incdec_but',f5);
+    setFontSizeForClass('hctl',f4);
+    var inp = document.getElementsByTagName('INPUT');
+    for(var i=0;i<inp.length;i++){ 
+        let el = inp[i];
+        console.log(el.type);
+        if(el.type == 'number' || el.type == 'text')
+            el.style.fontSize = f4;
+        
+    }
+}
 
 function startStream()
 {
