@@ -630,6 +630,7 @@ namespace ols {
                     stacker_.reset(new Stacker(width_,height_,channels_));
                     stacker_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
                     stacker_->set_remove_satellites(ctl->remove_satellites);
+                    stacker_->set_rollback_on_pause(ctl->rollback_on_pause);
                     restart_ = true;
                 }
                 if(out_)
@@ -641,6 +642,13 @@ namespace ols {
                 break;
             case StackerControl::ctl_pause:
                 restart_ = true;
+                if(stacker_) {
+                    stacker_->handle_pause();
+                    send_updated_image();
+                }
+                if(stats_) {
+                    stats_->push(create_stats());
+                }
                 break;
             case StackerControl::ctl_cancel:
                 if(stacker_) {

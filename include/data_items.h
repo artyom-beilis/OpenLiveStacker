@@ -82,6 +82,7 @@ namespace ols {
         bool mono = false; // is mono data
         bool calibration = false;  /// Collect calibration data
         bool remove_satellites = false; // apply sat removal algorithm
+        bool rollback_on_pause = false; // remove last frame on pause
 
         bool derotate = false; /// enable auto derote for AZ mount
         bool derotate_mirror = false; /// inverse direction for mirror image

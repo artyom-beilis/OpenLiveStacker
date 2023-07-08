@@ -1242,6 +1242,8 @@ function startStack()
     var de=parseDEC(getVal("de"));
     var lat = parseFloat(getVal("lat"));
     var lon = parseFloat(getVal("lon"));
+    var delay = getStartDelay();
+    var rollback_on_pause = delay > 0;
     var field_derotation = getBVal("field_derotation");
     var type = getVal('type');
     var calib = type != 'dso';
@@ -1286,6 +1288,7 @@ function startStack()
         field_derotation:   field_derotation,
         image_flip:         getBVal("image_flip"),
         remove_satellites:  getBVal("remove_satellites"),
+        rollback_on_pause:  rollback_on_pause,
         auto_stretch:       getBVal("auto_stretch"),
         stretch_low:        g_stretch.cut,
         stretch_high:       g_stretch.gain,
@@ -1304,7 +1307,6 @@ function startStack()
         dark_flats : dark_flats
     };
 
-    var delay = getStartDelay();
     var doStackFunc = ()=> {
         restCall('post','/api/stacker/start',config,(e)=>{
             changeStackerStatus('stacking');

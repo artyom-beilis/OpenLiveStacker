@@ -111,6 +111,7 @@ namespace ols {
             cmd->de = content_.get("target.de",cmd->de);
             cmd->derotate_mirror = content_.get("image_flip",cmd->derotate_mirror);
             cmd->derotate = content_.get("field_derotation",cmd->derotate);
+            cmd->rollback_on_pause = content_.get("rollback_on_pause",cmd->rollback_on_pause);
             cmd->darks_path = content_.get("darks",cmd->darks_path);
             cmd->flats_path = content_.get("flats",cmd->flats_path);
             cmd->dark_flats_path = content_.get("dark_flats",cmd->dark_flats_path);

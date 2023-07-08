@@ -84,6 +84,11 @@ namespace ols {
             make_fft_blur();
         }
 
+        void set_rollback_on_pause(bool v)
+        {
+            rollback_on_pause_ = v;
+        }
+
         void set_remove_satellites(bool v)
         {
             remove_satellites_ = v;
@@ -351,6 +356,15 @@ namespace ols {
             stretch.cut = - goffset * gscale;
             stretch.auto_stretch = enable_stretch_;
             return std::make_pair(tmp,stretch);
+        }
+
+        void handle_pause()
+        {
+            if(rollback_on_pause_ && fully_stacked_count_ > 1) {
+                prev_sum_.copyTo(sum_);
+                prev_frame_max_.copyTo(frame_max_);
+                fully_stacked_count_ --;
+            }
         }
         
         bool stack_image(cv::Mat frame,bool restart_position = false)
@@ -744,6 +758,11 @@ namespace ols {
 #else    
         void add_image_upscaled(cv::Mat img,cv::Point shift)
         {
+            if(rollback_on_pause_ && fully_stacked_count_ >= 1) {
+                sum_.copyTo(prev_sum_);
+                if(remove_satellites_) 
+                    frame_max_.copyTo(prev_frame_max_);
+            }
             int dx = shift.x;
             int dy = shift.y;
             int width  = (sum_.cols - std::abs(dx));
@@ -786,6 +805,7 @@ namespace ols {
         bool remove_satellites_ = false;
         cv::Mat frame_max_;
         cv::Mat sum_;
+        cv::Mat prev_sum_,prev_frame_max_;
         cv::Mat darks_;
         cv::Mat darks_gamma_corrected_;
         bool darks_corrected_ = false;
@@ -807,6 +827,8 @@ namespace ols {
 
         int channels_;
         int cv_type_;
+
+        bool rollback_on_pause_ = false;
 
         //float low_per_= 0.05;
         //float high_per_=99.999f;
