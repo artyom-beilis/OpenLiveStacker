@@ -1532,6 +1532,18 @@ function formatTableRow(a)
     return res;
 }
 
+function getFOVs()
+{
+    var vfov = parseFloat(document.getElementById('solver_fov').value);
+    var hfov = global_width * vfov / global_height;
+    var dfov = Math.sqrt(vfov*vfov + hfov*hfov);
+    return {
+        d:dfov,
+        v:vfov,
+        h:hfov,
+    };
+}
+
 function updateSolverTable()
 {
     if(g_solver_result == null)
@@ -1540,6 +1552,12 @@ function updateSolverTable()
     if(v.solved) {
         g_solver_result = v;
         status = 'Distance to target ' + v.distance_to_target.toFixed(2) + '°';
+        var fovs = getFOVs();
+        console.log(`${JSON.stringify(fovs)} dist=${v.distance_to_target}`)
+        if(v.distance_to_target*2 > fovs.v || v.distance_to_target*2 > fovs.h) {
+            let dist_screens = (v.distance_to_target / fovs.d).toFixed(1);
+            status += ` or ${dist_screens} diagonals`;
+        }
         var opt = document.getElementById('solver_units').value;
         var warn = '';
         var v0,v1;
