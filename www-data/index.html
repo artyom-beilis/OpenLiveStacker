@@ -68,6 +68,13 @@
     <tr class="dso_config stack_opt" ><td>Flats</td><td colspan="2"><select id="stack_flats" onchange="saveCalibValue(this);"></select></td></tr>
     <tr class="dso_config stack_opt" ><td>Dark Flats</td><td colspan="2"><select id="stack_dark_flats" onchange="saveCalibValue(this); "></select></td></tr>
     <tr class="stack_opt" ><td>Save All Frames</td><td><input class="saved_input" id="stack_save_data" type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr class="calib_config stack_opt" style='display:none'>
+        <td>White Screen</td>
+        <td>
+            <input class="saved_input val_input" id="white_delay" value="0" min="0" max="1000" type="number" />
+        </td>
+        <td>show white screen for</td>
+    </tr>
     <tr class="stack_opt" >
         <td>Delay (s)</td>
         <td>
@@ -218,6 +225,7 @@
     <button onclick="hideError();" id="confirm_cancel_button" >Cancel</button>
 </p>
 </div>
+<div id="white_screen" ></div>
 <script src="/media/js/jsdb.js"></script>
 <script src="/media/js/code.js"></script>
 </body>

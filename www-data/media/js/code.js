@@ -324,6 +324,11 @@ function updateStackSelect()
     for(var i=0;i<elements.length;i++) {
         elements[i].style.display = new_style;
     }
+    new_style = type != 'dso' ? '' : 'none';
+    elements = document.getElementsByClassName('calib_config');
+    for(var i=0;i<elements.length;i++) {
+        elements[i].style.display = new_style;
+    }
 }
 
 function checkOpenStatus(st)
@@ -1357,6 +1362,13 @@ function startStack()
     else {
         document.getElementById('stack').style.display = 'none';
         showNotification('Stacking',delay,true,doStackFunc);
+    }
+    var ws = parseFloat(document.getElementById('white_delay').value);
+    ws = isNaN(ws) ? 0 : ws;
+    if(ws > 0 && delay > 0 && calib) {
+        setTimeout(()=> { ctlStack('pause')},(delay + ws) * 1000);
+        setTimeout(()=> { document.getElementById('white_screen').style.display='none' },(delay *2 + ws) * 1000);
+        document.getElementById('white_screen').style.display='block';
     }
 }
 
