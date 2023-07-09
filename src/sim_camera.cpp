@@ -57,7 +57,7 @@ namespace ols {
         {
             std::ifstream data(dir_  + "/log.txt");
             if(!data)
-                throw SIMError("Failed to read log file");
+                throw SIMError("Failed to the read simultion log file.\nCheck that simulation data has been downloaded and that sim.path or OLS_SIM_DIR point to it");
             bayer_ = bayer_na;
             std::string str;
             while(std::getline(data,str)) {
