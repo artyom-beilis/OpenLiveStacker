@@ -10,6 +10,9 @@ option(NO_SSE4 "Disable SSE 4.1/4.3 on x86/x86_64 builds" OFF)
 find_library(ASI_CAMERA_LIB ASICamera2)
 find_path(ASI_CAMERA_HDR ASICamera2.h)
 
+find_library(TOUPCAM_CAMERA_LIB toupcam)
+find_path(TOUPCAM_CAMERA_HDR toupcam.h)
+
 find_library(LIBTIFF tiff)
 find_library(LIBCPPCMS cppcms)
 find_library(LIBBOOSTER booster)
@@ -115,6 +118,18 @@ if(ASI_CAMERA_HDR AND ASI_CAMERA_LIB)
     message("- Building ASI Driver")
 else()
     message("- No ASI SDK header/lib found")
+endif()
+
+if(TOUPCAM_CAMERA_HDR AND TOUPCAM_CAMERA_LIB)
+    include_directories(${TOUPCAM_CAMERA_HDR})
+    add_library(ols_driver_toup SHARED src/toup_camera.cpp)
+    target_link_libraries(ols_driver_toup ${TOUPCAM_CAMERA_LIB})
+    install(TARGETS ols_driver_toup
+            LIBRARY DESTINATION lib
+    )
+    message("- Building Toupcam Driver")
+else()
+    message("- No Toupcam SDK header/lib found")
 endif()
 
 
