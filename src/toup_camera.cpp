@@ -240,11 +240,7 @@ namespace ols
         /// Start a video stream with provided callback
         virtual void start_stream(CamStreamFormat format, frame_callback_type callback, CamErrorCode &e)
         {
-            std::stringstream ss;
             int hr;
-            ss << format;
-            std::string s = ss.str();
-            // printf("\n\nstart_stream: %s\n", s.c_str());
             if (stream_active_ != 0)
             {
                 stop_stream(e);
@@ -618,7 +614,11 @@ namespace ols
             }
             break;
             default:
-                e = make_message(cam_option_id_to_string_id(id), TOUPCAM_ERROR_INVALID_OPTION);
+                ///
+                /// we can't use cam_option_id_to_string_id I can't link with OLS because runtime of the library
+                /// isn't clear
+                /// e = make_message(cam_option_id_to_string_id(id), TOUPCAM_ERROR_INVALID_OPTION);
+                e = make_message(std::to_string(int(id)), TOUPCAM_ERROR_INVALID_OPTION);
                 break;
             }
             return r;
