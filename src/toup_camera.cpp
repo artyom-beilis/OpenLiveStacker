@@ -166,7 +166,18 @@ namespace ols
             }
             return ret;
         }
-
+        void handle_error(const char *msg)
+        {
+            CamFrame frm = {};
+            frm.format = stream_error;
+            frm.data = msg;
+            frm.data_size = strlen(msg);
+            std::unique_lock<std::mutex> guard(lock_);
+            if (callback_)
+            {
+                callback_(frm);
+            }
+        }
         void handle_frame()
         {
             CamFrame frm;
@@ -240,7 +251,11 @@ namespace ols
         /// Start a video stream with provided callback
         virtual void start_stream(CamStreamFormat format, frame_callback_type callback, CamErrorCode &e)
         {
+            //std::stringstream ss;
             int hr;
+            //ss << format;
+            //std::string s = ss.str();
+            // printf("\n\nstart_stream: %s\n", s.c_str());
             if (stream_active_ != 0)
             {
                 stop_stream(e);
@@ -873,10 +888,26 @@ namespace ols
      */
     void StartPullCallback(unsigned nEvent, void *pCallbackCtx)
     {
-        if (TOUPCAM_EVENT_IMAGE == nEvent)
+        ToupcamCamera *pToupcamCamera = reinterpret_cast<ToupcamCamera *>(pCallbackCtx);
+        switch (nEvent)
         {
-            ToupcamCamera *pToupcamCamera = reinterpret_cast<ToupcamCamera *>(pCallbackCtx);
+        case TOUPCAM_EVENT_IMAGE:
             pToupcamCamera->handle_frame();
+            break;
+        case TOUPCAM_EVENT_ERROR:
+            pToupcamCamera->handle_error("Generic error");
+            break;
+        case TOUPCAM_EVENT_DISCONNECTED:
+            pToupcamCamera->handle_error("Camera disconnected");
+            break;
+        case TOUPCAM_EVENT_NOFRAMETIMEOUT:
+            pToupcamCamera->handle_error("No frame timeout error");
+            break;
+        case TOUPCAM_EVENT_NOPACKETTIMEOUT:
+            pToupcamCamera->handle_error("No packet timeout");
+            break;
+        default:
+            break;
         }
     }
     /**
@@ -951,7 +982,7 @@ namespace ols
             }
             if (names_.size() == 0)
                 e = make_message("list_cameras", TOUPCAM_ERROR_OPEN_BY_INDEX);
-            // printf("\n\nToupcamCameraDriver::list_cameras: %d\n", names_.size());
+            // printf("\n\nToupcamCameraDriver::list_cameras: %lu\n", names_.size());
             return names_;
         }
         /**
