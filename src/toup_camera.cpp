@@ -191,11 +191,7 @@ namespace ols {
         /// Start a video stream with provided callback 
         virtual void start_stream(CamStreamFormat format,frame_callback_type callback,CamErrorCode &e) 
         {
-            std::stringstream ss;
             int hr;
-            ss << format;
-            std::string s = ss.str();
-            // printf("\n\nstart_stream: %s\n", s.c_str());
             if(stream_active_ != 0) {
                 stop_stream(e);
                 if(e)
@@ -516,7 +512,9 @@ namespace ols {
                 }
                 break;
             default:
-                e = make_message(cam_option_id_to_string_id(id), TOUPCAM_ERROR_INVALD_OPTION);
+                // don't use cam_option_id to prevent linking with main OLS - due to possible runtime issues
+                // e = make_message(cam_option_id_to_string_id(id), TOUPCAM_ERROR_INVALD_OPTION);
+                e = make_message(std::to_string(int(id)), TOUPCAM_ERROR_INVALD_OPTION);
                 break;
             }
             return r;
@@ -854,16 +852,15 @@ namespace ols {
 }
 
 extern "C" {
-    ols::CameraDriver *ols_get_toup_driver(int cam_id = -1)
+    ols::CameraDriver *ols_get_toup_driver(int cam_id,ols::CamErrorCode *e)
     {
         // printf("\n\nols_get_toup_driver: %d\n", cam_id);
-        ols::CamErrorCode e;
         std::unique_ptr<ols::CameraDriver> p;
         if(cam_id != -1)
-            p.reset(new ols::SingleToupcamCameraDriver(cam_id,e));
+            p.reset(new ols::SingleToupcamCameraDriver(cam_id,*e));
         else
             p.reset(new ols::ToupcamCameraDriver());
-        if(e) {
+        if(*e) {
             p.reset();
         }
         return p.release();

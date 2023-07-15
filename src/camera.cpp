@@ -2,7 +2,7 @@
 #include <dlfcn.h>
 #include <algorithm>
 
-extern "C" typedef ols::CameraDriver *(*cam_generator_ptr_type)(int);
+extern "C" typedef ols::CameraDriver *(*cam_generator_ptr_type)(int,ols::CamErrorCode *);
 extern "C" typedef int (*cam_config_ptr_type)(char const *);
 
 namespace ols {
@@ -52,9 +52,10 @@ std::unique_ptr<CameraDriver> CameraDriver::get(int id,int external_option)
 {
     if((unsigned)id >= driver_calls.size())
         throw CamError("Invalid driver id"); 
-    std::unique_ptr<CameraDriver> r(driver_calls.at(id)(external_option));
+    CamErrorCode e;
+    std::unique_ptr<CameraDriver> r(driver_calls.at(id)(external_option,&e));
     if(!r)
-        throw CamError("Failed to load camera " + std::to_string(id));
+        throw CamError("Failed to load camera " + std::to_string(id) + ":" + e.message());
     return r;
 }
 std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)

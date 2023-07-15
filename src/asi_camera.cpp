@@ -591,15 +591,14 @@ namespace ols {
 }
 
 extern "C" {
-    ols::CameraDriver *ols_get_asi_driver(int cam_id = -1)
+    ols::CameraDriver *ols_get_asi_driver(int cam_id,ols::CamErrorCode *e)
     {
-        ols::CamErrorCode e;
         std::unique_ptr<ols::CameraDriver> p;
         if(cam_id != -1)
-            p.reset(new ols::SingleASICameraDriver(cam_id,e));
+            p.reset(new ols::SingleASICameraDriver(cam_id,*e));
         else
             p.reset(new ols::ASICameraDriver());
-        if(e) {
+        if(*e) {
             p.reset();
         }
         return p.release();
