@@ -64,6 +64,7 @@ namespace ols {
         opt_fan_on,
         opt_cooler_power_perc,
         opt_average_bin,
+        opt_black_level,
         opt_live_stretch,
         opt_count
     };
