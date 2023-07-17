@@ -678,8 +678,8 @@ namespace ols
             break;
             case opt_exp:
             {
-                unsigned µsTime = (unsigned)(value * 1000);
-                hr = Toupcam_put_ExpoTime(hcam_, µsTime);
+                unsigned usTime = (unsigned)(value * 1000);
+                hr = Toupcam_put_ExpoTime(hcam_, usTime);
             }
             break;
             case opt_cooler_power_perc:
