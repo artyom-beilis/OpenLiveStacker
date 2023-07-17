@@ -53,6 +53,24 @@ inline void prepare_power_curve(int gamma_table_size,float *table,float pw)
     cv::pow(tmp,pw,tmp);
 }
 
+inline void prepare_asinh_curve(int gamma_table_size,float *table,float pw)
+{
+    float half_point = std::pow(0.5f,1.0f/pw);
+    float a = 1.0f/half_point * std::sinh(std::acosh(1.0f/(2.0f*half_point)));
+    float t_factor = 1.0f / (gamma_table_size - 1);
+    for(int i=0;i<gamma_table_size;i++) {
+        table[i] = i * t_factor;
+    }
+    table[gamma_table_size] = 1.0f;
+    if(a == 1)
+        return;
+    float factor = 1.0f / std::asinh(a);
+    for(int i=1;i<gamma_table_size;i++) {
+        table[i] = factor * std::asinh(table[i] * a);
+    }
+}
+
+
 
 
 }

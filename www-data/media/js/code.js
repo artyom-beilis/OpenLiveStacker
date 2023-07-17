@@ -572,6 +572,15 @@ function getStretchParams()
     return g_stretch;
 }
 
+function gammaToAsinh(pw)
+{
+    if(pw >= 1)
+        return 1.0;
+    var half_point = Math.pow(0.5,1.0/pw);
+    var a = 1.0/half_point * Math.sinh(Math.acosh(1.0/(2.0*half_point)));
+    return a;
+}
+
 function updateHistogram()
 {
     var div = document.getElementById('hist_div')
@@ -642,9 +651,12 @@ function updateHistogram()
     ctx.lineWidth=1;
     ctx.setLineDash([2,4]);
     ctx.beginPath();
-    for(var i=0;i<=100;i++) {
-        let xv = i / 100.0;
-        let yv = Math.pow(xv,1/sp.gamma);
+    var a_factor = gammaToAsinh(1/sp.gamma);
+    var scale = 1/Math.asinh(a_factor);
+    for(var i=0;i<=128;i++) {
+        let xv = i / 128.0;
+        //let yv = Math.pow(xv,1/sp.gamma);
+        let yv = Math.asinh(xv * a_factor) * scale;
         let xp = tr.getX(tr.x_black * (1-xv) + tr.x_white*xv);
         let yp = tr.getY(yv);
         if(i == 0)
