@@ -16,6 +16,7 @@ namespace ols
     static const unsigned int TOUPCAM_ERROR_OPEN_BY_INDEX = -1;
     static const unsigned int TOUPCAM_ERROR_OPEN_BY_INFO = -2;
     static const unsigned int TOUPCAM_ERROR_INVALID_OPTION = -3;
+    static const unsigned int TOUPCAM_ERROR_OPEN_MODEL = -4;
     static std::string make_message(std::string const &msg, unsigned int code)
     {
         std::string str;
@@ -34,6 +35,9 @@ namespace ols
                 break;
             case TOUPCAM_ERROR_INVALID_OPTION:
                 str = "Invalid option";
+                break;
+            case TOUPCAM_ERROR_OPEN_MODEL:
+                str = "Toupcam_query_Model returned nullptr";
                 break;
             case 0x80004005:
                 str = "Unspecified failure";
@@ -83,23 +87,24 @@ namespace ols
     {
     public:
         /// for Android
-        ToupcamCamera(unsigned int id, CamErrorCode &e)
+        ToupcamCamera(std::string const &android_id,std::string const &camera_name, CamErrorCode &e)
         {
+            memset(&info_,0,sizeof(info_));
             stream_active_ = 0;
-            ToupcamDeviceV2 info[TOUPCAM_MAX];
-            unsigned N = Toupcam_EnumV2(info);
-            if (id >= N)
-            {
-                e = make_message("No such camera index", TOUPCAM_ERROR_OPEN_BY_INDEX);
-                return;
-            }
-            hcam_ = Toupcam_Open(info[id].id);
+            hcam_ = Toupcam_Open(android_id.c_str());
             if (NULL == hcam_)
             {
-                e = make_message("Failed to open camera, hcam_ is NULL", TOUPCAM_ERROR_OPEN_BY_INFO);
+                e = make_message("Failed to open camera with id/name = " + android_id + "/" + camera_name + ", hcam_ is NULL", TOUPCAM_ERROR_OPEN_BY_INFO);
                 return;
             }
-            info_ = info[id];
+            strncpy(info_.id,android_id.c_str(),sizeof(info_.id)-1);
+            strncpy(info_.displayname,camera_name.c_str(),sizeof(info_.displayname)-1);
+            info_.model = Toupcam_query_Model(hcam_);
+            if(info_.model == nullptr) {
+                e = make_message("Failed to access model for camera " + android_id + "/" + camera_name, TOUPCAM_ERROR_OPEN_MODEL);
+                return;
+            }
+
             init(e);
         }
         ToupcamCamera(ToupcamDeviceV2 info, CamErrorCode &e) : info_(info)
@@ -924,17 +929,8 @@ namespace ols
         /**
          * Loops over connected Toupcam cameras, prepares display name, and saves camera info
          */
-        SingleToupcamCameraDriver(int id, CamErrorCode &e) : id_(id)
+        SingleToupcamCameraDriver(std::string const &id,std::string const &name) : id_(id),name_(name)
         {
-            // printf("\n\nSingleToupcamCameraDriver: %d\n", id);
-            ToupcamDeviceV2 info[TOUPCAM_MAX];
-            unsigned N = Toupcam_EnumV2(info);
-            if ((unsigned)id >= N)
-            {
-                e = make_message("No such camera index", TOUPCAM_ERROR_OPEN_BY_INDEX);
-                return;
-            }
-            name_ = info[id].displayname;
         }
         virtual std::vector<std::string> list_cameras(CamErrorCode &)
         {
@@ -950,14 +946,14 @@ namespace ols
                 e = "No such camera " + std::to_string(id);
                 return cam;
             }
-            cam = std::unique_ptr<Camera>(new ToupcamCamera(id_, e));
+            cam = std::unique_ptr<Camera>(new ToupcamCamera(id_,name_,e));
             if (e)
                 cam = nullptr;
             return cam;
         }
 
     private:
-        int id_;
+        std::string id_;
         std::string name_;
     };
 
@@ -1006,20 +1002,27 @@ namespace ols
         std::vector<ToupcamDeviceV2> cams_;
         std::vector<std::string> names_;
     };
+    namespace ToupDriverConfig {
+        std::string driver_config;
+    }
 }
 
 extern "C" {
-    ols::CameraDriver *ols_get_toup_driver(int cam_id,ols::CamErrorCode *e)
+    int ols_set_toup_driver_config(char const *str)
     {
-        // printf("\n\nols_get_toup_driver: %d\n", cam_id);
-        std::unique_ptr<ols::CameraDriver> p;
-        if(cam_id != -1)
-            p.reset(new ols::SingleToupcamCameraDriver(cam_id,*e));
-        else
-            p.reset(new ols::ToupcamCameraDriver());
-        if(*e) {
-            p.reset();
+        ols::ToupDriverConfig::driver_config = str;
+        return 0;
+    }
+    ols::CameraDriver *ols_get_toup_driver(int /*unused*/,ols::CamErrorCode * /*unused*/)
+    {
+        if(ols::ToupDriverConfig::driver_config.empty()) {
+            return new ols::ToupcamCameraDriver();
         }
-        return p.release();
+        else {
+            size_t split_point = ols::ToupDriverConfig::driver_config.find(':');
+            std::string id = ols::ToupDriverConfig::driver_config.substr(0,split_point);
+            std::string name = split_point == std::string::npos ? "Camera" : ols::ToupDriverConfig::driver_config.substr(split_point+1);
+            return new ols::SingleToupcamCameraDriver(id,name);
+        }
     }
 }
