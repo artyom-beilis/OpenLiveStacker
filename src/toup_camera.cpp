@@ -323,7 +323,7 @@ namespace ols
             if (frameRate < 1)
                 frameRate = 1;
             else if (frameRate > 63)
-                frameRate = 63;
+                frameRate = 0;
             hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FRAMERATE, frameRate);
             if (FAILED(hr))
             {
