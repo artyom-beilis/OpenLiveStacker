@@ -137,7 +137,7 @@ namespace ols {
         CamStreamType format;
         int width,height;
         int bin = 1;
-        int roi_num = 1; // roi_part = 2 -> 1/2, roi_part = 3 -> 1/3
+        int roi_num = 1; 
         int roi_den = 1; 
         // roi_num = 2, roi_den=3 -> 2/3
         float framerate = 1.0f; // -1 for unknown
