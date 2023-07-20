@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <thread>
 #include <algorithm>
+#include <cmath>
 
 namespace ols
 {
@@ -153,20 +154,30 @@ namespace ols
                 sfmt.framerate = info_.model->maxspeed;
                 sfmt.width = info_.model->res[i].width;
                 sfmt.height = info_.model->res[i].height;
+                sfmt.bin = (int)std::round(1.0 * info_.model->res[0].width / info_.model->res[i].width);
+
                 for (auto video_format : video_formats)
                 {
                     sfmt.format = video_format;
                     res.push_back(sfmt);
                 }
             }
-            auto ret = res; // duplicate before adding binning options
-            for (auto bin : bins_)
+            auto ret = res; // duplicate before adding ROI options
+            if(info_.model->flag | TOUPCAM_FLAG_ROI_HARDWARE) // Let's support HW ROI only
+            for (auto sfmt : res) // resolutions x ROI options
             {
-                if (bin < 2)
-                    continue;         // bin1 already in ret
-                for (auto sfmt : res) // native resolution x bin options
-                {
-                    sfmt.bin = bin;
+                int prevW = 1;
+                sfmt.roi_den = 1;
+                for(int scale = 2;scale < 50;scale++) {
+                    int newW = (info_.model->res[0].width / sfmt.bin) / scale / ROI_MIN_WIDTH_HEIGHT * ROI_MIN_WIDTH_HEIGHT;
+                    if(prevW == newW) continue;
+                    int newH = (info_.model->res[0].height / sfmt.bin) / scale / ROI_MIN_WIDTH_HEIGHT * ROI_MIN_WIDTH_HEIGHT; // not really required 16 pix granulatity, but let make larg steps 
+                    if(std::min(newW,newH) < 320)
+                        break;
+                    prevW = newW;
+                    sfmt.width = newW;
+                    sfmt.height = newH;
+                    sfmt.roi_den = scale;
                     ret.push_back(sfmt);
                 }
             }
@@ -189,20 +200,17 @@ namespace ols
             CamFrame frm;
             int hr;
             int nW = 1, nH = 1;
-            if(roiPercent_ == 100.0)
+            unsigned xOffset, yOffset, xWidth, yHeight;
+            if (FAILED(hr = Toupcam_get_Roi(hcam_, &xOffset, &yOffset, &xWidth, &yHeight)))
+                return;
+            if(xOffset | yOffset | xWidth | yHeight) // Roi is set
             {
-                hr = Toupcam_get_Size(hcam_, &nW, &nH); // Just in case let recalculate image buffer
-                if (FAILED(hr))
-                    return;
-            }
-            else
-            {
-                unsigned xOffset, yOffset, xWidth, yHeight;
-                if (FAILED(hr = Toupcam_get_Roi(hcam_, &xOffset, &yOffset, &xWidth, &yHeight)))
-                    return;
                 nW =  (int)xWidth;
                 nH =  (int)yHeight;             
             }
+            else if (FAILED(hr = Toupcam_get_Size(hcam_, &nW, &nH)))
+                return; 
+
             int binning = -1;
             hr = Toupcam_get_Option(hcam_, TOUPCAM_OPTION_BINNING, &binning);
             if (FAILED(hr))
@@ -306,19 +314,17 @@ namespace ols
                 e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_BINNING)", hr);
                 return;
             }
-            int width = format.width;
-            int height = format.height;
+            int width, height;
+            if (FAILED(hr = Toupcam_get_Size(hcam_, &width, &height)))
+            {
+                e = make_message("Failed to Toupcam_get_Size", hr);
+                return;
+            }
 
             updateWHByBin(width, height, binning);
 
             // Data buffer
             buf_.resize(width * height * bpp);
-            hr = Toupcam_put_Size(hcam_, format.width, format.height);
-            if (FAILED(hr))
-            {
-                e = make_message("Failed to Toupcam_put_Size", hr);
-                return;
-            }
             hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_RAW, raw);
             if (FAILED(hr))
             {
@@ -341,7 +347,7 @@ namespace ols
                 return;
             }
 
-            setROI(roiPercent_, e);
+            setROI(format, e);
             if(e)
                 return;
 
@@ -451,8 +457,6 @@ namespace ols
                 opts.push_back(opt_cooler_on);
             if (info_.model->flag | TOUPCAM_FLAG_TEC_ONOFF)
                 opts.push_back(opt_cooler_target);
-            if (info_.model->flag | TOUPCAM_FLAG_ROI_HARDWARE)
-                opts.push_back(opt_center_roi);
             if (average_bin_support_ != NULL)
                 opts.push_back(opt_average_bin);
             if (info_.model->flag | TOUPCAM_FLAG_BLACKLEVEL)
@@ -557,35 +561,6 @@ namespace ols
                 r.def_val = TOUPCAM_BLACKLEVEL_MIN;
                 return r;
             }
-            case opt_center_roi:
-            {
-                r.type = type_percent;
-                r.read_only = false;
-                r.min_val = r.step_size = getMinROIPercentage(e);
-                if(e)
-                    return r;
-
-                // printf("\n\nOPT_CENTER_ROI = %f\n", r.min_val);
-                r.max_val = 100.0;
-                unsigned xOffset, yOffset, xWidth, yHeight, nResolutionIndex;
-                if (FAILED(hr = Toupcam_get_Roi(hcam_, &xOffset, &yOffset, &xWidth, &yHeight)))
-                {
-                    e = make_message("Failed to Toupcam_get_Roi", hr);
-                    return r;
-                }
-                if (FAILED(hr = Toupcam_get_eSize(hcam_, &nResolutionIndex)))
-                {
-                    e = make_message("Failed to Toupcam_get_eSize", hr);
-                    return r;
-                }
-                calcROIPercentage(xOffset, yOffset, xWidth, yHeight, nResolutionIndex);
-                r.cur_val = roiPercent_;
-                // printf("\n\nroiPercent_ = %f\n", roiPercent_);
-
-                r.def_val = 100.0;
-                return r;
-            }
-            break;
             case opt_cooler_power_perc:
             {
                 r.type = type_percent;
@@ -743,12 +718,6 @@ namespace ols
                 hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_BLACKLEVEL, bl);
             }
             break;
-            case opt_center_roi:
-            {
-                setROI(value, e);
-                return;
-            }
-            break;
             case opt_gain:
             {
                 unsigned short nGain = (unsigned short)value;
@@ -812,14 +781,13 @@ namespace ols
             name_ = std::string(info_.displayname) + "/" + info_.model->name;
         }
         /**
-         * API does not provide get_Max_Binnig, so let do:
-         * 1. Saves current binning
-         * 2. Loops over [1:127] bin numbers and tries to set TOUPCAM_OPTION_BINNING to this bin number
-         * 3. Saves all successful attempts
-         * 4. Sets bin=2 | 0x80 - AVERAGE_BINNING_FLAG, if successful, enabled the Average binning option (useful for bin > 1)
+         * API does not provide info on types of binnig, so let's check it
+         * 1. Save current binning
+         * 2. Set TOUPCAM_OPTION_BINNING, 2 | AVERAGE_BINNING_FLAG 
+         * 3. If attmpt was successful note it
          * 5. Restores current binnig
          */
-        void setBins(CamErrorCode &e)
+        void checkAverageBinning(CamErrorCode &e)
         {
             if (NULL == hcam_)
             {
@@ -834,14 +802,15 @@ namespace ols
                 e = make_message("Failed to Toupcam_get_Option(TOUPCAM_OPTION_BINNING)", h);
                 return;
             }
-            for (int i = 1; i < 128; ++i) // Assume no more than 127 ;-) bins
-            {
-                h = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_BINNING, i);
-                if (SUCCEEDED(h))
-                    bins_.push_back(i);
-                else
-                    break;
-            }
+            // In this way we can find both HW and SW bins
+            // for (int i = 1; i < 128; ++i) // Assume no more than 127 ;-) bins
+            // {
+            //     h = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_BINNING, i);
+            //     if (SUCCEEDED(h))
+            //         bins_.push_back(i);
+            //     else
+            //         break;
+            // }
             h = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_BINNING, 2 | AVERAGE_BINNING_FLAG); // 0x80 - Average flag, 2 - min bin with average flag set
             if (SUCCEEDED(h))
             {
@@ -852,7 +821,6 @@ namespace ols
             if (FAILED(h))
             {
                 e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_BINNING, default)", h);
-                bins_.clear();
             }
         }
         /**
@@ -869,47 +837,15 @@ namespace ols
             height -= height % 2;
         }
         /**
-         * Calculates current ROI persentage of a selected resoulution
-         */
-        void calcROIPercentage(unsigned xOffset, unsigned yOffset, unsigned xWidth, unsigned yHeight, unsigned nResolutionIndex)
-        {
-            if(0 == (xOffset | yOffset | xWidth | yHeight))
-            {
-                roiPercent_ = 100.0;
-                return;
-            }
-
-            roiPercent_ = 100.0 * xWidth / info_.model->res[nResolutionIndex].width;
-            roiPercent_ = roiPercent_ == 0 ? 100.0 : roiPercent_;
-        }
-        /**
-         * Calculates min ROI persentage of a current resoulution
-         */
-        double getMinROIPercentage(CamErrorCode &e)
-        {
-            double ret = 100.0;
-            int w,h,hr;
-            hr = Toupcam_get_Size(hcam_, &w, &h);
-            if(FAILED(hr))
-            {
-                e = make_message("Failed to Toupcam_get_Size", hr);
-                return ret;
-            }
-            // printf("\n\ngetMinROIPercentage = %u\n", w);
-            return (10000 * ROI_MIN_WIDTH_HEIGHT / w) / 100.0;
-        }
-        /**
-		 * Set center ROI rectangle of a percentage of a current resolution
+		 * Set center ROI
 		 * Expectation: Toupcam_put_Size done before this method gets called
          */
-        void setROI(double roiPercent, CamErrorCode &e)
+        void setROI(CamStreamFormat sfmt, CamErrorCode &e)
         {
             int w,h,hr;
             
-            double minRoi = getMinROIPercentage(e);
-            if(roiPercent >= 100.0 - minRoi)
+            if(sfmt.roi_den == 1) // ROI is not set
             {
-                roiPercent_ = 100.0;
                 if (FAILED(hr = Toupcam_put_Roi(hcam_, 0, 0, 0, 0)))
                 {
                     e = make_message("setROI: Failed to Toupcam_put_Roi(100%)", hr);
@@ -917,9 +853,6 @@ namespace ols
                 // printf("\n\nROI=(0,0,0,0)\n");
                 return;
             }
-            roiPercent_ = roiPercent;
-            if(roiPercent_ < minRoi)
-                roiPercent_ = minRoi;
 
             if(FAILED(hr = Toupcam_get_Size(hcam_, &w, &h)))
             {
@@ -928,10 +861,10 @@ namespace ols
             }
 
             // printf("\n\n\nsetROI: val= %f, roiW=%u, hoiH=%u\n", roiPercent_, );
-            unsigned roiW = unsigned(roiPercent_ * w / 100.0);
+            unsigned roiW = sfmt.width;
             if(roiW < ROI_MIN_WIDTH_HEIGHT)
                 roiW = ROI_MIN_WIDTH_HEIGHT;
-            unsigned roiH = unsigned(roiPercent_ * h / 100.0);
+            unsigned roiH = sfmt.height;
             if(roiH < ROI_MIN_WIDTH_HEIGHT)
                 roiH = ROI_MIN_WIDTH_HEIGHT;
 
@@ -991,9 +924,14 @@ namespace ols
                 e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_LOW_NOISE, 1)", hr);
                 return;
             }
-
+            hr = Toupcam_put_Size(hcam_, info_.model->res[0].width, info_.model->res[0].height);
+            if (FAILED(hr))
+            {
+                e = make_message("Failed to Toupcam_put_Size", hr);
+                return;
+            }
             set_name();
-            setBins(e);
+            checkAverageBinning(e);
             if (!(info_.model->flag | TOUPCAM_FLAG_MONO)) // Supported in Color mode, let disable on init
             {
                 if (FAILED(hr = Toupcam_AwbOnce(hcam_, NULL, NULL)))
@@ -1008,10 +946,7 @@ namespace ols
         std::string name_;
         bool average_bin_;
         bool *average_bin_support_ = NULL;
-        bool chrome_;
-        double roiPercent_ = 100.0;
         std::vector<unsigned char> buf_;
-        std::vector<int> bins_;
         std::atomic<int> stream_active_;
         int frame_counter_ = 0;
         CamBayerType bayerPattern_ = bayer_na;

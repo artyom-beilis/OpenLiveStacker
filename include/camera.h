@@ -65,7 +65,6 @@ namespace ols {
         opt_cooler_power_perc,
         opt_average_bin,
         opt_black_level,
-        opt_center_roi, // Zoom the center part of the screen using percentage control: p = 100 * roi.width/current image width
         opt_live_stretch,
         opt_count
     };
