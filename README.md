@@ -3,7 +3,7 @@
 ## Status
 
 - Beta, runs on Linux and Android.
-- Works with UVC and ASI ZWO Cameras
+- Works with ASI ZWO, ToupTek and UVC Cameras
 
 ## Roadmap
 
@@ -13,7 +13,8 @@
 - Camera
     - Implemented
         - UVC Based like webcam, sv105
-        - ASI ZWO support - initial exposure and gain controls only
+        - ASI ZWO support
+        - ToupTek support
         - Watch directoy for files (universal integration with ekos)
         - Sim - simulation for development
     - Future extected drivers:
@@ -25,7 +26,7 @@
 
 Install APK file that can be downloaded from Releases section, you may see some warnings (that it is build for older devices) continue anyway
 
-Open the app. Connect ASI or UVC camera to the device. You may need USB to type-C or to microusb adapter. The device should support OTG and it needs to be enabled under settings.
+Open the app. Connect ASI, ToupTek or UVC camera to the device. You may need USB to type-C or to microusb adapter. The device should support OTG and it needs to be enabled under settings.
 
 Note, some devices may need external power to USB be provided
 
