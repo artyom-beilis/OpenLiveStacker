@@ -80,6 +80,7 @@ namespace ols
     static const unsigned int AVERAGE_BINNING_FLAG = 0x80; // usefull option for bin > 1
     static const double TOUPCAM_2_OLS_TEMP = 0.1;          // in 0.1℃ units (32 means 3.2℃, -35 means -3.5℃).
     static const double TOUPCAM_2_OLS_TIME = 1000.0;       // Toupcom API in microseconds, OLS API in ms
+    static const unsigned int ROI_MIN_WIDTH_HEIGHT = 16;   // xOffset, yOffset, xWidth, yHeight: must be even numbers, xWidth, yHeight >= 16
 
     void StartPullCallback(unsigned nEvent, void *pCallbackCtx);
     void AutoWB(const int nTemp, const int nTint, void *pCtx);
@@ -186,12 +187,21 @@ namespace ols
         void handle_frame()
         {
             CamFrame frm;
+            int hr;
             int nW = 1, nH = 1;
-            int hr = Toupcam_get_Size(hcam_, &nW, &nH); // Just in case let recalculate image buffer
-            if (FAILED(hr))
+            if(roiPercent_ == 100.0)
             {
-                // printf("handle_frame: Toupcam_get_Size=%x\n", hr);
-                return;
+                hr = Toupcam_get_Size(hcam_, &nW, &nH); // Just in case let recalculate image buffer
+                if (FAILED(hr))
+                    return;
+            }
+            else
+            {
+                unsigned xOffset, yOffset, xWidth, yHeight;
+                if (FAILED(hr = Toupcam_get_Roi(hcam_, &xOffset, &yOffset, &xWidth, &yHeight)))
+                    return;
+                nW =  (int)xWidth;
+                nH =  (int)yHeight;             
             }
             int binning = -1;
             hr = Toupcam_get_Option(hcam_, TOUPCAM_OPTION_BINNING, &binning);
@@ -228,7 +238,7 @@ namespace ols
             hr = Toupcam_PullImage(hcam_, buf_.data(), bpp * 8, &w, &h);
             if (FAILED(hr))
                 return;
-            // printf("handle_frame: Toupcam_PullImage=(%dx%d)\n", w, h);
+            // printf("handle_frame: Toupcam_PullImage=(%ux%u)\n", w, h);
             hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FLUSH, 2);
             if (FAILED(hr))
             {
@@ -330,6 +340,10 @@ namespace ols
                 e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_FRAMERATE)", hr);
                 return;
             }
+
+            setROI(roiPercent_, e);
+            if(e)
+                return;
 
             hr = Toupcam_StartPullModeWithCallback(hcam_, StartPullCallback, this);
             if (FAILED(hr))
@@ -437,10 +451,12 @@ namespace ols
                 opts.push_back(opt_cooler_on);
             if (info_.model->flag | TOUPCAM_FLAG_TEC_ONOFF)
                 opts.push_back(opt_cooler_target);
-            if (info_.model->flag | TOUPCAM_FLAG_BLACKLEVEL)
-                opts.push_back(opt_black_level);
+            if (info_.model->flag | TOUPCAM_FLAG_ROI_HARDWARE)
+                opts.push_back(opt_center_roi);
             if (average_bin_support_ != NULL)
                 opts.push_back(opt_average_bin);
+            if (info_.model->flag | TOUPCAM_FLAG_BLACKLEVEL)
+                opts.push_back(opt_black_level);
             return opts;
         }
         /// get camera control
@@ -539,6 +555,34 @@ namespace ols
                 }
                 r.cur_val = bl;
                 r.def_val = TOUPCAM_BLACKLEVEL_MIN;
+                return r;
+            }
+            case opt_center_roi:
+            {
+                r.type = type_percent;
+                r.read_only = false;
+                r.min_val = r.step_size = getMinROIPercentage(e);
+                if(e)
+                    return r;
+
+                // printf("\n\nOPT_CENTER_ROI = %f\n", r.min_val);
+                r.max_val = 100.0;
+                unsigned xOffset, yOffset, xWidth, yHeight, nResolutionIndex;
+                if (FAILED(hr = Toupcam_get_Roi(hcam_, &xOffset, &yOffset, &xWidth, &yHeight)))
+                {
+                    e = make_message("Failed to Toupcam_get_Roi", hr);
+                    return r;
+                }
+                if (FAILED(hr = Toupcam_get_eSize(hcam_, &nResolutionIndex)))
+                {
+                    e = make_message("Failed to Toupcam_get_eSize", hr);
+                    return r;
+                }
+                calcROIPercentage(xOffset, yOffset, xWidth, yHeight, nResolutionIndex);
+                r.cur_val = roiPercent_;
+                // printf("\n\nroiPercent_ = %f\n", roiPercent_);
+
+                r.def_val = 100.0;
                 return r;
             }
             break;
@@ -699,6 +743,12 @@ namespace ols
                 hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_BLACKLEVEL, bl);
             }
             break;
+            case opt_center_roi:
+            {
+                setROI(value, e);
+                return;
+            }
+            break;
             case opt_gain:
             {
                 unsigned short nGain = (unsigned short)value;
@@ -818,7 +868,88 @@ namespace ols
             width -= width % 2; // The final image size is rounded down to an even number, such as 640/3 to get 212
             height -= height % 2;
         }
+        /**
+         * Calculates current ROI persentage of a selected resoulution
+         */
+        void calcROIPercentage(unsigned xOffset, unsigned yOffset, unsigned xWidth, unsigned yHeight, unsigned nResolutionIndex)
+        {
+            if(0 == (xOffset | yOffset | xWidth | yHeight))
+            {
+                roiPercent_ = 100.0;
+                return;
+            }
 
+            roiPercent_ = 100.0 * xWidth / info_.model->res[nResolutionIndex].width;
+            roiPercent_ = roiPercent_ == 0 ? 100.0 : roiPercent_;
+        }
+        /**
+         * Calculates min ROI persentage of a current resoulution
+         */
+        double getMinROIPercentage(CamErrorCode &e)
+        {
+            double ret = 100.0;
+            int w,h,hr;
+            hr = Toupcam_get_Size(hcam_, &w, &h);
+            if(FAILED(hr))
+            {
+                e = make_message("Failed to Toupcam_get_Size", hr);
+                return ret;
+            }
+            // printf("\n\ngetMinROIPercentage = %u\n", w);
+            return (10000 * ROI_MIN_WIDTH_HEIGHT / w) / 100.0;
+        }
+        /**
+		 * Set center ROI rectangle of a percentage of a current resolution
+		 * Expectation: Toupcam_put_Size done before this method gets called
+         */
+        void setROI(double roiPercent, CamErrorCode &e)
+        {
+            int w,h,hr;
+            
+            double minRoi = getMinROIPercentage(e);
+            if(roiPercent >= 100.0 - minRoi)
+            {
+                roiPercent_ = 100.0;
+                if (FAILED(hr = Toupcam_put_Roi(hcam_, 0, 0, 0, 0)))
+                {
+                    e = make_message("setROI: Failed to Toupcam_put_Roi(100%)", hr);
+                }
+                // printf("\n\nROI=(0,0,0,0)\n");
+                return;
+            }
+            roiPercent_ = roiPercent;
+            if(roiPercent_ < minRoi)
+                roiPercent_ = minRoi;
+
+            if(FAILED(hr = Toupcam_get_Size(hcam_, &w, &h)))
+            {
+                e = make_message("setROI: Failed to Toupcam_get_Size", hr);
+                return;
+            }
+
+            // printf("\n\n\nsetROI: val= %f, roiW=%u, hoiH=%u\n", roiPercent_, );
+            unsigned roiW = unsigned(roiPercent_ * w / 100.0);
+            if(roiW < ROI_MIN_WIDTH_HEIGHT)
+                roiW = ROI_MIN_WIDTH_HEIGHT;
+            unsigned roiH = unsigned(roiPercent_ * h / 100.0);
+            if(roiH < ROI_MIN_WIDTH_HEIGHT)
+                roiH = ROI_MIN_WIDTH_HEIGHT;
+
+            // xOffset, yOffset, xWidth, yHeight: must be even numbers
+            roiW -= roiW % 2;
+            roiH -= roiH % 2;
+            unsigned roiX = (w - roiW) / 2;
+            roiX -= roiX % 2;
+            unsigned roiY = (h - roiH) / 2;
+            roiY -= roiY % 2;
+
+            // printf("\n\nROI=(%u,%u)-(%ux%u)\n", roiX, roiY, roiW, roiH);
+            if(FAILED(hr = Toupcam_put_Roi(hcam_, roiX, roiY, roiW, roiH)))
+            {
+                e = make_message("setROI: Failed to Toupcam_put_Roi", hr);
+                return;
+            }
+        }
         void init(CamErrorCode &e)
         {
             HRESULT hr;
@@ -878,6 +1009,7 @@ namespace ols
         bool average_bin_;
         bool *average_bin_support_ = NULL;
         bool chrome_;
+        double roiPercent_ = 100.0;
         std::vector<unsigned char> buf_;
         std::vector<int> bins_;
         std::atomic<int> stream_active_;
@@ -1015,6 +1147,15 @@ extern "C" {
     }
     ols::CameraDriver *ols_get_toup_driver(int /*unused*/,ols::CamErrorCode * /*unused*/)
     {
+        // const ToupcamModelV2** a = Toupcam_all_Model();
+        // if(a)
+        // {
+        //     while(*a)
+        //     {
+        //         printf("%s\n",(*a)->name);
+        //         ++(a);
+        //     }
+        // }
         if(ols::ToupDriverConfig::driver_config.empty()) {
             return new ols::ToupcamCameraDriver();
         }
