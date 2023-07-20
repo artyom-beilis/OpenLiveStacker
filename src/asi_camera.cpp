@@ -122,6 +122,7 @@ namespace ols {
                         fmt.width = info_.MaxWidth / bin;
                         fmt.height = info_.MaxHeight / bin;
                         fmt.bin = bin;
+                        fmt.roi_den = 1;
                         res.push_back(fmt);
                         for(int scale = 2;scale < 8;scale++) {
                             int newW = (info_.MaxWidth / bin) / scale / 8 * 8;
@@ -131,6 +132,7 @@ namespace ols {
                             fmt.width = newW;
                             fmt.height = newH;
                             fmt.bin = bin;
+                            fmt.roi_den = scale;
                             res.push_back(fmt);
                         }
                     }
