@@ -123,16 +123,35 @@ namespace ols {
                         fmt.height = info_.MaxHeight / bin;
                         fmt.bin = bin;
                         fmt.roi_den = 1;
+                        fmt.roi_num = 1;
                         res.push_back(fmt);
-                        for(int scale = 2;scale < 8;scale++) {
-                            int newW = (info_.MaxWidth / bin) / scale / 8 * 8;
-                            int newH = (info_.MaxHeight / bin) / scale / 8 * 8; // actually can be /2 * 2 but for symmetry of square frames I keep it this way
+                        for(int scale = 1;scale < 8;scale++) {
+                            int newW,newH;
+                            int num,den;
+                            if(scale == 1) {
+                                if(info_.MaxWidth <= 1280 || info_.MaxHeight <= 960) { // filter ASI120 that has stricter limits
+                                    continue;
+                                }
+                                /// make 2/3s ROI
+                                newW = (info_.MaxWidth / bin) * 2 / 3 / 8 * 8;
+                                newH = (info_.MaxHeight / bin) * 2 / 3 / 8 * 8;
+                                num = 2;
+                                den = 3;
+                            }
+                            else {
+                                /// rest 1/N th ROI
+                                newW = (info_.MaxWidth / bin) / scale / 8 * 8;
+                                newH = (info_.MaxHeight / bin) / scale / 8 * 8; // actually can be /2 * 2 but for symmetry of square frames I keep it this way
+                                num = 1;
+                                den = scale;
+                            }
                             if(std::min(newW,newH) < 480)
                                 break;
                             fmt.width = newW;
                             fmt.height = newH;
                             fmt.bin = bin;
-                            fmt.roi_den = scale;
+                            fmt.roi_num = num;
+                            fmt.roi_den = den;
                             res.push_back(fmt);
                         }
                     }
