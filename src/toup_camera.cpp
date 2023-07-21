@@ -82,7 +82,13 @@ namespace ols
     static const double TOUPCAM_2_OLS_TEMP = 0.1;          // in 0.1℃ units (32 means 3.2℃, -35 means -3.5℃).
     static const double TOUPCAM_2_OLS_TIME = 1000.0;       // Toupcom API in microseconds, OLS API in ms
     static const unsigned int ROI_MIN_WIDTH_HEIGHT = 16;   // xOffset, yOffset, xWidth, yHeight: must be even numbers, xWidth, yHeight >= 16
-
+    /** https://www.cloudynights.com/topic/875680-openlivestacker-getting-ready-for-google-play-discussions/?p=12823060
+    * "The HCG mode for my camera decreases the read noise at the cost of well capacity.
+    * So HCG should be better for very short exposures.
+    * LCG for long exposure. I assume with this phone app you would go for unguided short exposures, so maybe HCG should be the default"
+    */
+    static const unsigned int CG_OLS_DEFAULT_VAL = 1;
+    
     void StartPullCallback(unsigned nEvent, void *pCallbackCtx);
     void AutoWB(const int nTemp, const int nTint, void *pCtx);
     class ToupcamCamera : public Camera
@@ -142,7 +148,7 @@ namespace ols
         {
             std::vector<CamStreamFormat> res;
             std::vector<CamStreamType> video_formats;
-            bool isColor = !(info_.model->flag | TOUPCAM_FLAG_MONO);
+            bool isColor = !(info_.model->flag & TOUPCAM_FLAG_MONO);
             video_formats.push_back(stream_rgb24);
             video_formats.push_back(isColor ? stream_raw16 : stream_mono16);
 
@@ -163,7 +169,7 @@ namespace ols
                 }
             }
             auto ret = res; // duplicate before adding ROI options
-            if(info_.model->flag | TOUPCAM_FLAG_ROI_HARDWARE) // Let's support HW ROI only
+            if(info_.model->flag & TOUPCAM_FLAG_ROI_HARDWARE) // Let's support HW ROI only
             for (auto sfmt : res) // resolutions x ROI options
             {
                 int prevW = 1;
@@ -236,7 +242,7 @@ namespace ols
             else if (raw == 1)
             {
                 bpp = 2; // update to 1/2 if TOUPCAM_OPTION_BITDEPTH 0/1 for now using 1 unconditionaly
-                frm.format = !(info_.model->flag | TOUPCAM_FLAG_MONO) ? stream_raw16 : stream_mono16;
+                frm.format = !(info_.model->flag & TOUPCAM_FLAG_MONO) ? stream_raw16 : stream_mono16;
             }
             // printf("handle_frame=%dx%d(raw=%d, bpp=%d)\n", nW, nH, raw, bpp);
             size_t bufSize = nW * nH * bpp;
@@ -447,20 +453,24 @@ namespace ols
             opts.push_back(opt_gain);
             opts.push_back(opt_exp);
             // Conditionally supported
-            if (!(info_.model->flag | TOUPCAM_FLAG_MONO))
+            if (!(info_.model->flag & TOUPCAM_FLAG_MONO))
                 opts.push_back(opt_auto_wb);
-            if (info_.model->flag | TOUPCAM_FLAG_FAN)
+            if (info_.model->flag & TOUPCAM_FLAG_FAN)
                 opts.push_back(opt_cooler_power_perc);
-            if (info_.model->flag | TOUPCAM_FLAG_GETTEMPERATURE)
+            if (info_.model->flag & TOUPCAM_FLAG_GETTEMPERATURE)
                 opts.push_back(opt_temperature);
-            if (info_.model->flag | TOUPCAM_FLAG_TEC)
+            if (info_.model->flag & TOUPCAM_FLAG_TEC)
                 opts.push_back(opt_cooler_on);
-            if (info_.model->flag | TOUPCAM_FLAG_TEC_ONOFF)
+            if (info_.model->flag & TOUPCAM_FLAG_TEC_ONOFF)
                 opts.push_back(opt_cooler_target);
             if (average_bin_support_ != NULL)
                 opts.push_back(opt_average_bin);
-            if (info_.model->flag | TOUPCAM_FLAG_BLACKLEVEL)
+            if (info_.model->flag & TOUPCAM_FLAG_BLACKLEVEL)
                 opts.push_back(opt_black_level);
+            if (info_.model->flag & TOUPCAM_FLAG_CGHDR)
+                opts.push_back(opt_conv_gain_hdr); // 0-2
+            else if (info_.model->flag & TOUPCAM_FLAG_CG)
+                opts.push_back(opt_conv_gain_hcg); // 0-1
             return opts;
         }
         /// get camera control
@@ -542,13 +552,13 @@ namespace ols
                 r.read_only = false;
                 r.min_val = TOUPCAM_BLACKLEVEL_MIN;
                 r.max_val = TOUPCAM_BLACKLEVEL8_MAX;
-                if (info_.model->flag | TOUPCAM_FLAG_RAW10)
+                if (info_.model->flag & TOUPCAM_FLAG_RAW10)
                     r.max_val = TOUPCAM_BLACKLEVEL10_MAX;
-                if (info_.model->flag | TOUPCAM_FLAG_RAW12)
+                if (info_.model->flag & TOUPCAM_FLAG_RAW12)
                     r.max_val = TOUPCAM_BLACKLEVEL12_MAX;
-                if (info_.model->flag | TOUPCAM_FLAG_RAW14)
+                if (info_.model->flag & TOUPCAM_FLAG_RAW14)
                     r.max_val = TOUPCAM_BLACKLEVEL14_MAX;
-                if (info_.model->flag | TOUPCAM_FLAG_RAW16)
+                if (info_.model->flag & TOUPCAM_FLAG_RAW16)
                     r.max_val = TOUPCAM_BLACKLEVEL16_MAX;
                 r.step_size = 1;
                 int bl;
@@ -561,6 +571,10 @@ namespace ols
                 r.def_val = TOUPCAM_BLACKLEVEL_MIN;
                 return r;
             }
+            case opt_conv_gain_hcg:
+                return setCG(1, e);
+            case opt_conv_gain_hdr:
+                return setCG(2, e);
             case opt_cooler_power_perc:
             {
                 r.type = type_percent;
@@ -716,6 +730,13 @@ namespace ols
             {
                 int bl = (int)(value);
                 hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_BLACKLEVEL, bl);
+            }
+            break;
+            case opt_conv_gain_hcg:
+            case opt_conv_gain_hdr:
+            {
+                int cg = (int)(value);
+                hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_CG, cg);
             }
             break;
             case opt_gain:
@@ -883,6 +904,30 @@ namespace ols
                 return;
             }
         }
+        /**
+         * https://www.cloudynights.com/topic/875680-openlivestacker-getting-ready-for-google-play-discussions/?p=12823060
+         * "The HCG mode for my camera decreases the read noise at the cost of well capacity.
+         * So HCG should be better for very short exposures.
+         * LCG for long exposure. I assume with this phone app you would go for unguided short exposures, so maybe HCG should be the default"
+        */
+        CamParam setCG(double maxCG, CamErrorCode &e)
+        {
+            CamParam r = {};
+            r.type = type_number;
+            r.read_only = false;
+            r.min_val = 0;
+            r.max_val = maxCG;
+            r.step_size = 1;
+            int cg, hr;
+            if (FAILED(hr = Toupcam_get_Option(hcam_, TOUPCAM_OPTION_CG, &cg)))
+            {
+                e = make_message("Failed to Toupcam_get_Option(TOUPCAM_OPTION_CG)", hr);
+                return r;
+            }
+            r.cur_val = cg;
+            r.def_val = CG_OLS_DEFAULT_VAL;
+            return r;
+        }
         void init(CamErrorCode &e)
         {
             HRESULT hr;
@@ -919,7 +964,7 @@ namespace ols
                 return;
             }
             // Low noise seems a default choice for astroimageing
-            if (((info_.model->flag | TOUPCAM_FLAG_LOW_NOISE)) && FAILED(hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_LOW_NOISE, 1)))
+            if (((info_.model->flag & TOUPCAM_FLAG_LOW_NOISE)) && FAILED(hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_LOW_NOISE, 1)))
             {
                 e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_LOW_NOISE, 1)", hr);
                 return;
@@ -932,11 +977,19 @@ namespace ols
             }
             set_name();
             checkAverageBinning(e);
-            if (!(info_.model->flag | TOUPCAM_FLAG_MONO)) // Supported in Color mode, let disable on init
+            if (!(info_.model->flag & TOUPCAM_FLAG_MONO)) // Supported in Color mode, let disable on init
             {
                 if (FAILED(hr = Toupcam_AwbOnce(hcam_, NULL, NULL)))
                 {
                     e = make_message("Failed to Toupcam_AwbOnce(NULL)", hr);
+                    return;
+                }
+            }
+            if (info_.model->flag & (TOUPCAM_FLAG_CG | TOUPCAM_FLAG_CGHDR))
+            {
+                if (FAILED(hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_CG, CG_OLS_DEFAULT_VAL)))
+                {
+                    e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_CG, 1)", hr);
                     return;
                 }
             }
