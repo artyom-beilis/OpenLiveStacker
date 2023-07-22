@@ -65,6 +65,8 @@ namespace ols {
         opt_cooler_power_perc,
         opt_average_bin,
         opt_black_level,
+        opt_conv_gain_hcg,
+        opt_conv_gain_hdr,
         opt_live_stretch,
         opt_count
     };
