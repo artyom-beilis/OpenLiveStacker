@@ -67,6 +67,8 @@ namespace ols {
         opt_black_level,
         opt_conv_gain_hcg,
         opt_conv_gain_hdr,
+        opt_low_noise, // 	low noise mode (Higher signal noise ratio, lower frame rate)
+        opt_high_fullwell, // high fullwell capacity
         opt_live_stretch,
         opt_count
     };
