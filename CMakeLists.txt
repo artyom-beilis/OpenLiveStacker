@@ -23,14 +23,18 @@ find_path(LIBRAW_HDR libraw/libraw.h)
 
 find_path(LIBCURL_HDR curl/curl.h)
 find_path(LIBZ_HDR zlib.h)
+find_path(LIBCPPCMS_HRD cppcms/application.h)
 find_library(LIBCURL curl)
 find_library(LIBZ z)
+
 
 
 
 set(WITH_SSE OFF)
 set(OLS_EXTRA )
 
+
+include_directories(${LIBCPPCMS_HRD})
 
 if(LIBCURL_HDR AND LIBCURL)
     set(WITH_CURL ON)
