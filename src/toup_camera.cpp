@@ -966,8 +966,10 @@ namespace ols
             // Low noise seems a default choice for astroimageing
             if (((info_.model->flag & TOUPCAM_FLAG_LOW_NOISE)) && FAILED(hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_LOW_NOISE, 1)))
             {
-                e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_LOW_NOISE, 1)", hr);
-                return;
+                //e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_LOW_NOISE, 1)", hr);
+		//return;
+		//but do allow cameras which don't have this feature to still work.
+		;
             }
             hr = Toupcam_put_Size(hcam_, info_.model->res[0].width, info_.model->res[0].height);
             if (FAILED(hr))
