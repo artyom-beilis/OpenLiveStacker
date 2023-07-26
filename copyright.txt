@@ -2,9 +2,14 @@ OpenLiveStacker - open source live stacker with web interface for Linux based OS
 Linux, Raspberry PI, ANdroid
 
 Copyright: (C) 2022-2023 Artyom Beilis, 2023 Maxim Tonkikh
+
 License: GPLv3 with execeptions
+
 Addtional copyrights: 
   - external/OpenNGC - CC-BY-SAv4
+  - src/toup_oem.h - (c) 2018 CloudMakers, s. r. o. 'INDIGO Astronomy open-source license' 
+   
+
 
 Exceptions to GPLv3 license:
 ----------------------------
