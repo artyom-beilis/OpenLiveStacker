@@ -1,6 +1,7 @@
 from imageio import imread,imsave
 import numpy as np
 import sys
+import math
 from math import log
 
 
@@ -32,12 +33,24 @@ for path in sys.argv[1:]:
     img = np.maximum(0,np.minimum(1,(img-low_point) / (top_point- low_point)))
     meanv = np.mean(img[r0:r1,c0:c1,:])
     gamma_correction = max(1.0,min(gamma_limit,log(meanv)/log(mean_target)))
+
+    print(gamma_correction)
+    half_point = 0.5**(gamma_correction)
+    print("HP=",half_point)
+    print(1.0/(2.0*half_point))
+    print(math.acosh(1.0/(2.0*half_point)))
+    print(math.sinh(math.acosh(1.0/(2.0*half_point))))
+    a = 1/half_point * math.sinh(math.acosh(1.0/(2.0*half_point)))
     print('Stretch [%f->%f]^1/%f' % (low_point,top_point,gamma_correction))
     
     linear_gain = (linear_point**(1/gamma_correction)) / linear_point;
-    img = np.minimum(img**(1/gamma_correction),img*linear_gain)
-    img = (img*255).astype(np.uint8)
-    imsave(path.replace('.tiff','_stretched.png'),img)
+    img_gamma = np.minimum(img**(1/gamma_correction),img*linear_gain)
+    linear_gain = math.asinh(a*linear_point)/math.asinh(a) / linear_point
+    img_asinh = np.minimum(np.arcsinh(a*img)*(1/math.asinh(a)),img*linear_gain)
+    img_gamma = (img_gamma*255).astype(np.uint8)
+    img_asinh = (img_asinh*255).astype(np.uint8)
+    imsave(path.replace('.tiff','_stretched_gamma.png'),img_gamma)
+    imsave(path.replace('.tiff','_stretched_asinh.png'),img_asinh)
 
 
 

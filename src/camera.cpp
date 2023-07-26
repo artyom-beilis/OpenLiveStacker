@@ -2,7 +2,7 @@
 #include <dlfcn.h>
 #include <algorithm>
 
-extern "C" typedef ols::CameraDriver *(*cam_generator_ptr_type)(int);
+extern "C" typedef ols::CameraDriver *(*cam_generator_ptr_type)(int,ols::CamErrorCode *);
 extern "C" typedef int (*cam_config_ptr_type)(char const *);
 
 namespace ols {
@@ -52,9 +52,10 @@ std::unique_ptr<CameraDriver> CameraDriver::get(int id,int external_option)
 {
     if((unsigned)id >= driver_calls.size())
         throw CamError("Invalid driver id"); 
-    std::unique_ptr<CameraDriver> r(driver_calls.at(id)(external_option));
+    CamErrorCode e;
+    std::unique_ptr<CameraDriver> r(driver_calls.at(id)(external_option,&e));
     if(!r)
-        throw CamError("Failed to load camera " + std::to_string(id));
+        throw CamError("Failed to load camera " + std::to_string(id) + ":" + e.message());
     return r;
 }
 std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)
@@ -75,10 +76,10 @@ std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)
 }
 
 static char const *option_string_ids[] = {
-    "auto_exp", "auto_wb", "exp", "wb", "wb_r", "wb_b", "gain", "gamma", "brightness","contrast", "temperature", "cooler_target","cooler_on", "fan_on", "cooler_power","live_stretch"
+    "auto_exp", "auto_wb", "exp", "wb", "wb_r", "wb_b", "gain", "gamma", "brightness","contrast", "temperature", "cooler_target","cooler_on", "fan_on", "cooler_power","average_bin","black_level","conv_gain_hcg","conv_gain_hdr","live_stretch"
 };
 static char const *option_names[] = {
-    "Auto Exp.", "Auto WB", "Exp.", "WB", "WB Red", "WB Blue", "Gain", "Gamma", "Bright.", "Contr.", "Temp.", "Cooler Tgt.", "Cooler", "Fan","Cooler Pwr.","Auto Str."
+    "Auto Exp.", "Auto WB", "Exp.", "WB", "WB Red", "WB Blue", "Gain", "Gamma", "Bright.", "Contr.", "Temp.", "Cooler Tgt.", "Cooler", "Fan","Cooler Pwr.","Avg. Bin","Black Lvl.","ConvGain L-0/H-1","ConvGain Lcg-0/Hcg-1/Hdr-2","Auto Str."
 };
 
 std::string bayer_type_to_str(CamBayerType bayer)

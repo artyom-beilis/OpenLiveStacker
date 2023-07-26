@@ -244,6 +244,13 @@ namespace ols {
                 if(fmt.bin>1) {
                     name += ":bin" + std::to_string(fmt.bin);
                 }
+                if(fmt.roi_num > 1 || fmt.roi_den > 1) {
+                    if(fmt.bin == 1)
+                        name += ":";
+                    else
+                        name += ",";
+                    name += "roi=" + std::to_string(fmt.roi_num) + "/" + std::to_string(fmt.roi_den);
+                }
                 if(fmt.framerate > 0) {
                     std::ostringstream ss;
                     ss << "@" <<  std::fixed << std::setprecision(1) << fmt.framerate;

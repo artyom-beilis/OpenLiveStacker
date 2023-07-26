@@ -63,6 +63,10 @@ namespace ols {
         opt_cooler_on,
         opt_fan_on,
         opt_cooler_power_perc,
+        opt_average_bin,
+        opt_black_level,
+        opt_conv_gain_hcg,
+        opt_conv_gain_hdr,
         opt_live_stretch,
         opt_count
     };
@@ -134,6 +138,9 @@ namespace ols {
         CamStreamType format;
         int width,height;
         int bin = 1;
+        int roi_num = 1; 
+        int roi_den = 1; 
+        // roi_num = 2, roi_den=3 -> 2/3
         float framerate = 1.0f; // -1 for unknown
     };
 

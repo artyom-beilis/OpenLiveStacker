@@ -372,7 +372,7 @@ extern "C" {
         ols::SIMCameraDriver::data_dir = str;
         return 0;
     }
-    ols::CameraDriver *ols_get_sim_driver(int )
+    ols::CameraDriver *ols_get_sim_driver(int ,ols::CamErrorCode *)
     {
         return new ols::SIMCameraDriver();
     }

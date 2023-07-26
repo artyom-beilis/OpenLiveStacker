@@ -282,7 +282,8 @@ namespace ols {
             float invg= 1.0f/gamma;
             constexpr int M=128;
             float table[M+1];
-            prepare_power_curve(M,table,invg);
+            //prepare_power_curve(M,table,invg);
+            prepare_asinh_curve(M,table,invg);
             int i=0;
 #ifdef USE_CV_SIMD
             int limit = N / 4 * 4;

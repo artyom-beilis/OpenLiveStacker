@@ -560,14 +560,15 @@ namespace ols {
 };
 
 
-extern "C" ols::CameraDriver *ols_get_uvc_driver(int fd)
+extern "C" ols::CameraDriver *ols_get_uvc_driver(int fd,ols::CamErrorCode *e)
 {
     try {
         auto p = ols::get_uvc_driver(fd);
         return p.release();
     }
-    catch(std::exception const &e) {
-        fprintf(stderr,"Failed to load driver %s",e.what());
+    catch(std::exception const &er) {
+        fprintf(stderr,"Failed to load driver %s",er.what());
+        *e = ols::CamErrorCode(er);
         return nullptr;
     }
 }
