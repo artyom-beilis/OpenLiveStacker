@@ -1,5 +1,6 @@
 #include "camera.h"
 #include "toupcam.h"
+#include "toup_oem.h"
 #include <mutex>
 #include <sstream>
 #include <iostream>
@@ -1054,8 +1055,10 @@ namespace ols
         }
         virtual std::vector<std::string> list_cameras(CamErrorCode &)
         {
-            // printf("\n\nlist_cameras: %s\n", name_.c_str());
-            return {name_};
+            std::string vp;
+            if(id_.size()>=9)
+                vp = "/" + id_.substr(id_.size()-9,4) + ":" + id_.substr(id_.size()-4);
+            return {name_ + vp};
         }
         virtual std::unique_ptr<Camera> open_camera(int id, CamErrorCode &e)
         {
@@ -1080,16 +1083,56 @@ namespace ols
     class ToupcamCameraDriver : public CameraDriver
     {
     public:
+
+        ToupcamCameraDriver(bool oem=false):oem_(oem)
+        {
+        }
+
         /**
          * Loops over connected Toupcam cameras, prepares display name, and saves camera info
          * Returns: list of camera names
          */
+
+        int enumOEM(ToupcamDeviceV2 info[TOUPCAM_MAX])
+        {
+            int N = 0;
+            FILE *f=popen(R"xxx(lsusb | sed 's/Bus \(.*\) Device \(.*\): ID \(....\):\(....\) \(.*\)/\1,\2,\3,\4,\5/i')xxx","r");
+            char line[256];
+            while(fgets(line,sizeof(line),f)) {
+                int bus=-1,dev=-1;
+                int vendor_id=-1,product_id=-1;
+                int len = strlen(line);
+                if(line[len-1]=='\n') {
+                    line[len-1]=0;
+                }
+                if(!sscanf(line,"%d,%d,%x,%x",&bus,&dev,&vendor_id,&product_id))
+                    break;
+                char const *name = len >= (3*2+4*2+4) ? line +  (3*2+4*2+4) : "Camera";
+                int tp_vid = vendor_id, tp_pid = product_id;
+                oem_to_touptek(tp_vid,tp_pid);
+                // non OEM - skip
+                if(tp_vid == vendor_id && tp_pid == product_id)
+                    continue;
+                if(N>=TOUPCAM_MAX)
+                    continue;
+                printf("GOT [%s]\n",name);
+                snprintf(info[N].id,sizeof(info[N].id),"tp-%d-%d-%d-%d",bus,dev,tp_vid,tp_pid);
+                snprintf(info[N].displayname,sizeof(info[N].displayname),"%s",name);
+                info[N].model = Toupcam_get_Model(0x547,tp_pid);
+                if(!info[N].model)
+                    continue;
+                N++;
+            }
+            pclose(f);
+            return N;
+        }
+
         virtual std::vector<std::string> list_cameras(CamErrorCode &e)
         {
             names_.clear();
             cams_.clear();
             ToupcamDeviceV2 info[TOUPCAM_MAX] = {};
-            unsigned N = Toupcam_EnumV2(info);
+            unsigned N = oem_ ? enumOEM(info) : Toupcam_EnumV2(info);
             for (unsigned i = 0; i < N; i++)
             {
                 std::string name = std::string(info[i].displayname) + "/" + info[i].model->name + "/" + std::to_string(i);
@@ -1121,6 +1164,7 @@ namespace ols
     private:
         std::vector<ToupcamDeviceV2> cams_;
         std::vector<std::string> names_;
+        bool oem_;
     };
     namespace ToupDriverConfig {
         std::string driver_config;
@@ -1133,7 +1177,7 @@ extern "C" {
         ols::ToupDriverConfig::driver_config = str;
         return 0;
     }
-    ols::CameraDriver *ols_get_toup_driver(int /*unused*/,ols::CamErrorCode * /*unused*/)
+    ols::CameraDriver *ols_get_toup_driver(int /*unused*/,ols::CamErrorCode *e)
     {
         // const ToupcamModelV2** a = Toupcam_all_Model();
         // if(a)
@@ -1147,11 +1191,43 @@ extern "C" {
         if(ols::ToupDriverConfig::driver_config.empty()) {
             return new ols::ToupcamCameraDriver();
         }
+        else if(ols::ToupDriverConfig::driver_config == "oem") {
+            return new ols::ToupcamCameraDriver(true);
+        }
         else {
             size_t split_point = ols::ToupDriverConfig::driver_config.find(':');
             std::string id = ols::ToupDriverConfig::driver_config.substr(0,split_point);
+            int fd=-1,vendor_id=0,product_id=0;
+            if(sscanf(id.c_str(),"%d %x %x",&fd,&vendor_id,&product_id)!=3) {
+                *e = ols::CamErrorCode("Invalid Android string:" + ols::ToupDriverConfig::driver_config);
+                return nullptr;
+            }
+
+            // handle OEM cameras replace OEM to Topu product/vendor id
+            ols::oem_to_touptek(vendor_id,product_id);
+
+            char toup_id[256];
+            // touptek android format
+            snprintf(toup_id,sizeof(toup_id),"fd-%d-%04x-%04x",fd,vendor_id,product_id);
             std::string name = split_point == std::string::npos ? "Camera" : ols::ToupDriverConfig::driver_config.substr(split_point+1);
-            return new ols::SingleToupcamCameraDriver(id,name);
+
+            
+#if 0
+            char const *test_path="/storage/emulated/0/Android/media/org.openlivestacker/test.txt";
+            char const *log_path="/storage/emulated/0/Android/media/org.openlivestacker/toup_log.txt";
+
+            /// DEBUGGING!
+
+            {
+                FILE *f=fopen(test_path,"w");
+                fprintf(f,"test\n");
+                fclose(f);
+                Toupcam_log_File(log_path);
+                Toupcam_log_Level(3);
+            }
+            /// END DEBUGGING
+#endif
+            return new ols::SingleToupcamCameraDriver(toup_id,name);
         }
     }
 }
