@@ -862,6 +862,17 @@ function prepareControls(ctls)
             control_str += '<td>&nbsp;</td>';
             control_str += '<td>&nbsp;</td>';
         }
+        else if(ctl.type == 'select') {
+            control_str +=`<td><select class="val_input" id="control_opt_${ctl.option_id}" onchange="enableNumControl('${ctl.option_id}',true);" >`;
+            for(var i=0;i<ctl.options.length;i++) {
+                var selected = i == ctl.cur ? 'selected ' : '';
+                control_str += `<option value="${i}" ${selected} >${ctl.options[i]}</option>`;
+            }
+            control_str += `</select></td>`;
+            control_str += `<td><button disabled id="control_button_${ctl.option_id}" onclick="updateNumControl('${ctl.option_id}');" >set</button></td>`;
+            control_str += '<td>&nbsp;</td>';
+            control_str += '<td>&nbsp;</td>';
+        }
         else {
             var injected = disabled ? 'readonly' : '';
             control_str +=`<td><form onsubmit="return updateNumControl('${ctl.option_id}');" ><input class="val_input" id="control_opt_${ctl.option_id}" min="${ctl.min}" max="${ctl.max}" step="${ctl.step}" type="number" value="${ctl.cur}" oninput="enableNumControl('${ctl.option_id}',true);"  ${injected}  /></form></td>`;

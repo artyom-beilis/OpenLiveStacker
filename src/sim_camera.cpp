@@ -262,11 +262,11 @@ namespace ols {
         /// list of camera controls that the camera supports
         virtual std::vector<CamOptionId> supported_options(CamErrorCode &)
         {
-            std::vector<CamOptionId> opts = {opt_exp,opt_gamma};
+            std::vector<CamOptionId> opts = {opt_exp,opt_gamma,opt_iso};
             return opts;
         }
         /// get camera control
-        virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e) 
+        virtual CamParam get_parameter(CamOptionId id,bool current_only,CamErrorCode &e) 
         {
             CamParam r;
             memset(&r,0,sizeof(r));
@@ -288,6 +288,17 @@ namespace ols {
                 r.cur_val = gamma_;
                 r.step_size = 0.01;
                 break;
+            case opt_iso:
+                r.type = type_selection;
+                r.cur_val = iso_;
+                if(!current_only) {
+                    r.min_val = 0;
+                    r.max_val = iso_values.size();
+                    r.def_val = 0;
+                    r.step_size = 1;
+                    r.names = iso_values;
+                }
+                break;
             default:
                 e=CamErrorCode("Unimplemented: " + cam_option_id_to_name(id));
             }
@@ -308,6 +319,12 @@ namespace ols {
                         throw SIMError("Invalid range");
                     gamma_ = value;
                     break;
+                case opt_iso:
+                    if(int(value) < 0 || int(value) >= int(iso_values.size())) {
+                        throw SIMError("Invalid range");
+                    }
+                    iso_ = int(value);
+                    break;
                 default:
                     throw SIMError("Unimplemented" +  cam_option_id_to_name(id));
                 }
@@ -320,6 +337,8 @@ namespace ols {
         std::string dir_;
         int exposure_ = 1000;
         double gamma_ = 1.0;
+        std::vector<std::string> iso_values = {"100", "200", "400", "800" };
+        int iso_ = 0;
         CamStreamType stream_ = stream_mjpeg;
         CamBayerType  bayer_ = bayer_na;
         bool is_jpeg_ = true;

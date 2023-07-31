@@ -67,6 +67,9 @@ namespace ols {
         opt_black_level,
         opt_conv_gain_hcg,
         opt_conv_gain_hdr,
+        opt_iso,
+
+        /// External non-device specific options start HERE!
         opt_live_stretch,
         opt_count
     };
@@ -87,6 +90,7 @@ namespace ols {
         type_percent,
         type_kelvin,
         type_celsius,
+        type_selection,
     };
 
     std::string cam_option_type_to_str(CamOptionType type);
@@ -101,6 +105,7 @@ namespace ols {
         double max_val;
         double def_val;
         double cur_val;
+        std::vector<std::string> names;
     };
 
     enum CamStreamType {

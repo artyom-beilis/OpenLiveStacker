@@ -171,6 +171,9 @@ namespace ols {
                 response_[i]["min"] = param.min_val;
                 response_[i]["max"] = param.max_val;
                 response_[i]["default"] = param.def_val;
+                if(param.type == type_selection) {
+                    response_[i]["options"] = param.names;
+                }
             }
         }
 

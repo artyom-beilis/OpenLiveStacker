@@ -76,10 +76,10 @@ std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)
 }
 
 static char const *option_string_ids[] = {
-    "auto_exp", "auto_wb", "exp", "wb", "wb_r", "wb_b", "gain", "gamma", "brightness","contrast", "temperature", "cooler_target","cooler_on", "fan_on", "cooler_power","average_bin","black_level","conv_gain_hcg","conv_gain_hdr","live_stretch"
+    "auto_exp", "auto_wb", "exp", "wb", "wb_r", "wb_b", "gain", "gamma", "brightness","contrast", "temperature", "cooler_target","cooler_on", "fan_on", "cooler_power","average_bin","black_level","conv_gain_hcg","conv_gain_hdr", "iso",  "live_stretch"
 };
 static char const *option_names[] = {
-    "Auto Exp.", "Auto WB", "Exp.", "WB", "WB Red", "WB Blue", "Gain", "Gamma", "Bright.", "Contr.", "Temp.", "Cooler Tgt.", "Cooler", "Fan","Cooler Pwr.","Avg. Bin","Black Lvl.","ConvGain L-0/H-1","ConvGain Lcg-0/Hcg-1/Hdr-2","Auto Str."
+    "Auto Exp.", "Auto WB", "Exp.", "WB", "WB Red", "WB Blue", "Gain", "Gamma", "Bright.", "Contr.", "Temp.", "Cooler Tgt.", "Cooler", "Fan","Cooler Pwr.","Avg. Bin","Black Lvl.","ConvGain L-0/H-1","ConvGain Lcg-0/Hcg-1/Hdr-2","ISO","Auto Str."
 };
 
 std::string bayer_type_to_str(CamBayerType bayer)
@@ -150,7 +150,7 @@ CamStreamType stream_type_from_str(std::string s)
 }
 
 
-static char const *cam_option_type_names[]={"bool","number","msec","percent","kelvin","celsius"};
+static char const *cam_option_type_names[]={"bool","number","msec","percent","kelvin","celsius","select"};
 
 std::string cam_option_type_to_str(CamOptionType type)
 {
