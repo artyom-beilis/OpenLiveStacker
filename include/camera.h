@@ -68,6 +68,8 @@ namespace ols {
         opt_conv_gain_hcg,
         opt_conv_gain_hdr,
         opt_iso,
+        opt_shutter,
+        opt_viewfinder,
 
         /// External non-device specific options start HERE!
         opt_live_stretch,
