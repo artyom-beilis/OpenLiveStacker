@@ -20,7 +20,7 @@
 #include <cppcms/json.h>
 
 #ifdef WITH_LIBRAW
-#include <libraw/libraw.h>
+#include "libraw_wrapper.h"
 #endif
 
 namespace ols {
@@ -109,53 +109,6 @@ namespace ols {
                 return true;
             return false;
         }
-#ifdef WITH_LIBRAW
-        std::string index2color(LibRaw &raw)
-        {
-            std::string res;
-            int pat_index[4] = {raw.COLOR(0,0),raw.COLOR(0,1),raw.COLOR(1,0),raw.COLOR(1,1)};
-            for(int i=0;i<4;i++) {
-                char const *v="RGBG";
-                if(pat_index[i] < 0 || pat_index[i]>3)
-                    res += '?';
-                else
-                    res += v[pat_index[i]];
-            }
-            return res;
-        }
-        std::pair<cv::Mat,CamBayerType> load_libraw(std::string const &path)
-        {
-            cv::Mat img;
-            LibRaw raw;
-            int code=0;
-            if((code = raw.open_file(path.c_str()))!=LIBRAW_SUCCESS
-                || (code=raw.unpack())!=LIBRAW_SUCCESS)
-            {
-                throw WDIRError("Failed to open or read " + path + ": " + libraw_strerror(code));
-            }
-            #if 0
-            printf("%p raw=%dx%d act=%dx%d stride_bytes %d pat=%s\n",raw.imgdata.rawdata.raw_image,
-                    raw.imgdata.sizes.raw_height,raw.imgdata.sizes.raw_width,
-                    raw.imgdata.sizes.height,raw.imgdata.sizes.width,
-                    raw.imgdata.sizes.raw_pitch,
-                    raw.imgdata.idata.cdesc);
-            #endif
-
-            if(!raw.imgdata.rawdata.raw_image) {
-                throw WDIRError("Is not 16 bit bayer:" + path);
-            }
-            cv::Mat raw_image(raw.imgdata.sizes.raw_height,raw.imgdata.sizes.raw_width,CV_16UC1,raw.imgdata.rawdata.raw_image,raw.imgdata.sizes.raw_pitch);
-            int scale = 65535 / raw.imgdata.color.maximum;
-            std::string bayer_name = index2color(raw);
-            CamBayerType bayer = bayer_type_from_str(bayer_name);
-            if(scale != 1)
-                img = raw_image.mul(cv::Scalar::all(scale));
-            else
-                img = raw_image.clone();
-
-            return std::make_pair(img,bayer);
-        }
-#endif
 
         void handle_frame(std::string const &fname)
         {
@@ -180,6 +133,7 @@ namespace ols {
                 auto res = load_libraw(fname);
                 img = res.first; 
                 frm.bayer  = res.second;
+                printf("%d %d\n",img.rows,img.cols);
             }
 #endif                
             else

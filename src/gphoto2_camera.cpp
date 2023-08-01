@@ -16,7 +16,7 @@
 #include <opencv2/imgproc.hpp>
 
 #ifdef WITH_LIBRAW
-#include <libraw/libraw.h>
+#include "libraw_wrapper.h"
 #endif
 
 namespace ols {
@@ -229,63 +229,13 @@ namespace ols {
             }
             else {
 #ifdef WITH_LIBRAW                
-                return load_libraw();
+                return load_libraw(const_cast<char*>(data_),size_);
 #else
                 throw GPError("OpenLiveStacker was build without libraw support");                
 #endif                
             }
         }
 
-#ifdef WITH_LIBRAW
-        std::string index2color(LibRaw &raw)
-        {
-            std::string res;
-            int pat_index[4] = {raw.COLOR(0,0),raw.COLOR(0,1),raw.COLOR(1,0),raw.COLOR(1,1)};
-            for(int i=0;i<4;i++) {
-                char const *v="RGBG";
-                if(pat_index[i] < 0 || pat_index[i]>3)
-                    res += '?';
-                else
-                    res += v[pat_index[i]];
-            }
-            return res;
-        }
-        
-        std::pair<cv::Mat,CamBayerType> load_libraw()
-        {
-            cv::Mat img;
-            LibRaw raw;
-            int code=0;
-            if(0){
-                static int counter = 0;
-                char name[256];
-                snprintf(name,sizeof(name),"/tmp/%05d.raw",counter);
-                counter++;
-                std::ofstream f(name);
-                f.write(const_cast<char *>(data_),size_);
-                f.close();
-            }
-
-            if((code = raw.open_buffer(const_cast<char *>(data_),size_))!=LIBRAW_SUCCESS
-                || (code=raw.unpack())!=LIBRAW_SUCCESS)
-            {
-                throw GPError("Failed to read RAW file " + name() + ": " + libraw_strerror(code));
-            }
-            if(!raw.imgdata.rawdata.raw_image) {
-                throw GPError("Is not 16 bit bayer:" + name());
-            }
-            cv::Mat raw_image(raw.imgdata.sizes.raw_height,raw.imgdata.sizes.raw_width,CV_16UC1,raw.imgdata.rawdata.raw_image,raw.imgdata.sizes.raw_pitch);
-            int scale = 65535 / raw.imgdata.color.maximum;
-            std::string bayer_name = index2color(raw);
-            CamBayerType bayer = bayer_type_from_str(bayer_name);
-            if(scale != 1)
-                img = raw_image.mul(cv::Scalar::all(scale));
-            else
-                img = raw_image.clone();
-
-            return std::make_pair(img,bayer);
-        }
-#endif
         char const *data() {
             return data_;
         }
@@ -651,8 +601,9 @@ namespace ols {
     public:
         virtual std::vector<std::string> list_cameras(CamErrorCode &e) 
         {
-            if(!camera_list_.empty())
+            if(!camera_list_.empty()) {
                 return camera_list_;
+            }
 	        gp_camera_new(&camera_);
             int ret = gp_camera_init(camera_,ctx_);
             if(!check(ret,"init",e)) {
