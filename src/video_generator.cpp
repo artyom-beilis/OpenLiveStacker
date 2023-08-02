@@ -231,9 +231,10 @@ namespace ols {
                 auto live_ptr = std::dynamic_pointer_cast<LiveControl>(data_ptr);
                 if(live_ptr){
                     handle_live_ctl(live_ptr);
+                    continue;
                 }
                 
-                BOOSTER_ERROR("stacker") << "Invalid data for video generator";
+                BOOSTER_ERROR("stacker") << "Invalid data for video generator got " << (data_ptr? typeid(*data_ptr).name() : "nullptr");
             }
         }
         void handle_live_ctl(std::shared_ptr<LiveControl> ctl)
