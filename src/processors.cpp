@@ -74,17 +74,18 @@ namespace ols {
             int i=0;
 #ifdef USE_CV_SIMD
             cv::v_float32x4 zero = cv::v_setall_f32(0.0f);
+            cv::v_float32x4 one = cv::v_setall_f32(1.0f);
             int limit = N/4*4;
             for(;i<limit;i+=4,p+=4,d+=4,f+=4) {
                 cv::v_float32x4 v=cv::v_max(zero,cv::v_load(p) - cv::v_load(d));
-                v *= cv::v_load(f);
+                v = cv::v_min(cv::v_load(f) * v,one);
                 cv::v_store(p,v);
             }
 #endif            
             for(;i<N;i++) {
                 float v=std::max(0.0f,*p - *d);
                 v*= *f;
-                *p = v;
+                *p = std::min(v,1.0f);
                 p++,d++,f++;
             }
         }

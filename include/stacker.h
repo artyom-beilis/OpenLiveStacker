@@ -327,7 +327,7 @@ namespace ols {
             double goffset = 0.0;
             double mean = 0.5;
             float gamma_correction = 1.0f;
-
+            
             int N = calc_hist(tmp(fully_stacked_area_));
             if(enable_stretch_) {
                 stretch(N,gscale,goffset,mean);
@@ -429,6 +429,7 @@ namespace ols {
                         float G = *p++;
                         float B = *p++;
                         unsigned Y = unsigned((0.3f * R + 0.6f * G + 0.1f * B) * (hist_bins-1));
+                        Y &= (hist_bins - 1); // protect gainst overflow
                         counters_[Y]++;
                     }
                 }
@@ -438,6 +439,7 @@ namespace ols {
                     float *p = (float*)(img.data + img.step[0] * r);
                     for(int c=0;c<img.cols;c++) {
                         unsigned Y = (hist_bins-1) * *p++;
+                        Y &= (hist_bins - 1); // protect gainst overflow
                         counters_[Y]++;
                     }
                 }
