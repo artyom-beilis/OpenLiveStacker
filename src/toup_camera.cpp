@@ -1,6 +1,7 @@
 #include "camera.h"
 #include "toupcam.h"
 #include "toup_oem.h"
+#include "shift_bit.h"
 #include <mutex>
 #include <sstream>
 #include <iostream>
@@ -202,27 +203,44 @@ namespace ols
                 callback_(frm);
             }
         }
+        void handle_error(std::string const &info,int code)
+        {
+            CamFrame frm = {};
+            std::string msg =make_message(info,code);
+            frm.format = stream_error;
+            frm.data = msg.c_str();
+            frm.data_size =msg.size();
+            std::unique_lock<std::mutex> guard(lock_);
+            if (callback_)
+            {
+                callback_(frm);
+            }
+        }
         void handle_frame()
         {
             CamFrame frm;
             int hr;
             int nW = 1, nH = 1;
             unsigned xOffset, yOffset, xWidth, yHeight;
-            if (FAILED(hr = Toupcam_get_Roi(hcam_, &xOffset, &yOffset, &xWidth, &yHeight)))
+            if (FAILED(hr = Toupcam_get_Roi(hcam_, &xOffset, &yOffset, &xWidth, &yHeight))) {
+                handle_error("Toupcam_get_Roi",hr);
                 return;
+            }
             if(xOffset | yOffset | xWidth | yHeight) // Roi is set
             {
                 nW =  (int)xWidth;
                 nH =  (int)yHeight;             
             }
-            else if (FAILED(hr = Toupcam_get_Size(hcam_, &nW, &nH)))
+            else if (FAILED(hr = Toupcam_get_Size(hcam_, &nW, &nH))) {
+                handle_error("Toupcam_get_Size",hr);
                 return; 
+            }
 
             int binning = -1;
             hr = Toupcam_get_Option(hcam_, TOUPCAM_OPTION_BINNING, &binning);
             if (FAILED(hr))
             {
-                // printf("handle_frame: Toupcam_get_Option(TOUPCAM_OPTION_BINNING)=%x\n", hr);
+                handle_error("Toupcam_get_Option BINNING",hr);
                 return;
             }
             binning &= ~AVERAGE_BINNING_FLAG; // remove flag before calculation
@@ -231,7 +249,7 @@ namespace ols
             hr = Toupcam_get_Option(hcam_, TOUPCAM_OPTION_RAW, &raw);
             if (FAILED(hr))
             {
-                // printf("handle_frame: Toupcam_get_Option(TOUPCAM_OPTION_RAW)=%x\n", hr);
+                handle_error("Toupcam_get_Option RAW",hr);
                 return;
             }
             int bpp = -1;
@@ -251,14 +269,30 @@ namespace ols
                 buf_.resize(bufSize);
             unsigned w = 0, h = 0;
             hr = Toupcam_PullImage(hcam_, buf_.data(), bpp * 8, &w, &h);
-            if (FAILED(hr))
+            if (FAILED(hr)) {
+                handle_error("Toupcam_PullImage",hr);
                 return;
+            }
             // printf("handle_frame: Toupcam_PullImage=(%ux%u)\n", w, h);
             hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FLUSH, 2);
             if (FAILED(hr))
             {
+                handle_error("Toupcam_put_Option FLUSH",hr);
                 // printf("handle_frame:Toupcam_put_Option(TOUPCAM_OPTION_FLUSH, 2)=%d\n", hr);
             }
+
+            if(bpp == 2) {
+                int bits=16;
+                if(info_.model->flag & TOUPCAM_FLAG_RAW10)
+                    bits = 10;
+                else if(info_.model->flag & TOUPCAM_FLAG_RAW12)
+                    bits = 12;
+                else if(info_.model->flag & TOUPCAM_FLAG_RAW14)
+                    bits = 14;
+                if(bits != 16) 
+                    shift_to16(bits,reinterpret_cast<uint16_t *>(buf_.data()),buf_.size()/2);
+            }
+
             struct timeval tv;
             gettimeofday(&tv, nullptr);
             frm.unix_timestamp = tv.tv_sec;
@@ -379,6 +413,8 @@ namespace ols
             }
 
             stream_active_ = 1;
+
+
 #ifndef MAKEFOURCC
 #define MAKEFOURCC(a, b, c, d) ((unsigned)(unsigned char)(a) | ((unsigned)(unsigned char)(b) << 8) | ((unsigned)(unsigned char)(c) << 16) | ((unsigned)(unsigned char)(d) << 24))
 #endif
@@ -1033,6 +1069,7 @@ namespace ols
             pToupcamCamera->handle_error("No packet timeout");
             break;
         default:
+            pToupcamCamera->handle_error("Callback?");
             break;
         }
     }
@@ -1213,17 +1250,13 @@ extern "C" {
 
             
 #if 0
-            char const *test_path="/storage/emulated/0/Android/media/org.openlivestacker/test.txt";
             char const *log_path="/storage/emulated/0/Android/media/org.openlivestacker/toup_log.txt";
 
             /// DEBUGGING!
 
             {
-                FILE *f=fopen(test_path,"w");
-                fprintf(f,"test\n");
-                fclose(f);
                 Toupcam_log_File(log_path);
-                Toupcam_log_Level(3);
+                Toupcam_log_Level(4);
             }
             /// END DEBUGGING
 #endif
