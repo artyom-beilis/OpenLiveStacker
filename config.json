@@ -10,6 +10,9 @@
         "format" : "raw16",
         "path" : "./wd"
     },
+    "toup" : {
+        "oem": false
+    },
     "astap" : {
         "exe": "astap_cli",
         "db": "data/db"

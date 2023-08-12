@@ -1,53 +1,73 @@
 # OpenLiveStacker - live stacking application
 
+OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) that uses an external camera for imaging and performs live stacking. It runs on Android and in Linux environments (including Linux Subsystem for Windows).
+
 ## Status
 
 - Beta, runs on Linux and Android.
-- Works with ASI ZWO, ToupTek and UVC Cameras
-
-## Roadmap
-
-- Platforms:
-    - Implemented: Linux and  Android (see <https://github.com/artyom-beilis/android_live_stacker/tree/web_ols>)
-    - In near future: need to test Raspberry PI, maybe windows
-- Camera
-    - Implemented
+- Works with ASI ZWO, ToupTek and UVC Cameras, 
+- Platforms: Linux, PI and  Android, Windows services for Linux are working as well
+- Cameras:
+    - Supported:
         - UVC Based like webcam, sv105
         - ASI ZWO support
         - ToupTek support
         - Watch directoy for files (universal integration with ekos)
         - Sim - simulation for development
-    - Future extected drivers:
-        - Android camera
-        - INDI Library (for wide range of cameras)
-- Switch pure JS UI to better looking one
+    - Under development:
+        - DSLR support using gphoto2 (see dslr branch)
+    - Planned to be supported:
+        - Android Camera
+        - SVBony - linux only (android SDK was not released yet by SVBony)
+- Featues:
+    - Live Stacking
+    - Auto/Manual stretch
+    - Plate solving
+    - Calibration frames: darks, flats, dark-flats
 
 ## Using on Android
 
-Install APK file that can be downloaded from Releases section, you may see some warnings (that it is build for older devices) continue anyway
+Install APK file that can be downloaded from Releases section:
 
-Open the app. Connect ASI, ToupTek or UVC camera to the device. You may need USB to type-C or to microusb adapter. The device should support OTG and it needs to be enabled under settings.
+Please refer to <https://github.com/artyom-beilis/OpenLiveStacker/wiki/Open-Live-Stacker-Manual> for use instructions
 
-Note, some devices may need external power to USB be provided
-
-Press on `ASI Device` or `UVC Device` - you'll be asked for permission to access the device and than borwser will be opened with address <http://127.0.0.1:8080>. Where you can control the stacking app.
-
-Stacked images and all data is stored under `DCIM/OpenLiveStacker` 
 
 ## Using on Linux
 
-### Build On Linux
+### Build Requirements
+
+
 
 3rd party libraries needed:
 
 - libtiff
-- libuvc 
 - cppcms 2.0 beta
 - OpenCV >= 3.2 core, imgproc, imgcodecs
 - C++11 enabled compiler
-- Optional:
+- Per camera requirement:
     - ASI ZWO SDK for ASI support
+    - ToupTek SDK for support of ToupTek, Meade cameras
+    - for UVC cameras libuvc and libusb
+    - for DSLR (under development) libgphoto2
     - libraw for watch directory driver support of dng/raw files
+
+
+Here the packages you can install on apt based distributions
+
+    apt-get install libgphoto2-dev git python3 cmake libuvc-dev libtiff-dev libpcre3-dev libcurl4-openssl-dev zlib1g-dev libraw-dev libopencv-dev libopencv-imgcodecs-dev libopencv-imgproc-dev bulld-essential libpcre3-dev zlib1g-dev
+
+For installing CppCMS please refer to: <http://cppcms.com/wikipp/en/page/cppcms_1x_build>, in the nutshell
+
+    git clone https://github.com/artyom-beilis/cppcms
+    cd cppcms
+    mkdir build
+    cd build
+    cmake -DDISABLE_STATIC=ON -DCMAKE_INSTALL_PREFIX=/usr ..
+    make
+    make install
+    
+
+### Building
 
 Clone repo:
 
@@ -60,9 +80,13 @@ cd OpenLiveStacker and run
     cmake ..
     make
     
-For 3rd part libraries or non-standard installations like SDK pass `-DCMAKE_INCLUDE_PATH=/path/to/includes` and `-DCMAKE_LIBRARY_PATH=/path/to/libs` parameters to cmake
+
+For 3rd part libraries or non-standard installations like SDK pass `-DCMAKE_INCLUDE_PATH=/path/to/includes` and `-DCMAKE_LIBRARY_PATH=/path/to/libs` parameters to cmake. For example if you have your ASI SDK here `/home/me/ASI_linux_mac_SDK_V1.28/` and you build on `x86_64` architecture use following cmake command:
+
+    cmake -DCMAKE_INCLUDE_PATH=/home/me/ASI_linux_mac_SDK_V1.28/include -DCMAKE_LIBRARY_PATH=/home/me/ASI_linux_mac_SDK_V1.28/lib/x64/ ..
 
 For building for old Intel CPUs without SSE4 support add `-DNO_SSE4=OFF` to cmake.
+
 
 ### Running
 
@@ -77,12 +101,6 @@ Important parameters in config.json:
 
 Open browser and go to `http://127.0.0.1:8080/` to open UI
 
-All the captured images and calibration frames will be stored under `data` directory on Linux
-
-**Note:** since it access USB directly you either need:
-
-1. Provide proper udev rules that provide access to the device
-2. Run `chmod a+rw /dev/usb/NNN/MMM` where NNN and MMM are device indexes of USB camera, you can find it by running `lsusb -t`
-3. Run app as root
+For more details on using OpenLiveStacker on Linux refer to: <https://github.com/artyom-beilis/OpenLiveStacker/wiki/Linux-Instructions-for-using-OpenLiveStacker>
 
 

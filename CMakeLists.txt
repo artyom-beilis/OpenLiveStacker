@@ -23,14 +23,18 @@ find_path(LIBRAW_HDR libraw/libraw.h)
 
 find_path(LIBCURL_HDR curl/curl.h)
 find_path(LIBZ_HDR zlib.h)
+find_path(LIBCPPCMS_HRD cppcms/application.h)
 find_library(LIBCURL curl)
 find_library(LIBZ z)
+
 
 
 
 set(WITH_SSE OFF)
 set(OLS_EXTRA )
 
+
+include_directories(${LIBCPPCMS_HRD})
 
 if(LIBCURL_HDR AND LIBCURL)
     set(WITH_CURL ON)
@@ -57,11 +61,13 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
         add_definitions(-DUSE_CV_SIMD)
     elseif(${ANDROID_ABI} STREQUAL "arm64-v8a") # No simd for armeabi-v7a
         add_definitions(-DUSE_CV_SIMD)
+        add_definitions(-DUSE_ARM_SIMD)
     endif()
 else()
     message("CPU: ${CMAKE_SYSTEM_PROCESSOR}")
     add_definitions(-DOLS_ARCH="${CMAKE_SYSTEM_PROCESSOR}")
     if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86") 
+        add_definitions(-DUSE_CV_SIMD)
         set(WITH_SSE ON)
     endif()        
     set(ANDROID_BUILD OFF)
