@@ -273,13 +273,13 @@ namespace ols
                 handle_error("Toupcam_PullImage",hr);
                 return;
             }
-            // printf("handle_frame: Toupcam_PullImage=(%ux%u)\n", w, h);
+/*            // printf("handle_frame: Toupcam_PullImage=(%ux%u)\n", w, h);
             hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FLUSH, 2);
             if (FAILED(hr))
             {
                 handle_error("Toupcam_put_Option FLUSH",hr);
                 // printf("handle_frame:Toupcam_put_Option(TOUPCAM_OPTION_FLUSH, 2)=%d\n", hr);
-            }
+            }*/
 
             if(bpp == 2) {
                 int bits=16;
@@ -402,11 +402,11 @@ namespace ols
             /* 1 = hard flush, discard frames cached by camera DDR (if any)
                2 = soft flush, discard frames cached by toupcam.dll (if any)
                3 = both flush */
-            hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FLUSH, 3);
+/*            hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FLUSH, 3);
             if (FAILED(hr))
             {
                 // printf("start_stream:Toupcam_put_Option(TOUPCAM_OPTION_FLUSH, 3)=%d\n", hr);
-            }
+            }*/
             {
                 std::unique_lock<std::mutex> guard(lock_);
                 callback_ = callback;
@@ -472,12 +472,12 @@ namespace ols
             /* 1 = hard flush, discard frames cached by camera DDR (if any)
                2 = soft flush, discard frames cached by toupcam.dll (if any)
                3 = both flush */
-            hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FLUSH, 3);
+/*            hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FLUSH, 3);
             if (FAILED(hr))
             {
                 e = make_message("Toupcam_put_Option(TOUPCAM_OPTION_FLUSH, 3)", hr);
                 return;
-            }
+            }*/
         }
 
         /// list of camera controls that the camera supports
@@ -1348,7 +1348,7 @@ extern "C" {
             std::string name = split_point == std::string::npos ? "Camera" : ols::ToupDriverConfig::driver_config.substr(split_point+1);
 
             
-#if 0
+#if 1
             char const *log_path="/storage/emulated/0/Android/media/org.openlivestacker/toup_log.txt";
 
             /// DEBUGGING!
