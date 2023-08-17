@@ -492,14 +492,15 @@ namespace ols
             // Conditionally supported
             if (!(info_.model->flag & TOUPCAM_FLAG_MONO))
                 opts.push_back(opt_auto_wb);
-            if (info_.model->flag & TOUPCAM_FLAG_FAN)
+            if (info_.model->flag & TOUPCAM_FLAG_TEC) // Thermoelectric Cooler Present
+            {
                 opts.push_back(opt_cooler_power_perc);
-            if (info_.model->flag & TOUPCAM_FLAG_GETTEMPERATURE)
-                opts.push_back(opt_temperature);
-            if (info_.model->flag & TOUPCAM_FLAG_TEC)
                 opts.push_back(opt_cooler_on);
-            if (info_.model->flag & TOUPCAM_FLAG_TEC_ONOFF)
-                opts.push_back(opt_cooler_target);
+                if (info_.model->flag & TOUPCAM_FLAG_TEC_ONOFF) // Thermoelectric Cooler can be turn on or off, support to set the target temperature of TEC 
+                    opts.push_back(opt_cooler_target);
+            }
+            if (info_.model->flag & TOUPCAM_FLAG_GETTEMPERATURE) // Support to get the temperature of the sensor
+                opts.push_back(opt_temperature);
             if (average_bin_support_ != NULL)
                 opts.push_back(opt_average_bin);
             if (info_.model->flag & TOUPCAM_FLAG_BLACKLEVEL)
@@ -508,6 +509,10 @@ namespace ols
                 opts.push_back(opt_conv_gain_hdr); // 0-2
             else if (info_.model->flag & TOUPCAM_FLAG_CG)
                 opts.push_back(opt_conv_gain_hcg); // 0-1
+            if (info_.model->flag & TOUPCAM_FLAG_LOW_NOISE)
+                opts.push_back(opt_low_noise);
+            if (info_.model->flag & TOUPCAM_FLAG_HIGH_FULLWELL)
+                opts.push_back(opt_high_fullwell);
             return opts;
         }
         /// get camera control
@@ -609,22 +614,17 @@ namespace ols
                 return r;
             }
             case opt_conv_gain_hcg:
-                return setCG(1, e);
+                return setCG(1, r, e);
             case opt_conv_gain_hdr:
-                return setCG(2, e);
+                return setCG(2, r, e);
             case opt_cooler_power_perc:
             {
                 r.type = type_percent;
+                r.read_only = true;
                 r.min_val = 0;
-                r.max_val = info_.model->maxfanspeed;
-                r.step_size = 1;
-                int fanValue = 0;
-                if (FAILED(hr = Toupcam_get_Option(hcam_, TOUPCAM_OPTION_FAN, &fanValue)))
-                {
-                    e = make_message("Failed to Toupcam_get_Option(TOUPCAM_OPTION_FAN)", hr);
-                    return r;
-                }
-                r.cur_val = fanValue;
+                r.max_val = 100.0;
+                r.step_size = 1.0;
+                r.cur_val = getTECVoltage(e);
                 r.def_val = 0;
                 // printf("FAN(0:%d)\n",info_.model->maxfanspeed);
                 return r;
@@ -664,7 +664,8 @@ namespace ols
                 }
                 // printf("Toupcam_get_Temperature = %d -> %d\n", hr, temp);
 
-                r.cur_val = r.def_val = temp * TOUPCAM_2_OLS_TEMP; // in 0.1℃ units (32 means 3.2℃, -35 means -3.5℃).
+                r.cur_val = std::round(10.0 * temp * TOUPCAM_2_OLS_TEMP) / 10.0; // in 0.1℃ units (32 means 3.2℃, -35 means -3.5℃).
+                r.def_val = TOUPCAM_TEC_TARGET_DEF * TOUPCAM_2_OLS_TEMP;
             }
             break;
             case opt_cooler_target:
@@ -680,7 +681,7 @@ namespace ols
 
                 r.min_val = TOUPCAM_TEC_TARGET_MIN * TOUPCAM_2_OLS_TEMP; // Toupcam API in 0.1℃ units (32 means 3.2℃, -35 means -3.5℃)
                 r.max_val = TOUPCAM_TEC_TARGET_MAX * TOUPCAM_2_OLS_TEMP;
-                r.def_val = temp * TOUPCAM_2_OLS_TEMP;
+                r.def_val = TOUPCAM_TEC_TARGET_DEF * TOUPCAM_2_OLS_TEMP;
                 r.cur_val = temp * TOUPCAM_2_OLS_TEMP;
                 r.step_size = TOUPCAM_2_OLS_TEMP;
             }
@@ -700,6 +701,42 @@ namespace ols
                 r.max_val = 1;
                 r.def_val = 0;
                 r.cur_val = cooler_on;
+                r.step_size = 1;
+            }
+            break;
+            case opt_low_noise:
+            {
+                r.type = type_bool;
+                r.read_only = false;
+                int low_noise;
+                if (FAILED(hr = Toupcam_get_Option(hcam_, TOUPCAM_OPTION_LOW_NOISE, &low_noise)))
+                {
+                    e = make_message("Failed to Toupcam_get_Option(TOUPCAM_OPTION_LOW_NOISE)", hr);
+                    return r;
+                }
+
+                r.min_val = 0;
+                r.max_val = 1;
+                r.def_val = 1;
+                r.cur_val = low_noise;
+                r.step_size = 1;
+            }
+            break;
+            case opt_high_fullwell:
+            {
+                r.type = type_bool;
+                r.read_only = false;
+                int high_fullwell;
+                if (FAILED(hr = Toupcam_get_Option(hcam_, TOUPCAM_OPTION_HIGH_FULLWELL, &high_fullwell)))
+                {
+                    e = make_message("Failed to Toupcam_get_Option(TOUPCAM_OPTION_HIGH_FULLWELL)", hr);
+                    return r;
+                }
+
+                r.min_val = 0;
+                r.max_val = 1;
+                r.def_val = 1;
+                r.cur_val = high_fullwell;
                 r.step_size = 1;
             }
             break;
@@ -757,12 +794,12 @@ namespace ols
                 hr = Toupcam_put_ExpoTime(hcam_, usTime);
             }
             break;
-            case opt_cooler_power_perc:
-            {
-                int perCent = (int)(value);
-                hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FAN, perCent);
-            }
-            break;
+            // case opt_cooler_power_perc:
+            // {
+            //     int perCent = (int)(value);
+            //     hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FAN, perCent);
+            // }
+            // break;
             case opt_black_level:
             {
                 int bl = (int)(value);
@@ -784,23 +821,24 @@ namespace ols
             break;
             case opt_cooler_target:
             {
-                short temp = (short)value * 10;
+                short temp = (short)(value / TOUPCAM_2_OLS_TEMP);
                 hr = Toupcam_put_Temperature(hcam_, temp);
                 if (FAILED(hr))
                 {
                     e = make_message("Toupcam_put_Temperature()", hr);
                     return;
                 }
-                hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FAN, 1);
+                hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_TEC, 1);
+                if (FAILED(hr))
+                {
+                    e = make_message("Toupcam_put_Option(TOUPCAM_OPTION_TEC)", hr);
+                    return;
+                }
+                if (info_.model->flag & TOUPCAM_FLAG_FAN)
+                    hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FAN, 1);
                 if (FAILED(hr))
                 {
                     e = make_message("Toupcam_put_Option(TOUPCAM_OPTION_FAN=1)", hr);
-                    return;
-                }
-                hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_TECTARGET, temp);
-                if (FAILED(hr))
-                {
-                    e = make_message("Toupcam_put_Option(TOUPCAM_OPTION_TECTARGET)", hr);
                     return;
                 }
             }
@@ -813,12 +851,33 @@ namespace ols
                     e = make_message("Toupcam_put_Option(TOUPCAM_OPTION_TEC)", hr);
                     return;
                 }
-                hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FAN, value ? 1 : 0);
+                if (info_.model->flag & TOUPCAM_FLAG_FAN)
+                    hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FAN, value ? 1 : 0);
+            }
+            break;
+            case opt_low_noise:
+            {
+                hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_LOW_NOISE, value ? 1 : 0);
+                if (FAILED(hr))
+                {
+                    e = make_message("Toupcam_put_Option(TOUPCAM_OPTION_LOW_NOISE)", hr);
+                    return;
+                }
+            }
+            break;
+            case opt_high_fullwell:
+            {
+                hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_HIGH_FULLWELL, value ? 1 : 0);
+                if (FAILED(hr))
+                {
+                    e = make_message("Toupcam_put_Option(TOUPCAM_OPTION_HIGH_FULLWELL)", hr);
+                    return;
+                }
             }
             break;
             case opt_temperature:
             {
-                short temp = (short)(value * 10);
+                short temp = (short)(value / TOUPCAM_2_OLS_TEMP);
                 hr = Toupcam_put_Temperature(hcam_, temp);
             }
             break;
@@ -947,9 +1006,8 @@ namespace ols
          * So HCG should be better for very short exposures.
          * LCG for long exposure. I assume with this phone app you would go for unguided short exposures, so maybe HCG should be the default"
         */
-        CamParam setCG(double maxCG, CamErrorCode &e)
+        CamParam setCG(double maxCG, CamParam r, CamErrorCode &e)
         {
-            CamParam r = {};
             r.type = type_number;
             r.read_only = false;
             r.min_val = 0;
@@ -964,6 +1022,23 @@ namespace ols
             r.cur_val = cg;
             r.def_val = CG_OLS_DEFAULT_VAL;
             return r;
+        }
+        double getTECVoltage(CamErrorCode &e)
+        {
+            timeval tv = {};
+            gettimeofday(&tv, nullptr);
+            // Please do not get this value too frequently, the recommended interval is 2 seconds or more
+            if(tv.tv_sec - lastTECVoltageMeasure_ < 2l)
+            {
+                lastTECVoltageMeasure_ = tv.tv_sec;
+                return lastTECVoltage_;
+            }
+            int hr, voltage;
+            if (FAILED(hr = Toupcam_get_Option(hcam_, TOUPCAM_OPTION_TEC_VOLTAGE, &voltage)))
+            {
+                e = make_message("Failed to Toupcam_get_Option(TOUPCAM_OPTION_TEC_VOLTAGE)", hr);
+            }
+            return lastTECVoltage_ = std::round(1000.0 * voltage / TECMaxVoltage_) / 10.0; // one signigivant digit after decimal point
         }
         void init(CamErrorCode &e)
         {
@@ -1006,6 +1081,12 @@ namespace ols
                 e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_LOW_NOISE, 1)", hr);
                 return;
             }
+            // High Fullwell capacity seems a default choice for astroimageing
+            if (((info_.model->flag & TOUPCAM_FLAG_HIGH_FULLWELL)) && FAILED(hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_HIGH_FULLWELL, 1)))
+            {
+                e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_HIGH_FULLWELL, 1)", hr);
+                return;
+            }
             hr = Toupcam_put_Size(hcam_, info_.model->res[0].width, info_.model->res[0].height);
             if (FAILED(hr))
             {
@@ -1030,6 +1111,21 @@ namespace ols
                     return;
                 }
             }
+            if (info_.model->flag & TOUPCAM_FLAG_TEC)
+            {
+                if (FAILED(hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_TEC, 0)))
+                {
+                    e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_TEC, 0)", hr);
+                    return;
+                }
+
+                if (FAILED(hr = Toupcam_get_Option(hcam_, TOUPCAM_OPTION_TEC_VOLTAGE_MAX, &TECMaxVoltage_)))
+                {
+                    e = make_message("Failed to Toupcam_get_Option(TOUPCAM_OPTION_TEC_VOLTAGE_MAX)", hr);
+                    return;
+                }
+                getTECVoltage(e);
+            }
         }
         ToupcamDeviceV2 info_;
         HToupcam hcam_ = nullptr;
@@ -1039,6 +1135,9 @@ namespace ols
         std::vector<unsigned char> buf_;
         std::atomic<int> stream_active_;
         int frame_counter_ = 0;
+        double lastTECVoltage_;
+        int TECMaxVoltage_;
+        time_t lastTECVoltageMeasure_ = 0;
         CamBayerType bayerPattern_ = bayer_na;
         bool auto_wb_ = false;
         // protected by mutex
