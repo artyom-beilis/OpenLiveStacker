@@ -204,6 +204,8 @@ endif()
 if(LIBGPHOTO2_HDR AND LIBGPHOTO2_LIB AND LIBGPHOTO2_PORT_LIB)
     include_directories(${LIBGPHOTO2_HDR})
     add_library(ols_driver_gphoto2 SHARED src/gphoto2_camera.cpp)
+    target_link_libraries(ols_driver_gphoto2 ols ${LIBGPHOTO2_LIB} ${LIBGPHOTO2_PORT_LIB} ${OPENCV_CORE} ${OPENCV_IMGCODECS} ${OPENCV_IMGPROC})
+
     if(LIBRAW_LIB AND LIBRAW_HDR)
         include_directories(${LIBRAW_HDR})
         set_target_properties(ols_driver_gphoto2 PROPERTIES COMPILE_DEFINITIONS WITH_LIBRAW)
@@ -213,7 +215,6 @@ if(LIBGPHOTO2_HDR AND LIBGPHOTO2_LIB AND LIBGPHOTO2_PORT_LIB)
         message("- Building GPhoto2 Driver without libraw")
     endif()
 
-    target_link_libraries(ols_driver_gphoto2 ${LIBGPHOTO2_LIB} ${LIBGPHOTO2_PORT_LIB})
 
     install(TARGETS ols_driver_gphoto2
             LIBRARY DESTINATION lib

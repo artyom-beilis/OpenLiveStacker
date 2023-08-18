@@ -20,9 +20,10 @@ void CameraDriver::load_driver(std::string const &name,std::string base_path,cha
         return;
     if(!base_path.empty())
         base_path += "/";
+    std::string so_path = (base_path + "libols_driver_" + name + ".so");
     void *h = dlopen((base_path + "libols_driver_" + name + ".so").c_str(),RTLD_LAZY | RTLD_GLOBAL);
     if(!h)
-        throw CamError("Failed to load driver " + name);
+        throw CamError("Failed to load driver " + so_path + ": `" + dlerror() + "'");
     void *func = dlsym(h,("ols_get_" + name + "_driver").c_str());
     if(!func) {
         dlclose(h);

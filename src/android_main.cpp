@@ -48,6 +48,7 @@ extern "C" {
         try {
             booster::shared_ptr<booster::log::sink> logger(new ols::AndroidSink());
             booster::log::logger::instance().add_sink(logger);
+            BOOSTER_ERROR("ols") <<"Loading " << driver << " from " << driver_dir << " with config " << driver_config;
             ols::CameraDriver::load_driver(driver,driver_dir,driver_config);
             BOOSTER_ERROR("ols") <<"Driver loaded" << driver;
             ols::OpenLiveStacker::disableCVThreads();

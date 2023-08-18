@@ -1,5 +1,6 @@
 #include "camera.h"
 #include <gphoto2/gphoto2.h>
+#include <gphoto2/gphoto2-port.h>
 #include <mutex>
 #include <sstream>
 #include <iostream>
@@ -584,16 +585,26 @@ namespace ols {
     };
  
 
+    static FILE *error_stream = NULL;
     extern "C" {
         static void ctx_error_func(GPContext *, char const *msg, void *)
         {
-            fprintf(stderr,"GP2 Error:%s\n",msg);
-            fflush(stderr);
+            FILE *f = !error_stream ? stderr : error_stream;
+            fprintf(f,"GP2 Error:%s\n",msg);
+            fflush(f);
         }
         static void ctx_status_func(GPContext *, char const *msg, void *)
         {
-            fprintf(stderr,"GP2 Status:%s\n",msg);
-            fflush(stderr);
+            FILE *f = !error_stream ? stderr : error_stream;
+            fprintf(f,"GP2 Status:%s\n",msg);
+            fflush(f);
+        }
+        static void errordumper(GPLogLevel level, const char *domain, const char *str,
+                 void *data) 
+        {
+            FILE *f = !error_stream ? stderr : error_stream;
+            fprintf(f,"GP2 LOG:%s:%s\n",domain,str);
+            fflush(f);
         }
     }
 
@@ -628,6 +639,7 @@ namespace ols {
             ctx_ = gp_context_new();
             gp_context_set_error_func(ctx_,ctx_error_func,nullptr);
             gp_context_set_status_func(ctx_,ctx_status_func,nullptr);
+	        gp_log_add_func(GP_LOG_DEBUG, errordumper, NULL);
         }
         ~GP2CameraDriver()
         {
@@ -643,14 +655,30 @@ namespace ols {
 }
 
 extern "C" {
-    ols::CameraDriver *ols_get_gphoto2_driver(int /*cam_id*/,ols::CamErrorCode * /*e*/)
+#ifdef ANDROID_SUPPORT
+    int ols_set_gphoto2_driver_config(char const *libdir)
     {
-        //std::unique_ptr<ols::CameraDriver> p;
-        //if(cam_id != -1)
-        //    p.reset(new ols::SingleGP2CameraDriver(cam_id,e));
-        //else
-        //p.reset(new ols::GP2CameraDriver());
-        //return p.release();
+        setenv("CAMLIBS",libdir,1);
+        setenv("IOLIBS", libdir,1);
+        setenv("CAMLIBS_PREFIX","libgphoto2_camlib_",1);
+        setenv("IOLIBS_PREFIX","libgphoto2_port_iolib_",1);
+#if 1
+        ols::error_stream = fopen("/storage/emulated/0/Android/media/org.openlivestacker/gphoto2_log.txt","w");
+#endif
+        return 0;
+    }
+    
+    ols::CameraDriver *ols_get_gphoto2_driver(int fd,ols::CamErrorCode *e)
+    {
+        int status = gp_port_usb_set_sys_device(fd);
+        if(!ols::check(status,"gp_port_usb_set_sys_device",*e))
+            return nullptr;
         return new ols::GP2CameraDriver();
     }
+#else    
+    ols::CameraDriver *ols_get_gphoto2_driver(int /*cam_id*/,ols::CamErrorCode * /*e*/)
+    {
+        return new ols::GP2CameraDriver();
+    }
+#endif    
 }
