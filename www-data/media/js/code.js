@@ -4,7 +4,7 @@ var global_height = 0;
 var global_bin = 0;
 var global_download_progress = null;
 var global_zoom = 1.0;
-var g_stacker_status = 'idle';
+var g_stacker_status = 'closed';
 var g_show_thumb_live = false;
 var g_stats = null;
 var g_solving = false;
@@ -359,6 +359,7 @@ function changeStackerStatus(new_status)
 {
     var ui_ctl = {
         stack: true,
+        stop:true,
         pause: false,
         cancel: false,
         resume: false,
@@ -368,12 +369,26 @@ function changeStackerStatus(new_status)
         pp: false,
         stats: false
     };
-    if(new_status == 'idle') {
+    if(new_status == 'closed') {
+        ui_ctl.stack = false;
+        ui_ctl.solve = false;
+        ui_ctl.stop = false;
+        ui_ctl.pause = false;
+        ui_ctl.resume = false;
+        ui_ctl.save=false;
+        ui_ctl.cancel=false;
+        ui_ctl.pp=false;
+        ui_ctl.live = false;
+        ui_ctl.stats = false;
+    }
+    else if(new_status == 'idle') {
         if(g_stacker_status != 'idle') {
             showLiveVideo();
             showThumbLive(false);
         }
         ui_ctl.stack = true;
+        ui_ctl.solve = true;
+        ui_ctl.stop = true;
         ui_ctl.pause = false;
         ui_ctl.resume = false;
         ui_ctl.save=false;
@@ -387,6 +402,8 @@ function changeStackerStatus(new_status)
             showStackedVideo(true);
         }
         ui_ctl.stack = false;
+        ui_ctl.solve = true;
+        ui_ctl.stop = false;
         ui_ctl.cancel = true;
         ui_ctl.pause = true;
         ui_ctl.resume = false;
@@ -400,6 +417,7 @@ function changeStackerStatus(new_status)
             showStackedVideo(true);
         }
         ui_ctl.stack = false;
+        ui_ctl.stop = false;
         ui_ctl.pause = false;
         ui_ctl.cancel = true;
         ui_ctl.resume = true;
@@ -975,11 +993,19 @@ function showStackedVideo(stacked_on)
 function showStream(name)
 {
     var video = document.getElementById('live_stream_video');
-    if(video)
-        video.src = `/api/video/${name}`;
-    else
-        document.getElementById('video').innerHTML = `<div id="live_stream_video_div"><img id="live_stream_video" alt="streaming video" src="/api/video/${name}" /></div>`;
-    onResize(null);
+    if(name == 'none') {
+        if(video) {
+            video.src = '/media/invalid.jpeg';
+        }
+        document.getElementById('video').innerHTML = '';
+    }
+    else {
+        if(video)
+            video.src = `/api/video/${name}`;
+        else
+            document.getElementById('video').innerHTML = `<div id="live_stream_video_div"><img id="live_stream_video" alt="streaming video" src="/api/video/${name}" /></div>`;
+        onResize(null);
+    }
 }
 
 function toggleThumbLive()
@@ -1108,21 +1134,30 @@ function updateFontSize()
     }
 }
 
+function stopStream()
+{
+    restCall('post','/api/camera/stream',{op:'stop'},(r)=>{
+        changeStackerStatus('closed');
+        showStream('none');
+        showConfig(true);
+    });
+}
+
 function startStream()
 {
     var format_id = document.getElementById('stream_format').value;
     var max_fr = parseFloat(document.getElementById('stream_max_framerate').value);
     if(isNaN(max_fr))
         max_fr = 0;
-        restCall('post','/api/camera/stream',{op:'start',format_id:format_id, max_framerate: max_fr },(r)=>{
-            saveInputValue('stream_format');
-            global_width = r.width;
-            global_height = r.height;
-            global_bin = r.bin;
-            showLiveVideo();
-            changeStackerStatus('idle');
-            recalcFOV();
-        });
+    restCall('post','/api/camera/stream',{op:'start',format_id:format_id, max_framerate: max_fr },(r)=>{
+        saveInputValue('stream_format');
+        global_width = r.width;
+        global_height = r.height;
+        global_bin = r.bin;
+        showLiveVideo();
+        changeStackerStatus('idle');
+        recalcFOV();
+    });
     showConfig(false);
 }
 

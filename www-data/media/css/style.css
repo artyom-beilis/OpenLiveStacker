@@ -55,6 +55,10 @@
         background: url(/media/img/save.png) no-repeat center center;
         background-size: 10mm 10mm;
     }
+    .stop_background {
+        background: url(/media/img/stop.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
     .cancel_background {
         background: url(/media/img/cancel.png) no-repeat center center;
         background-size: 10mm 10mm;
