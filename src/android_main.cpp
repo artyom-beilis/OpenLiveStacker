@@ -43,13 +43,22 @@ extern "C" {
             char const *driver_dir,         /// location of OLS drivers to load from
             char const *driver,             /// driver name
             char const *driver_config,      /// driver config option
-            int driver_parameter)           /// FD for UVC camera, or CameraID for ASI
+            int driver_parameter,           /// FD for UVC camera, or CameraID for ASI
+            int debug_driver)               /// 1 if need extra logging for camera driver
     {
         try {
             booster::shared_ptr<booster::log::sink> logger(new ols::AndroidSink());
             booster::log::logger::instance().add_sink(logger);
             BOOSTER_ERROR("ols") <<"Loading " << driver << " from " << driver_dir << " with config " << driver_config;
-            ols::CameraDriver::load_driver(driver,driver_dir,driver_config);
+
+            std::string dp = data_path;
+            ols::make_dir(dp);
+            dp += "/debug";
+            ols::make_dir(dp);
+            std::string camera_log = dp + "/" + driver + "_camera.log"; 
+            rename(camera_log.c_str(),(camera_log + ".1").c_str());
+
+            ols::CameraDriver::load_driver(driver,driver_dir,driver_config,camera_log,debug_driver);
             BOOSTER_ERROR("ols") <<"Driver loaded" << driver;
             ols::OpenLiveStacker::disableCVThreads();
             std::string astap_exe = driver_dir + std::string("/libastap_cli.so");

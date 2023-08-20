@@ -86,7 +86,7 @@ int main(int argc,char **argv)
             driver_opt_ptr = driver_opt.c_str();
         }
 
-        ols::CameraDriver::load_driver(driver,path,driver_opt_ptr);
+        ols::CameraDriver::load_driver(driver,path,driver_opt_ptr,cfg.get("camera.log","/tmp/ols_camera.log"),cfg.get("camera.debug",false));
         ols::PlateSolver::init(astap_db,astap_exe);
         ols::OpenLiveStacker stacker;
         stacker.http_ip = cfg.get("http.ip",stacker.http_ip);

@@ -306,23 +306,18 @@ namespace ols {
                 check(status,"Wait event");
                 switch(ev) {
                 case GP_EVENT_UNKNOWN:
-                    printf("No event\n");
                     continue;
                 case GP_EVENT_TIMEOUT:
-                    printf("timeout\n");
                     continue;
                 case GP_EVENT_FILE_ADDED:
                     if(fno < MAX_FILES) { 
                         CameraFilePath *fp = static_cast<CameraFilePath*>(ptr);
                         files[fno++] = *fp;
-                        printf("Got %s/%s\n",fp->folder,fp->name);
                     }
                     break;
                 case GP_EVENT_CAPTURE_COMPLETE:
-                    printf("Capture done\n");
                     return fno;
                 default:
-                    printf("other event\n");
                     break;
                 }
                 free(ptr);
@@ -599,8 +594,8 @@ namespace ols {
             fprintf(f,"GP2 Status:%s\n",msg);
             fflush(f);
         }
-        static void errordumper(GPLogLevel level, const char *domain, const char *str,
-                 void *data) 
+        static void errordumper(GPLogLevel /*level*/, const char *domain, const char *str,
+                 void * /*data*/) 
         {
             FILE *f = !error_stream ? stderr : error_stream;
             fprintf(f,"GP2 LOG:%s:%s\n",domain,str);
@@ -639,7 +634,6 @@ namespace ols {
             ctx_ = gp_context_new();
             gp_context_set_error_func(ctx_,ctx_error_func,nullptr);
             gp_context_set_status_func(ctx_,ctx_status_func,nullptr);
-	        gp_log_add_func(GP_LOG_DEBUG, errordumper, NULL);
         }
         ~GP2CameraDriver()
         {
@@ -655,6 +649,13 @@ namespace ols {
 }
 
 extern "C" {
+
+    void ols_set_gphoto2_driver_log(char const *log_path,int debug)
+    {
+        ols::error_stream = fopen(log_path,"w");
+	    gp_log_add_func(debug ? GP_LOG_DEBUG : GP_LOG_ERROR , ols::errordumper, NULL);
+    }
+
 #ifdef ANDROID_SUPPORT
     int ols_set_gphoto2_driver_config(char const *libdir)
     {
@@ -662,12 +663,9 @@ extern "C" {
         setenv("IOLIBS", libdir,1);
         setenv("CAMLIBS_PREFIX","libgphoto2_camlib_",1);
         setenv("IOLIBS_PREFIX","libgphoto2_port_iolib_",1);
-#if 1
-        ols::error_stream = fopen("/storage/emulated/0/Android/media/org.openlivestacker/gphoto2_log.txt","w");
-#endif
         return 0;
     }
-    
+   
     ols::CameraDriver *ols_get_gphoto2_driver(int fd,ols::CamErrorCode *e)
     {
         int status = gp_port_usb_set_sys_device(fd);

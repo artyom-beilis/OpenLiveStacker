@@ -1313,6 +1313,11 @@ extern "C" {
         ols::ToupDriverConfig::driver_config = str;
         return 0;
     }
+    void ols_set_toup_driver_log(char const *log_path,int debug)
+    {
+        Toupcam_log_File(log_path);
+        Toupcam_log_Level(debug ? 4 : 1);
+    }
     ols::CameraDriver *ols_get_toup_driver(int /*unused*/,ols::CamErrorCode *e)
     {
         // const ToupcamModelV2** a = Toupcam_all_Model();
@@ -1346,19 +1351,6 @@ extern "C" {
             // touptek android format
             snprintf(toup_id,sizeof(toup_id),"fd-%d-%04x-%04x",fd,vendor_id,product_id);
             std::string name = split_point == std::string::npos ? "Camera" : ols::ToupDriverConfig::driver_config.substr(split_point+1);
-
-            
-#if 0
-            char const *log_path="/storage/emulated/0/Android/media/org.openlivestacker/toup_log.txt";
-
-            /// DEBUGGING!
-
-            {
-                Toupcam_log_File(log_path);
-                Toupcam_log_Level(4);
-            }
-            /// END DEBUGGING
-#endif
             return new ols::SingleToupcamCameraDriver(toup_id,name);
         }
     }

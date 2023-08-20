@@ -4,6 +4,7 @@
 
 extern "C" typedef ols::CameraDriver *(*cam_generator_ptr_type)(int,ols::CamErrorCode *);
 extern "C" typedef int (*cam_config_ptr_type)(char const *);
+extern "C" typedef void (*cam_log_ptr_type)(char const *,int );
 
 namespace ols {
 
@@ -14,7 +15,7 @@ CamError::CamError(std::string const &msg) : std::runtime_error(msg)
 static std::vector<std::string> driver_names;
 static std::vector<cam_generator_ptr_type> driver_calls;
 
-void CameraDriver::load_driver(std::string const &name,std::string base_path,char const *opt)
+void CameraDriver::load_driver(std::string const &name,std::string base_path,char const *opt,std::string cam_log,int cam_debug)
 {
     if(std::find(driver_names.begin(),driver_names.end(),name) != driver_names.end())
         return;
@@ -38,6 +39,13 @@ void CameraDriver::load_driver(std::string const &name,std::string base_path,cha
         cam_config_ptr_type config = reinterpret_cast<cam_config_ptr_type>(opt_func);
         if(config(opt)!=0)
             throw CamError("Failed to config driver for " + name);
+    }
+    if(!cam_log.empty()) {
+        void *log_func = dlsym(h,("ols_set_" + name + "_driver_log").c_str());
+        if(log_func) {
+            cam_log_ptr_type log_f = reinterpret_cast<cam_log_ptr_type>(log_func);
+            log_f(cam_log.c_str(),cam_debug);
+        }
     }
 
     driver_calls.insert(driver_calls.begin(),reinterpret_cast<cam_generator_ptr_type>(func));
