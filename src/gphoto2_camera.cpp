@@ -668,9 +668,11 @@ extern "C" {
    
     ols::CameraDriver *ols_get_gphoto2_driver(int fd,ols::CamErrorCode *e)
     {
-        int status = gp_port_usb_set_sys_device(fd);
-        if(!ols::check(status,"gp_port_usb_set_sys_device",*e))
-            return nullptr;
+        if(fd >= 0) {
+            int status = gp_port_usb_set_sys_device(fd);
+            if(!ols::check(status,"gp_port_usb_set_sys_device",*e))
+                return nullptr;
+        }
         return new ols::GP2CameraDriver();
     }
 #else    
