@@ -49,7 +49,7 @@ extern "C" {
         try {
             booster::shared_ptr<booster::log::sink> logger(new ols::AndroidSink());
             booster::log::logger::instance().add_sink(logger);
-            BOOSTER_ERROR("ols") <<"Loading " << driver << " from " << driver_dir << " with config " << driver_config;
+            BOOSTER_ERROR("ols") <<"Loading " << driver << " from " << driver_dir << " with config " << (driver_config ? driver_config : "");
 
             std::string dp = data_path;
             ols::make_dir(dp);
@@ -74,6 +74,7 @@ extern "C" {
             BOOSTER_INFO("ols") << "Service created";
         }
         catch(std::exception const &e) {
+            LOG("OLS INIT FAILED %s",e.what());
             snprintf(ols_andoid_error_str,sizeof(ols_andoid_error_str),"Init Failed:%s",e.what());
             g_stacker.reset();
             return 1;
