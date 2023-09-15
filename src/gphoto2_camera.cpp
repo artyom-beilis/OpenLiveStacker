@@ -21,6 +21,32 @@
 #endif
 
 namespace ols {
+
+    static FILE *error_stream = NULL;
+    extern "C" {
+        static void ctx_error_func(GPContext *, char const *msg, void *)
+        {
+            FILE *f = !error_stream ? stderr : error_stream;
+            fprintf(f,"GP2 Error:%s\n",msg);
+            fflush(f);
+        }
+        static void ctx_status_func(GPContext *, char const *msg, void *)
+        {
+            FILE *f = !error_stream ? stderr : error_stream;
+            fprintf(f,"GP2 Status:%s\n",msg);
+            fflush(f);
+        }
+        static void errordumper(GPLogLevel /*level*/, const char *domain, const char *str,
+                 void * /*data*/) 
+        {
+            FILE *f = !error_stream ? stderr : error_stream;
+            fprintf(f,"GP2 LOG:%s:%s\n",domain,str);
+            fflush(f);
+        }
+    }
+
+    #define LOG(...) do { if( ::ols::error_stream) fprintf( ::ols::error_stream,__VA_ARGS__); } while(0)
+
         
     static constexpr int MAX_FILES = 3;
 
@@ -580,29 +606,6 @@ namespace ols {
     };
  
 
-    static FILE *error_stream = NULL;
-    extern "C" {
-        static void ctx_error_func(GPContext *, char const *msg, void *)
-        {
-            FILE *f = !error_stream ? stderr : error_stream;
-            fprintf(f,"GP2 Error:%s\n",msg);
-            fflush(f);
-        }
-        static void ctx_status_func(GPContext *, char const *msg, void *)
-        {
-            FILE *f = !error_stream ? stderr : error_stream;
-            fprintf(f,"GP2 Status:%s\n",msg);
-            fflush(f);
-        }
-        static void errordumper(GPLogLevel /*level*/, const char *domain, const char *str,
-                 void * /*data*/) 
-        {
-            FILE *f = !error_stream ? stderr : error_stream;
-            fprintf(f,"GP2 LOG:%s:%s\n",domain,str);
-            fflush(f);
-        }
-    }
-
     class GP2CameraDriver : public CameraDriver {
     public:
         virtual std::vector<std::string> list_cameras(CamErrorCode &e) 
@@ -634,6 +637,7 @@ namespace ols {
             ctx_ = gp_context_new();
             gp_context_set_error_func(ctx_,ctx_error_func,nullptr);
             gp_context_set_status_func(ctx_,ctx_status_func,nullptr);
+            LOG("context created\n");
         }
         ~GP2CameraDriver()
         {
@@ -663,12 +667,14 @@ extern "C" {
         setenv("IOLIBS", libdir,1);
         setenv("CAMLIBS_PREFIX","libgphoto2_camlib_",1);
         setenv("IOLIBS_PREFIX","libgphoto2_port_iolib_",1);
+        LOG("Gphoto libdir %s\n",libdir);
         return 0;
     }
    
     ols::CameraDriver *ols_get_gphoto2_driver(int fd,ols::CamErrorCode *e)
     {
         if(fd >= 0) {
+            LOG("Using file descriptor for USB device %d\n",fd);
             int status = gp_port_usb_set_sys_device(fd);
             if(!ols::check(status,"gp_port_usb_set_sys_device",*e))
                 return nullptr;
