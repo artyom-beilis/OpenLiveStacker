@@ -242,7 +242,7 @@ namespace ols {
             check(status,"get data");
         }
 
-        std::pair<cv::Mat,CamBayerType> to_mat()
+        std::pair<cv::Mat,CamBayerType> to_mat(int w=-1,int h=-1,int bin=1)
         {
             std::pair<cv::Mat,CamBayerType> r;
             if(!loaded()) {
@@ -256,7 +256,7 @@ namespace ols {
             }
             else {
 #ifdef WITH_LIBRAW                
-                return load_libraw(const_cast<char*>(data_),size_);
+                return load_libraw(const_cast<char*>(data_),size_,h,w,bin);
 #else
                 throw GPError("OpenLiveStacker was build without libraw support");                
 #endif                
@@ -367,26 +367,71 @@ namespace ols {
                     GPFile file(files[i],cam_,ctx_);
                     file.get();
                     file.del();
-                    CamStreamFormat fmt;
-                    if(file.is_jpeg())
+                    if(file.is_jpeg()) {
+                        CamStreamFormat fmt;
                         fmt.format = stream_mjpeg;
+                        std::pair<cv::Mat,CamBayerType> res = file.to_mat();
+                        fmt.width = res.first.cols;
+                        fmt.height = res.first.rows;
+                        formats_.push_back(fmt);
+                    }
                     else {
                         #ifdef WITH_LIBRAW
-                        fmt.format = stream_raw16;
+                        std::pair<cv::Mat,CamBayerType> res = file.to_mat();
+                        for(int is_rgb=0;is_rgb <=1;is_rgb++) {
+                            for(int bin=1;bin<=3;bin++) {
+                                for(int scale = 0;scale < 8;scale++) {
+                                    int num,den;
+                                    switch(scale) {
+                                    case  0: num=1; den=1; break;
+                                    case  1: num=2; den=3; break;
+                                    default: num=1; den=scale;
+                                    }
+                                    int w = num * res.first.cols / den / (2*bin) * 2; // make sure round of 2
+                                    int h = num * res.first.rows / den / (2*bin) * 2; // make sure round of 2
+
+                                    if(std::min(w,h) < 480)
+                                        break;
+                                    
+                                    CamStreamFormat fmt;
+                                    fmt.format = is_rgb ? stream_rgb48 : stream_raw16;
+                                    fmt.width = w;
+                                    fmt.height = h;
+                                    fmt.bin = bin;
+                                    fmt.roi_num = num;
+                                    fmt.roi_den = den;
+                                    formats_.push_back(fmt);
+                                }
+                            }
+                        }
                         #else
                         continue;
                         #endif
                     }
-                    std::pair<cv::Mat,CamBayerType> res = file.to_mat();
-                    fmt.width = res.first.cols;
-                    fmt.height = res.first.rows;
-                    formats_.push_back(fmt);
                 }
             }
             catch(std::exception const &err)  {
                 e = err.what();
             }
             return formats_;
+        }
+
+        std::pair<cv::Mat,CamBayerType> to_rgb(std::pair<cv::Mat,CamBayerType> const &raw)
+        {
+            cv::Mat rgb,result;
+            cv::Mat bayer = raw.first;
+            switch(raw.second) {
+            case bayer_rg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerBG2BGR); break; // COLOR_BayerRGGB2BGR = COLOR_BayerBG2BGR
+            case bayer_gr:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGB2BGR); break; // COLOR_BayerGRBG2BGR = COLOR_BayerGB2BGR
+            case bayer_bg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerRG2BGR); break; // COLOR_BayerBGGR2BGR = COLOR_BayerRG2BGR
+            case bayer_gb:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGR2BGR); break; // COLOR_BayerGBRG2BGR = COLOR_BayerGR2BGR
+            default:
+                throw std::runtime_error("Invalid bayer patter");
+            }
+            if(format_.bin == 1)
+                return std::make_pair(rgb,bayer_na);
+            cv::resize(rgb,result,cv::Size(format_.width,format_.height),0.0,0.0,cv::INTER_AREA);
+            return std::make_pair(result,bayer_na);
         }
 
         void handle_frame(std::pair<cv::Mat,CamBayerType> const &in)
@@ -482,7 +527,12 @@ namespace ols {
                         }
                         else {
                             if(!f.is_jpeg()) {
-                                handle_frame(f.to_mat());
+                                if(format_.format == stream_raw16) {
+                                    handle_frame(f.to_mat(format_.width,format_.height,format_.bin));
+                                }
+                                else if(format_.format == stream_rgb48) {
+                                    handle_frame(to_rgb(f.to_mat(format_.width * format_.bin, format_.height * format_.bin))); 
+                                }
                             }
                         }
                         f.del();

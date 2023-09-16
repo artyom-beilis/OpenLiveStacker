@@ -76,6 +76,9 @@ namespace ols {
             case stream_rgb48:
                 bpp=6;
                 break;
+            case stream_error:
+                bpp=-1;
+                break;
             default:
                 BOOSTER_ERROR("stacker") << "Got invalid format";
                 return;
