@@ -490,8 +490,10 @@ namespace ols
             opts.push_back(opt_gain);
             opts.push_back(opt_exp);
             // Conditionally supported
-            if (!(info_.model->flag & TOUPCAM_FLAG_MONO))
+            if (!(info_.model->flag & TOUPCAM_FLAG_MONO)) {
                 opts.push_back(opt_auto_wb);
+                opts.push_back(opt_wb);
+            }
             if (info_.model->flag & TOUPCAM_FLAG_TEC) // Thermoelectric Cooler Present
             {
                 opts.push_back(opt_cooler_power_perc);
@@ -577,6 +579,18 @@ namespace ols
                 return r;
             }
             break;
+            case opt_wb:
+            {
+                int temp=6503,tint=1000;
+                Toupcam_get_TempTint(hcam_,&temp,&tint);
+                r.type = type_kelvin;
+                r.min_val = 2000;
+                r.max_val = 15000;
+                r.step_size = 1;
+                r.cur_val = temp;
+                r.def_val = 6503;
+                return r;
+            }
             case opt_average_bin:
             {
                 r.type = type_bool;
@@ -768,6 +782,13 @@ namespace ols
                 auto_wb_ = !!value;
                 // TODO: not yet tested, but it seems the callback dictates if Auto White balance is enabled
                 hr = Toupcam_AwbOnce(hcam_, auto_wb_ ? AutoWB : NULL, auto_wb_ ? this : NULL);
+            }
+            break;
+            case opt_wb:
+            {
+                int temp = value;
+                int tint = 1000; // default
+                hr = Toupcam_put_TempTint(hcam_,temp,tint);
             }
             break;
             case opt_average_bin:
@@ -1095,14 +1116,6 @@ namespace ols
             }
             set_name();
             checkAverageBinning(e);
-            if (!(info_.model->flag & TOUPCAM_FLAG_MONO)) // Supported in Color mode, let disable on init
-            {
-                if (FAILED(hr = Toupcam_AwbOnce(hcam_, NULL, NULL)))
-                {
-                    e = make_message("Failed to Toupcam_AwbOnce(NULL)", hr);
-                    return;
-                }
-            }
             if (info_.model->flag & (TOUPCAM_FLAG_CG | TOUPCAM_FLAG_CGHDR))
             {
                 if (FAILED(hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_CG, CG_OLS_DEFAULT_VAL)))
