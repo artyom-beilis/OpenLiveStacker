@@ -12,10 +12,9 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
         - UVC Based like webcam, sv105
         - ASI ZWO support
         - ToupTek support
+        - DSLR support using gphoto2 (experimental)
         - Watch directoy for files (universal integration with ekos)
         - Sim - simulation for development
-    - Under development:
-        - DSLR support using gphoto2 (see dslr branch)
     - Planned to be supported:
         - Android Camera
         - SVBony - linux only (android SDK was not released yet by SVBony)
