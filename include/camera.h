@@ -73,6 +73,8 @@ namespace ols {
         opt_iso,
         opt_shutter,
         opt_viewfinder,
+        opt_capturetarget,
+        opt_keep_images,
         /// External non-device specific options start HERE!
         opt_live_stretch,
         opt_count

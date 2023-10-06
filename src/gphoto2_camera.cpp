@@ -45,7 +45,7 @@ namespace ols {
         }
     }
 
-    #define LOG(...) do { if( ::ols::error_stream) fprintf( ::ols::error_stream,__VA_ARGS__); } while(0)
+    #define LOG(...) do { if( ::ols::error_stream) { fprintf( ::ols::error_stream,__VA_ARGS__); fflush(::ols::error_stream); }} while(0)
 
         
     static constexpr int MAX_FILES = 3;
@@ -223,6 +223,7 @@ namespace ols {
         }
         void del()
         {
+            LOG("Deleting file %s/%s\n",path_.folder,path_.name);
             int status = gp_camera_file_delete(cam_,path_.folder,path_.name,ctx_);
             check(status,"delete");
         }
@@ -318,36 +319,45 @@ namespace ols {
             check(status,"trigger");
         }
 
-        int wait_event(CameraFilePath files[MAX_FILES])
+        int wait_event(CameraFilePath files[MAX_FILES],bool wait_multiple = false)
         {
             int fno = 0;
-            for(;;) {
+            while(fno <= 0 || wait_multiple) {
                 CameraEventType ev = GP_EVENT_UNKNOWN;
                 void *ptr = NULL;
                 int status;
                 {
                     std::unique_lock<std::recursive_mutex> guard(clock_);
-                    status = gp_camera_wait_for_event(cam_,5000,&ev,&ptr,ctx_);
+                    status = gp_camera_wait_for_event(cam_,3000,&ev,&ptr,ctx_);
                 }
                 check(status,"Wait event");
                 switch(ev) {
                 case GP_EVENT_UNKNOWN:
-                    continue;
+                    LOG("EV:Unknown\n");
+                    break;
                 case GP_EVENT_TIMEOUT:
-                    continue;
+                    LOG("EV:Timeout\n");
+                    if(fno > 0) {
+                        return fno;
+                    }
+                    break;
                 case GP_EVENT_FILE_ADDED:
                     if(fno < MAX_FILES) { 
                         CameraFilePath *fp = static_cast<CameraFilePath*>(ptr);
                         files[fno++] = *fp;
+                        LOG("Got file %s/%s\n",fp->folder,fp->name);
                     }
                     break;
                 case GP_EVENT_CAPTURE_COMPLETE:
+                    LOG("EV:Capture Done\n");
                     return fno;
                 default:
+                    LOG("EV:Other %d\n",int(ev));
                     break;
                 }
                 free(ptr);
             }
+            return fno;
         }
 
         virtual std::vector<CamStreamFormat> formats(CamErrorCode &e)
@@ -357,11 +367,12 @@ namespace ols {
             try {
                 trigger();
                 CameraFilePath files[MAX_FILES];
-                int N = wait_event(files);
+                int N = wait_event(files,true);
                 if(N == 0) {
                     e="Failed to capture images";
                     return formats_;
                 }
+                /// first go over images even if many to make sure we clean them up
                 for(int i=0;i<N;i++) {
                     std::unique_lock<std::recursive_mutex> guard(clock_);
                     GPFile file(files[i],cam_,ctx_);
@@ -408,6 +419,11 @@ namespace ols {
                         continue;
                         #endif
                     }
+                }
+                if(N > 1) {
+                    e = "Too many images captured per single request, multiple formats aren't supported make sure you select either raw or jpeg, but not both";
+                    formats_.clear();
+                    return formats_;
                 }
             }
             catch(std::exception const &err)  {
@@ -535,7 +551,9 @@ namespace ols {
                                 }
                             }
                         }
-                        f.del();
+                        if(!keep_images_) {
+                            f.del();
+                        }
                     }
                 }
             }
@@ -581,6 +599,12 @@ namespace ols {
                 if(w.try_load())
                     opts.push_back(opt_viewfinder);
             }
+            {
+                GPWidget w(cam_,ctx_,"capturetarget");
+                if(w.try_load())
+                    opts.push_back(opt_capturetarget);
+            }
+            opts.push_back(opt_keep_images);
             return opts;
         }
         std::string opt_to_name(CamOptionId id)
@@ -596,6 +620,9 @@ namespace ols {
             case opt_viewfinder:
                 name = "viewfinder";
                 break;
+            case opt_capturetarget:
+                name = "capturetarget";
+                break;
             default:
                 throw GPError("Unsupported camera option");
             }
@@ -605,10 +632,28 @@ namespace ols {
         virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e) 
         {
             try {
-                std::string name = opt_to_name(id);
-                std::unique_lock<std::recursive_mutex> guard(clock_);
-                GPWidget w(cam_,ctx_,name);
-                return w.get(id);
+                switch(id) {
+                case opt_keep_images:
+                    {
+                        CamParam r;
+                        r.option = id;
+                        r.type = type_bool;
+                        r.min_val = 0;
+                        r.max_val = 1;
+                        r.step_size = 1;
+                        r.cur_val = keep_images_;
+                        r.def_val = 0;
+                        return r;
+                    }
+                    break;
+                default:
+                    {
+                        std::string name = opt_to_name(id);
+                        std::unique_lock<std::recursive_mutex> guard(clock_);
+                        GPWidget w(cam_,ctx_,name);
+                        return w.get(id);
+                    }
+                }
             }
             catch(std::exception const &er) {
                 e = er.what();
@@ -630,9 +675,19 @@ namespace ols {
         void set_parameter_internal(CamOptionId id,double value,CamErrorCode &e)
         {
             try {
-                std::string name = opt_to_name(id);
-                GPWidget w(cam_,ctx_,name);
-                w.set(value);
+                switch(id) {
+                case opt_keep_images:
+                    {
+                        keep_images_ = !!value;
+                    }
+                    break;
+                default:
+                    {
+                        std::string name = opt_to_name(id);
+                        GPWidget w(cam_,ctx_,name);
+                        w.set(value);
+                    }
+                }
             }
             catch(std::exception const &er) {
                 e = er.what();
@@ -646,6 +701,7 @@ namespace ols {
         std::vector<CamStreamFormat> formats_;
         CamStreamFormat format_;
         int frame_counter_ = 0;
+        int keep_images_ = 0;
         // protected by mutex
         std::mutex lock_;
         std::recursive_mutex clock_;
