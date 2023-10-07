@@ -421,7 +421,7 @@ namespace ols {
                     }
                 }
                 if(N > 1) {
-                    e = "Too many images captured per single request, multiple formats aren't supported make sure you select either raw or jpeg, but not both";
+                    e = "OLS does not supports multiple image formats for a single image. Please choose either Raw of JPG, but not both.";
                     formats_.clear();
                     return formats_;
                 }
