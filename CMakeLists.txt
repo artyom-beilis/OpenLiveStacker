@@ -24,9 +24,12 @@ find_path(LIBRAW_HDR libraw/libraw.h)
 find_path(LIBCURL_HDR curl/curl.h)
 find_path(LIBZ_HDR zlib.h)
 find_path(LIBCPPCMS_HRD cppcms/application.h)
+find_path(LIBCAMERA2_HDR camera/NdkCameraDevice.h)
+find_path(LIBMEDIANDK_HDR media/NdkImageReader.h)
 find_library(LIBCURL curl)
 find_library(LIBZ z)
-
+find_library(LIBCAMERA2_LIB camera2ndk)
+find_library(LIBMEDIANDK_LIB mediandk)
 
 find_path(LIBGPHOTO2_HDR gphoto2/gphoto2.h)
 find_library(LIBGPHOTO2_LIB gphoto2)
@@ -223,7 +226,20 @@ else()
     message("- No GPhoto2 header/lib found")
 endif()
 
-
+if(ANDROID_BUILD)
+    if(LIBCAMERA2_HDR AND LIBCAMERA2_LIB AND LIBMEDIANDK_HDR AND LIBMEDIANDK_LIB)
+        include_directories(LIBCAMERA2_HDR)
+        include_directories(LIBMEDIANDK_HDR)
+        add_library(ols_driver_android SHARED src/android_camera.cpp)
+        target_link_libraries(ols_driver_android ols ${LIBCAMERA2_LIB} ${LIBMEDIANDK_LIB} android)
+        message("- Building Android camera driver ")
+        install(TARGETS ols_driver_android
+                LIBRARY DESTINATION lib
+        )
+    else()
+        message("- No Android Ndk Camera2 header/lib found, disabling android camera support")
+    endif()
+endif()
 
 install(TARGETS ols ols_driver_sim 
             RUNTIME DESTINATION bin
@@ -245,6 +261,8 @@ if(NOT ANDROID_BUILD)
             LIBRARY DESTINATION lib
     )
 endif()
+
+
 
 add_custom_command(TARGET ols POST_BUILD
     COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/make_db.py ${CMAKE_CURRENT_SOURCE_DIR}/www-data/media/js/jsdb.js
