@@ -50,10 +50,12 @@ namespace ols {
     enum CamOptionId {
         opt_auto_exp,
         opt_auto_wb,
+        opt_auto_focus,
         opt_exp,
         opt_wb,
         opt_wb_r,
         opt_wb_b,
+        opt_focus,
         opt_gain,
         opt_gamma,
         opt_brightness,

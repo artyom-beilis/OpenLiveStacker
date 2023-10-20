@@ -444,6 +444,17 @@ namespace ols {
             /// stop capture there
             stream_active_=0;
         }
+        
+        void make_modes(std::vector<std::string> &supported_names,std::vector<uint8_t> &codes,ACameraMetadata_const_entry &entry,std::vector<std::string> const &names)
+        {
+            for(unsigned i=0;i<entry.count;i++) {
+                unsigned v = entry.data.u8[i];
+                if(v>=names.size())
+                    continue;
+                supported_names.push_back(names[v]);
+                codes.push_back(v);
+            }
+        }
 
         /// list of camera controls that the camera supports
         virtual std::vector<CamOptionId> supported_options(CamErrorCode &/*ec*/)
@@ -465,18 +476,36 @@ namespace ols {
             if(res == ACAMERA_OK) {
                 opts.push_back(opt_exp);
             }
+            
             entry = ACameraMetadata_const_entry();
             res = ACameraMetadata_getConstEntry(meta_,ACAMERA_SENSOR_INFO_SENSITIVITY_RANGE, &entry);
             log_status("ISO",res);
             if(res == ACAMERA_OK) {
                 opts.push_back(opt_iso);
             }
+            
+
             entry = ACameraMetadata_const_entry();
             res = ACaptureRequest_getConstEntry(request_,ACAMERA_CONTROL_AWB_MODE ,&entry);
             log_status("AWB_MODE",res);
             if(res == ACAMERA_OK) {
                 opts.push_back(opt_wb);
             }
+
+            entry = ACameraMetadata_const_entry();
+            res = ACameraMetadata_getConstEntry(meta_,ACAMERA_LENS_INFO_MINIMUM_FOCUS_DISTANCE, &entry);
+            log_status("ACAMERA_LENS_INFO_MINIMUM_FOCUS_DISTANCE",res);
+            if(res == ACAMERA_OK) {
+                min_fd_ = entry.data.f[0];
+            }
+            entry = ACameraMetadata_const_entry();
+            res = ACaptureRequest_getConstEntry(request_,ACAMERA_CONTROL_AF_MODE,&entry);
+            log_status("ACAMERA_CONTROL_AF_MODE",res);
+            if(res == ACAMERA_OK && min_fd_ > 0) {
+                opts.push_back(opt_auto_focus);
+                opts.push_back(opt_focus);
+            }
+
             return opts;
         }
         /// get camera control
@@ -543,6 +572,26 @@ namespace ols {
                         r.names = modes;
                         return r;
                     }
+                case opt_auto_focus:
+                    res = ACaptureRequest_getConstEntry(request_,ACAMERA_CONTROL_AF_MODE,&entry);
+                    check("ACAMERA_CONTROL_AF_MODE",res);
+                    r.type = type_bool;
+                    r.min_val = 0;
+                    r.max_val = 1;
+                    r.step_size = 1;
+                    r.cur_val = entry.data.u8[0] != ACAMERA_CONTROL_AF_MODE_OFF ? 1 : 0;
+                    r.def_val = r.cur_val; // no way to query if auto is default
+                    return r;
+                case opt_focus:
+                    res = ACaptureRequest_getConstEntry(request_,ACAMERA_LENS_FOCUS_DISTANCE,&entry);
+                    check("ACAMERA_LENS_FOCUS_DISTANCE",res);
+                    r.cur_val = entry.data.f[0];
+                    r.type = type_number;
+                    r.def_val = r.cur_val; // no way to query if auto is default
+                    r.min_val = 0;
+                    r.max_val = min_fd_;
+                    r.step_size = 0.001;
+                    return r;
                 default:
                     throw std::runtime_error("Unsupported parameter");
                 }
@@ -590,6 +639,20 @@ namespace ols {
                         check("set ACAMERA_CONTROL_AWB_MODE",res);
                     }
                     break;
+                case opt_auto_focus:
+                    {
+                        uint8_t v = value ? ACAMERA_CONTROL_AF_MODE_CONTINUOUS_PICTURE : ACAMERA_CONTROL_AF_MODE_OFF ;
+                        res = ACaptureRequest_setEntry_u8(request_,ACAMERA_CONTROL_AF_MODE,1,&v);
+                        check("set ACAMERA_CONTROL_AF_MODE",res);
+                    }
+                    break;
+                case opt_focus:
+                    {
+                        float v = value;
+                        res = ACaptureRequest_setEntry_float(request_,ACAMERA_LENS_FOCUS_DISTANCE,1,&v);
+                        check("set ACAMERA_LENS_FOCUS_DISTANCE",res);
+                    }
+                    break;
                 default:
                     throw std::runtime_error("Unsupported");
                 }
@@ -619,6 +682,8 @@ namespace ols {
         ACaptureSessionOutput *output_ = nullptr;
         ACaptureSessionOutputContainer *output_container_  = nullptr;
         ACameraCaptureSession *capture_session_ = nullptr;
+
+        float min_fd_ = 0.0f;
 
 
         std::atomic<int> stream_active_;
