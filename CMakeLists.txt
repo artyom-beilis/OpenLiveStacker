@@ -231,7 +231,7 @@ if(ANDROID_BUILD)
         include_directories(LIBCAMERA2_HDR)
         include_directories(LIBMEDIANDK_HDR)
         add_library(ols_driver_android SHARED src/android_camera.cpp)
-        target_link_libraries(ols_driver_android ols ${LIBCAMERA2_LIB} ${LIBMEDIANDK_LIB} android)
+        target_link_libraries(ols_driver_android ols ${OPENCV_CORE} ${LIBCAMERA2_LIB} ${LIBMEDIANDK_LIB} android)
         message("- Building Android camera driver ")
         install(TARGETS ols_driver_android
                 LIBRARY DESTINATION lib

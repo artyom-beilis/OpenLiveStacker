@@ -14,6 +14,7 @@
 #include <thread>
 #include <algorithm>
 #include <queue>
+#include "sw_bin.h"
 //#include <opencv2/imgcodecs.hpp>
 //#include <opencv2/imgproc.hpp>
 
@@ -202,6 +203,58 @@ namespace ols {
                         fmt.height = h;
                         formats_.push_back(fmt);
                     }
+                    else if(fmt == AIMAGE_FORMAT_RAW16) {
+                        if(raw_w_ != 0 || raw_h_ != 0)
+                            continue;
+                        raw_w_ = w;
+                        raw_h_ = h;
+                        ACameraMetadata_const_entry maxv = ACameraMetadata_const_entry();
+                        camera_status_t res = ACameraMetadata_getConstEntry(meta_,ACAMERA_SENSOR_INFO_WHITE_LEVEL,&maxv);
+                        if(res != ACAMERA_OK) {
+                            log_status("ACAMERA_SENSOR_INFO_WHITE_LEVEL",res);
+                            continue;
+                        }
+                        raw_max_ = maxv.data.i32[0];
+                        ACameraMetadata_const_entry bayer = ACameraMetadata_const_entry();
+                        res = ACameraMetadata_getConstEntry(meta_,ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT,&bayer);
+                        if(res != ACAMERA_OK) {
+                            log_status("ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT",res);
+                            continue;
+                        }
+                        switch(bayer.data.u8[0]) {
+                        case ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_RGGB: bayer_ = bayer_rg; break;
+                        case ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_GRBG: bayer_ = bayer_gr; break;
+                        case ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_GBRG: bayer_ = bayer_gb; break;
+                        case ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_BGGR: bayer_ = bayer_bg; break;
+                        default:
+                            LOG("Unsupported bayer pattern %d\n",bayer.data.u8[0]);
+                            continue;
+                        }
+                        LOG("Adding raw16 for %dx%d bayer=%s maxv=%d\n",w,h,bayer_type_to_str(bayer_).c_str(),raw_max_);
+                        CamStreamFormat fmt;
+                        fmt.format = stream_raw16;
+                        fmt.width = w;
+                        fmt.height = h;
+                        formats_.push_back(fmt);
+                        CamStreamFormat fmt2 = fmt;
+                        fmt2.width = w / 4 * 2;
+                        fmt2.height = h / 4 * 2;
+                        fmt2.bin = 2;
+                        formats_.push_back(fmt2);
+                        CamStreamFormat fmt3 = fmt;
+                        fmt3.width = w / 6 * 2;
+                        fmt3.height = h / 6 * 2;
+                        fmt3.bin = 3;
+                        formats_.push_back(fmt3);
+                        /*
+                        fmt.format = stream_rgb48;
+                        formats_.push_back(fmt);
+                        fmt2.format = stream_rgb48;
+                        formats_.push_back(fmt2);
+                        fmt3.format = stream_rgb48;
+                        formats_.push_back(fmt3);
+                        */
+                    }
                 }
             }
             catch(std::exception const &err)  {
@@ -252,6 +305,29 @@ namespace ols {
                 }
                 frm.data = data;
                 frm.data_size = size;
+            }
+            else if(format_.format == stream_raw16) {
+                int size = raw_w_ * raw_h_ * 2;
+                if(len < size) {
+                    LOG("Invalid frame size for raw16 %d, expecting at least %d\n",len,size);
+                    handle_error("Invalid frame size");
+                    return;
+                }
+                int binfact = 2 * format_.bin;
+                cv::Mat in(raw_h_ / binfact * binfact,raw_w_ / binfact * binfact,CV_16UC1,data,raw_w_ * 2);
+                int scale = 65535 / raw_max_;
+                if(format_.bin == 2) {
+                    apply_bin2(in.mul(cv::Scalar::all(scale)),out_);
+                }
+                else if(format_.bin == 3) {
+                    apply_bin3(in.mul(cv::Scalar::all(scale)),out_);
+                }
+                else {
+                    out_ = in.mul(cv::Scalar::all(scale));
+                }
+                frm.data = out_.data;
+                frm.data_size = out_.rows*out_.cols*2;
+                frm.bayer = bayer_;
             }
             else {
                 LOG("Internal error invalid format\n");
@@ -308,15 +384,24 @@ namespace ols {
 
         void configure_capture()
         {
-            int fmt;
-            if(format_.format == stream_mjpeg)
-                fmt = AIMAGE_FORMAT_JPEG;
-            else if(format_.format == stream_mono8)
-                fmt = AIMAGE_FORMAT_YUV_420_888;
-            else
+            int fmt,w = format_.width,h = format_.height;
+            switch(format_.format){
+            case stream_mjpeg: 
+                fmt = AIMAGE_FORMAT_JPEG;        
+                break;
+            case stream_mono8:
+                fmt = AIMAGE_FORMAT_YUV_420_888; 
+                break;
+            case stream_raw16: 
+                fmt = AIMAGE_FORMAT_RAW16;       
+                w = raw_w_;
+                h = raw_h_;
+                break;
+            default:
                 throw std::runtime_error("Invalid frame format requested");
+            }
 
-            media_status_t status = AImageReader_new(format_.width,format_.height,fmt,4,&reader_);
+            media_status_t status = AImageReader_new(w,h,fmt,4,&reader_);
             if(status != 0) {
                 throw std::runtime_error("AImageReader_new returned error code: " + std::to_string(int(status)));
             }
@@ -684,6 +769,9 @@ namespace ols {
         ACameraCaptureSession *capture_session_ = nullptr;
 
         float min_fd_ = 0.0f;
+        CamBayerType bayer_ = bayer_na;
+        int raw_w_=0,raw_h_ = 0,raw_max_ = 0;
+        cv::Mat out_;
 
 
         std::atomic<int> stream_active_;
