@@ -173,6 +173,27 @@ namespace ols {
             return strfmt;
         }
 
+        static int to_val(CamStreamFormat f) 
+        {
+            int index;
+            switch(f.format) {
+            case stream_raw16:  index = 9; break;
+            case stream_mono16: index = 8; break;
+            case stream_mono8:  index = 5; break;
+            case stream_mjpeg:  index = 3; break;
+            default:
+                index=0;
+            }
+            return index * 100000 + f.width;
+
+        }
+        void sort_formats()
+        {
+           std::stable_sort(formats_.begin(),formats_.end(),[](CamStreamFormat l,CamStreamFormat r) {
+               return to_val(l) > to_val(r);
+           });
+        }
+
         virtual std::vector<CamStreamFormat> formats(CamErrorCode &e)
         {
             if(!formats_.empty())
@@ -202,6 +223,10 @@ namespace ols {
                         fmt.width = w;
                         fmt.height = h;
                         formats_.push_back(fmt);
+                        if(yuv_max_w_ * yuv_max_h_ < w*h) {
+                            yuv_max_w_ = w;
+                            yuv_max_h_ = h;
+                        }
                     }
                     else if(fmt == AIMAGE_FORMAT_RAW16) {
                         if(raw_w_ != 0 || raw_h_ != 0)
@@ -256,11 +281,20 @@ namespace ols {
                         */
                     }
                 }
+                for(int bin=2;bin<=3;bin++) {
+                    CamStreamFormat fmt;
+                    fmt.format = stream_mono16;
+                    fmt.width  = yuv_max_w_ / bin;
+                    fmt.height = yuv_max_h_ / bin;
+                    fmt.bin = bin;
+                    formats_.push_back(fmt);
+                }
             }
             catch(std::exception const &err)  {
                 e = err.what();
                 formats_.clear();
             }
+            sort_formats();
             return formats_;
         }
 /*
@@ -282,6 +316,26 @@ namespace ols {
             return std::make_pair(result,bayer_na);
         }
 */
+        void mono_bin2(unsigned char *p,int stride,int rows,int cols,uint16_t *out)
+        {
+            for(int r=0,r2=0;r<rows;r++,r2+=2,p+= 2 * stride) {
+                for(int c=0,c2=0;c<cols;c++,c2+=2) {
+                    *out ++ = (uint16_t(p[c2]) + p[c2+1] + p[c2+stride] + p[c2+stride + 1])*64;
+                }
+            }
+        }
+        void mono_bin3(unsigned char *p,int stride,int rows,int cols,uint16_t *out)
+        {
+            int stride2 = stride * 2;
+            for(int r=0,r3=0;r<rows;r++,r3+=3,p+= 3 * stride) {
+                for(int c=0,c3=0;c<cols;c++,c3+=3) {
+                    *out ++ = (uint16_t(p[c3]) +       p[c3+1] +         p[c3+2]
+                                      + p[c3+stride] + p[c3+stride + 1] +p[c3+stride +2]
+                                      + p[c3+stride2]+ p[c3+stride2+ 1] +p[c3+stride2+2]
+                                      )*28;
+                }
+            }
+        }
         void handle_frame(void *data,int len)
         {
             struct timeval tv;
@@ -305,6 +359,31 @@ namespace ols {
                 }
                 frm.data = data;
                 frm.data_size = size;
+            }
+            else if(format_.format == stream_mono16) {
+                int size = yuv_max_w_ * yuv_max_h_;
+                if(len < size) {
+                    LOG("Invalid frame size for mono16 %d, expecting at least %d \n",len,size);
+                    handle_error("Invalid frame size");
+                    return;
+                }
+                if(yuv_max_h_ / format_.bin != format_.height || yuv_max_w_ / format_.bin != format_.width) {
+                    LOG("Image size mistmatch for mono16 from yuv\n");
+                    handle_error("Image size mistmatch for mono16 from yuv");
+                    return;
+                }
+                cv::Mat in(yuv_max_h_,yuv_max_w_,CV_8UC1,data);
+                out_.create(format_.height,format_.width,CV_16UC1);
+                switch(format_.bin) {
+                case 2: mono_bin2(in.data,in.step[0],format_.height,format_.width,(uint16_t*)out_.data); break;
+                case 3: mono_bin3(in.data,in.step[0],format_.height,format_.width,(uint16_t*)out_.data); break;
+                default:
+                    LOG("Image size mistmatch for mono16 from yuv\n");
+                    handle_error("Image size mistmatch for mono16 from yuv");
+                    return;
+                }
+                frm.data = out_.data;
+                frm.data_size = out_.rows*out_.cols*2;
             }
             else if(format_.format == stream_raw16) {
                 int size = raw_w_ * raw_h_ * 2;
@@ -391,6 +470,11 @@ namespace ols {
                 break;
             case stream_mono8:
                 fmt = AIMAGE_FORMAT_YUV_420_888; 
+                break;
+            case stream_mono16:
+                fmt = AIMAGE_FORMAT_YUV_420_888; 
+                w = yuv_max_w_;
+                h = yuv_max_h_;
                 break;
             case stream_raw16: 
                 fmt = AIMAGE_FORMAT_RAW16;       
@@ -771,6 +855,7 @@ namespace ols {
         float min_fd_ = 0.0f;
         CamBayerType bayer_ = bayer_na;
         int raw_w_=0,raw_h_ = 0,raw_max_ = 0;
+        int yuv_max_w_ = 0,yuv_max_h_ = 0;
         cv::Mat out_;
 
 
