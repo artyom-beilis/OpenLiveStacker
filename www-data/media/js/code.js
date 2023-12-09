@@ -398,7 +398,7 @@ function changeStackerStatus(new_status)
         ui_ctl.stats = false;
     }
     else if(new_status =='stacking') {
-        if(g_stacker_status == 'idle') {
+        if(g_stacker_status == 'idle' || g_stacker_status == 'closed') {
             showStackedVideo(true);
         }
         ui_ctl.stack = false;
@@ -413,7 +413,7 @@ function changeStackerStatus(new_status)
         ui_ctl.stats = true;
     }
     else if(new_status == 'paused') {
-        if(g_stacker_status == 'idle') {
+        if(g_stacker_status == 'idle' || g_stacker_status == 'closed') {
             showStackedVideo(true);
         }
         ui_ctl.stack = false;
