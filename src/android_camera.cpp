@@ -79,15 +79,15 @@ namespace ols {
         static void ac_image_callback(void* context, AImageReader* reader);
         static void ac_cap_ready(void *,ACameraCaptureSession *)
         {
-            LOG("Capture ready");
+            LOG("Capture ready\n");
         }
         static void ac_cap_closed(void *,ACameraCaptureSession *)
         {
-            LOG("Capture closed");
+            LOG("Capture closed\n");
         }
         static void ac_cap_active(void *,ACameraCaptureSession *)
         {
-            LOG("Capture active");
+            LOG("Capture active\n");
         }
     }
   
@@ -652,6 +652,24 @@ namespace ols {
             if(res == ACAMERA_OK) {
                 opts.push_back(opt_iso);
             }
+
+
+            entry = ACameraMetadata_const_entry();
+            res = ACameraMetadata_getConstEntry(meta_,ACAMERA_CONTROL_ZOOM_RATIO_RANGE, &entry);
+            log_status("ZOOM",res);
+            if(res == ACAMERA_OK) {
+                opts.push_back(opt_zoom);
+                max_crop_region_= -1.0f;
+            }
+            else {
+                entry = ACameraMetadata_const_entry();
+                res = ACameraMetadata_getConstEntry(meta_,ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM, &entry);
+                log_status("Max digital ZOOM",res);
+                if(res == ACAMERA_OK) {
+                    opts.push_back(opt_zoom);
+                    max_crop_region_ = entry.data.f[0];
+                }
+            }
             
 
             entry = ACameraMetadata_const_entry();
@@ -676,6 +694,19 @@ namespace ols {
             }
 
             return opts;
+        }
+        void get_array_size(ACameraMetadata_const_entry &entry)
+        {
+            camera_status_t res = ACAMERA_OK;
+            entry = ACameraMetadata_const_entry();
+            res = ACameraMetadata_getConstEntry(meta_,ACAMERA_DISTORTION_CORRECTION_MODE, &entry);
+            LOG("get ACAMERA_DISTORTION_CORRECTION_MODE=%d\n",res);
+            bool use_pre = (res == ACAMERA_OK && entry.data.u8[0] != ACAMERA_DISTORTION_CORRECTION_MODE_OFF);
+            entry = ACameraMetadata_const_entry();
+            res = ACameraMetadata_getConstEntry(meta_,
+                    (use_pre ? ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE : ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE),
+                    &entry);
+            check("ACTIVE_ARRAY_SIZE",res);
         }
         /// get camera control
         virtual CamParam get_parameter(CamOptionId id,bool current_only,CamErrorCode &e) 
@@ -709,6 +740,43 @@ namespace ols {
                         r.max_val = entry.data.i64[1] * 1e-6;
                         r.step_size = 1e-3;
                         r.def_val = r.cur_val; // no way to query if auto is default
+                    }
+                    return r;
+                case opt_zoom:
+                    if(max_crop_region_ > 0) {
+                        get_array_size(entry);
+                        int left   = entry.data.i32[0];
+                        int top    = entry.data.i32[1];
+                        int width  = entry.data.i32[2];
+                        int height = entry.data.i32[3];
+
+                        LOG("Active array size=(%d,%d,%d,%d)\n",left,top,width,height);
+
+                        entry = ACameraMetadata_const_entry();
+                        res = ACaptureRequest_getConstEntry(request_,ACAMERA_SCALER_CROP_REGION,&entry);
+                        check("ACAMERA_SCALER_CROP_REGION",res);
+                        LOG("Current crop: (%d,%d,%d,%d)\n",entry.data.i32[0],entry.data.i32[1],entry.data.i32[2],entry.data.i32[3]);
+                        int cur_width = entry.data.i32[2];
+                        double scale = double(width) / cur_width;
+                        r.cur_val = scale;
+                        r.min_val = 1;
+                        r.def_val = 1;
+                        r.max_val = max_crop_region_;
+                    }
+                    else {
+                        res = ACaptureRequest_getConstEntry(request_,ACAMERA_CONTROL_ZOOM_RATIO,&entry);
+                        check("ACAMERA_CONTROL_ZOOM_RATIO",res);
+                        r.cur_val = entry.data.f[0];
+                        r.type = type_number;
+                        if(!current_only) {
+                            entry = ACameraMetadata_const_entry();
+                            res = ACameraMetadata_getConstEntry(meta_,ACAMERA_CONTROL_ZOOM_RATIO_RANGE, &entry);
+                            check("ACAMERA_CONTROL_ZOOM_RATIO_RANGE",res);
+                            r.min_val = entry.data.f[0];
+                            r.max_val = entry.data.f[1];
+                            r.step_size = 0.1;
+                            r.def_val = r.cur_val; // no way to query if auto is default
+                        }
                     }
                     return r;
                 case opt_iso:
@@ -822,6 +890,38 @@ namespace ols {
                         check("set ACAMERA_LENS_FOCUS_DISTANCE",res);
                     }
                     break;
+                case opt_zoom:
+                    if(max_crop_region_ > 0) {
+                        ACameraMetadata_const_entry entry;
+                        get_array_size(entry);
+                        double roi = 1/std::min(value,(double)max_crop_region_);
+                        int left   = entry.data.i32[0];
+                        int top    = entry.data.i32[1];
+                        int width  = entry.data.i32[2];
+                        int height = entry.data.i32[3];
+
+                        LOG("Set active array size=(%d,%d,%d,%d)\n",left,top,width,height);
+
+                        entry = ACameraMetadata_const_entry();
+                        res = ACaptureRequest_getConstEntry(request_,ACAMERA_SCALER_CROP_REGION,&entry);
+                        check("ACAMERA_SCALER_CROP_REGION",res);
+                        LOG("Current crop: (%d,%d,%d,%d)\n",entry.data.i32[0],entry.data.i32[1],entry.data.i32[2],entry.data.i32[3]);
+
+                        int new_width = width * roi;
+                        int new_height = height * roi;
+                        int new_left = (width - new_width) / 2;
+                        int new_top  = (height - new_height) / 2;
+                        int32_t new_config[4] =  { new_left, new_top, new_width, new_height };
+                        LOG("New crop: (%d,%d,%d,%d)\n",new_config[0],new_config[1],new_config[2],new_config[3]);
+                        res = ACaptureRequest_setEntry_i32(request_,ACAMERA_SCALER_CROP_REGION,4,new_config);
+                        check("set ACAMERA_SCALER_CROP_REGION",res);
+                    }
+                    else {
+                        float v = value;
+                        res = ACaptureRequest_setEntry_float(request_,ACAMERA_CONTROL_ZOOM_RATIO,1,&v);
+                        check("set ACAMERA_CONTROL_ZOOM_RATIO",res);
+                    }
+                    break;
                 default:
                     throw std::runtime_error("Unsupported");
                 }
@@ -853,6 +953,7 @@ namespace ols {
         ACameraCaptureSession *capture_session_ = nullptr;
 
         float min_fd_ = 0.0f;
+        float max_crop_region_ = -1.0f;
         CamBayerType bayer_ = bayer_na;
         int raw_w_=0,raw_h_ = 0,raw_max_ = 0;
         int yuv_max_w_ = 0,yuv_max_h_ = 0;
