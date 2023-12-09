@@ -60,20 +60,19 @@ namespace ols {
             throw std::runtime_error(buf);
         }
         cv::Mat raw_image = full(cv::Rect(raw.imgdata.sizes.left_margin+dw,raw.imgdata.sizes.top_margin+dh,w,h));
-        switch(bin) {
-        case 1: break;
-        case 2: raw_image = apply_bin2(raw_image); break;
-        case 3: raw_image = apply_bin3(raw_image); break;
-        default:
-            throw std::runtime_error("Invalid bin value");
-        }
         int black = raw.imgdata.color.black;
         int maxv  = raw.imgdata.color.maximum;
         int scale = 65535 / (maxv - black);
+        switch(bin) {
+        case 1: img = (raw_image - cv::Scalar::all(black));
+                img = img.mul(cv::Scalar::all(scale)); break;
+        case 2: img = apply_bin2(raw_image,scale,black); break;
+        case 3: img = apply_bin3(raw_image,scale,black); break;
+        default:
+            throw std::runtime_error("Invalid bin value");
+        }
         std::string bayer_name = raw_index2color(raw);
         CamBayerType bayer = bayer_type_from_str(bayer_name);
-        img = (raw_image - cv::Scalar::all(black));
-        img = img.mul(cv::Scalar::all(scale));
 
         return std::make_pair(img,bayer);
     }

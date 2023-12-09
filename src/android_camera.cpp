@@ -256,29 +256,30 @@ namespace ols {
                             continue;
                         }
                         LOG("Adding raw16 for %dx%d bayer=%s maxv=%d\n",w,h,bayer_type_to_str(bayer_).c_str(),raw_max_);
-                        CamStreamFormat fmt;
-                        fmt.format = stream_raw16;
-                        fmt.width = w;
-                        fmt.height = h;
-                        formats_.push_back(fmt);
-                        CamStreamFormat fmt2 = fmt;
-                        fmt2.width = w / 4 * 2;
-                        fmt2.height = h / 4 * 2;
-                        fmt2.bin = 2;
-                        formats_.push_back(fmt2);
-                        CamStreamFormat fmt3 = fmt;
-                        fmt3.width = w / 6 * 2;
-                        fmt3.height = h / 6 * 2;
-                        fmt3.bin = 3;
-                        formats_.push_back(fmt3);
-                        /*
-                        fmt.format = stream_rgb48;
-                        formats_.push_back(fmt);
-                        fmt2.format = stream_rgb48;
-                        formats_.push_back(fmt2);
-                        fmt3.format = stream_rgb48;
-                        formats_.push_back(fmt3);
-                        */
+                        static const int num_den[5][2] = { {1,1}, {2,3}, {1,2}, {1,3}, {1,4}};
+                        for(int roi=0;roi<=4;roi++) {
+                            CamStreamFormat fmt;
+                            fmt.format = stream_raw16;
+                            int num = num_den[roi][0];
+                            int den = num_den[roi][1];
+                            int width  =  num * w / den / 2 * 2;
+                            int height =  num * h / den / 2 * 2;
+                            fmt.width = width;
+                            fmt.height = height;
+                            fmt.roi_num = num;
+                            fmt.roi_den = den;
+                            formats_.push_back(fmt);
+                            CamStreamFormat fmt2 = fmt;
+                            fmt2.width = width / 4 * 2;
+                            fmt2.height = height / 4 * 2;
+                            fmt2.bin = 2;
+                            formats_.push_back(fmt2);
+                            CamStreamFormat fmt3 = fmt;
+                            fmt3.width = width / 6 * 2;
+                            fmt3.height = height / 6 * 2;
+                            fmt3.bin = 3;
+                            formats_.push_back(fmt3);
+                        }
                     }
                 }
                 for(int bin=2;bin<=3;bin++) {
@@ -386,20 +387,25 @@ namespace ols {
                 frm.data_size = out_.rows*out_.cols*2;
             }
             else if(format_.format == stream_raw16) {
+                int width  = format_.width  * format_.bin;
+                int height = format_.height * format_.bin;
+                int top    = (raw_h_ - height) / 4 * 2;
+                int left   = (raw_w_ -  width) / 4 * 2;
                 int size = raw_w_ * raw_h_ * 2;
                 if(len < size) {
                     LOG("Invalid frame size for raw16 %d, expecting at least %d\n",len,size);
                     handle_error("Invalid frame size");
                     return;
                 }
-                int binfact = 2 * format_.bin;
-                cv::Mat in(raw_h_ / binfact * binfact,raw_w_ / binfact * binfact,CV_16UC1,data,raw_w_ * 2);
+                cv::Mat in_actual(raw_h_,raw_w_,CV_16UC1,data,raw_w_ * 2);
+                cv::Rect roi(left,top,width,height);
+                cv::Mat in = in_actual(roi);
                 int scale = 65535 / raw_max_;
                 if(format_.bin == 2) {
-                    apply_bin2(in.mul(cv::Scalar::all(scale)),out_);
+                    apply_bin2(in,out_,scale,0);
                 }
                 else if(format_.bin == 3) {
-                    apply_bin3(in.mul(cv::Scalar::all(scale)),out_);
+                    apply_bin3(in,out_,scale,0);
                 }
                 else {
                     out_ = in.mul(cv::Scalar::all(scale));
