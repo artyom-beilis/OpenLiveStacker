@@ -220,6 +220,22 @@ namespace ols {
         /// set camera control
         virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e) = 0;
 
+        virtual std::vector<CamParam> get_all_parameters(bool current_only,CamErrorCode &e) 
+        {
+            std::vector<CamParam> r;
+            std::vector<CamOptionId> ids = supported_options(e);
+            if(e)
+                return r;
+            r.reserve(ids.size());
+            for(auto opt: ids) {
+                auto opt_val = get_parameter(opt,current_only,e);
+                if(e)
+                    return r;
+                r.push_back(opt_val);
+            }
+            return r;
+        }
+
         virtual ~Camera() {}
     };
 

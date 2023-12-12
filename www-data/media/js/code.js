@@ -1416,6 +1416,8 @@ function startStack()
         });
     };
     if(delay == 0) {
+        document.getElementById('stack').style.display = 'none';
+        showNotification('Starting Stacking',1,false);
         doStackFunc();
     }
     else {

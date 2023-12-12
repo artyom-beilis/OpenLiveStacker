@@ -328,7 +328,8 @@ namespace ols {
                 int status;
                 {
                     std::unique_lock<std::recursive_mutex> guard(clock_);
-                    status = gp_camera_wait_for_event(cam_,3000,&ev,&ptr,ctx_);
+                    // keep timeout short such that other calls can go through
+                    status = gp_camera_wait_for_event(cam_,500,&ev,&ptr,ctx_);
                 }
                 check(status,"Wait event");
                 switch(ev) {
@@ -627,6 +628,12 @@ namespace ols {
                 throw GPError("Unsupported camera option");
             }
             return name;
+        }
+        /// override to prevent loosing mutex
+        virtual std::vector<CamParam> get_all_parameters(bool current_only,CamErrorCode &e)
+        {
+            std::unique_lock<std::recursive_mutex> guard(clock_);
+            return Camera::get_all_parameters(current_only,e);
         }
         /// get camera control
         virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e) 

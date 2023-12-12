@@ -94,13 +94,11 @@ namespace ols {
             {
                 CamErrorCode e;
                 std::unique_lock<std::recursive_mutex> guard(cam_->lock());
-                auto opts = cam_->cam().supported_options(e);
+                auto opts = cam_->cam().get_all_parameters(true,e);
                 e.check();
-                for(auto opt:opts) {
-                    CamParam param = cam_->cam().get_parameter(opt,true,e);
-                    e.check();
-                    cmd->camera_config[opt] = param.cur_val;
-                    if(opt == opt_gamma)
+                for(auto param:opts) {
+                    cmd->camera_config[param.option] = param.cur_val;
+                    if(param.option == opt_gamma)
                         cmd->source_gamma = param.cur_val;
                 }
             }
