@@ -125,6 +125,7 @@ namespace ols {
             cfg.width = v.get<int>("width");
             cfg.height = v.get<int>("height");
             cfg.mono = v.get<bool>("mono",false);
+            cfg.synthetic_exposure_mpl = v.get<int>("synthetic_exposure_mpl",cfg.synthetic_exposure_mpl);
             cfg.calibration = v.get<bool>("calibration");
             cfg.derotate = v.get<bool>("derotate");
             cfg.derotate_mirror = v.get<bool>("derotate_mirror");

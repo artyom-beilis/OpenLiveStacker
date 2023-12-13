@@ -150,9 +150,25 @@ namespace ols {
                         << " got " << video->frame.rows<< "x"<<video->frame.cols << "x" << video->frame.channels();
                 return false;
             }
-            video->frame.convertTo(video->processed_frame,cv_type_,1.0/video->frame_dr);
+            video->frame.convertTo(video->processed_frame,cv_type_,(1.0/synthetic_exposure_mpl_)/video->frame_dr);
             if(calibration_)
                 return true;
+            if(synthetic_exposure_mpl_ > 1) {
+                synthetic_exposure_count_ ++;
+                if(synthetic_exposure_count_ == 1) {
+                    synthetic_frame_ = video->processed_frame;
+                    return false;
+                }
+                else if(synthetic_exposure_count_ < synthetic_exposure_mpl_) {
+                    synthetic_frame_ += video->processed_frame;
+                    return false;
+                }
+                else {
+                    video->processed_frame += synthetic_frame_;
+                    synthetic_frame_ = cv::Mat();
+                    synthetic_exposure_count_ = 0;
+                }
+            }
             if(gamma_ != 1.0) {
                 apply_gamma(video->processed_frame);
             }
@@ -193,9 +209,13 @@ namespace ols {
                 channels_ = mono_ ? 1 : 3;
                 cv_type_ = mono_ ? CV_32FC1 : CV_32FC3;
                 calibration_ = ctl->calibration;
+                synthetic_exposure_mpl_ = 1;
+                synthetic_frame_ = cv::Mat();
+                synthetic_exposure_count_ = 0;
                 if(calibration_)
                     break;
                 gamma_ = ctl->source_gamma;
+                synthetic_exposure_mpl_ = ctl->synthetic_exposure_mpl;
                 if(ctl->derotate) {
                     derotator_.reset(new Derotator(ctl->lon,ctl->lat,ctl->ra,ctl->de));
                     first_frame_ts_ = 0;
@@ -312,6 +332,9 @@ namespace ols {
         cv::Mat flats_;
         bool apply_darks_;
         bool apply_flats_;
+        int synthetic_exposure_mpl_ = 1;
+        int synthetic_exposure_count_ = 0;
+        cv::Mat synthetic_frame_;
     };
 
     std::thread start_preprocessor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type err)
@@ -441,10 +464,13 @@ namespace ols {
 
         void create_meta(std::ostream &m)
         {
-            m << "Name           " << name_ << std::endl;
-            m << "Time           " << timestamp() << std::endl;
-            m << "Frames         " << stacker_->stacked_count() << std::endl;
-            m << "Integration (s)" << stacker_->stacked_count() * get_exp_s() << std::endl;
+            int frames = stacker_->stacked_count();
+            double exp = get_exp_s();
+            m << "Name            " << name_ << std::endl;
+            m << "Time            " << timestamp() << std::endl;
+            m << "Frames          " << frames  << std::endl;
+            m << "True Frames     " << frames * stack_info_.synthetic_exposure_mpl << std::endl;
+            m << "Integration (s) " << frames * exp << std::endl;
             m << "Frame:"<<std::endl;
             m << " - format " << stack_info_.format << std::endl;
             m << " - width  " << stack_info_.width << std::endl;
@@ -492,7 +518,7 @@ namespace ols {
 
         double get_exp_s()
         {
-            return stack_info_.camera_config[opt_exp] * 1e-3; // ms to s
+            return stack_info_.camera_config[opt_exp] * 1e-3 * stack_info_.synthetic_exposure_mpl; // ms to s
         }
 
         std::shared_ptr<StatsData> create_stats()
@@ -816,6 +842,7 @@ namespace ols {
                     v["width"] = ctl->width;
                     v["height"] = ctl->height;
                     v["mono"] = ctl->mono;
+                    v["synthetic_exposure_mpl"] = ctl->synthetic_exposure_mpl;
                     v["darks"] = ctl->darks_path;
                     v["flats"] = ctl->flats_path;
                     v["dark_flats"] = ctl->dark_flats_path;

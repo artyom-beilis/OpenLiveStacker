@@ -79,6 +79,7 @@ namespace ols {
         int bin=1;
         int width = 0;
         int height = 0;
+        int synthetic_exposure_mpl = 1;
         bool mono = false; // is mono data
         bool calibration = false;  /// Collect calibration data
         bool remove_satellites = false; // apply sat removal algorithm

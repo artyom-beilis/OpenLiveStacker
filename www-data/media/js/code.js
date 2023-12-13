@@ -1345,6 +1345,9 @@ function startStack()
     var lat = parseFloat(getVal("lat"));
     var lon = parseFloat(getVal("lon"));
     var delay = getStartDelay();
+    var synthetic_exposure_mpl = parseFloat(getVal("synthetic_exposure_mpl"));
+    if(isNaN(synthetic_exposure_mpl))
+        synthetic_exposure_mpl = 1
     var rollback_on_pause = delay > 0;
     var field_derotation = getBVal("field_derotation");
     var type = getVal('type');
@@ -1388,6 +1391,7 @@ function startStack()
         name:               name,
         save_data:          getBVal("save_data"),
         field_derotation:   field_derotation,
+        synthetic_exposure_mpl: synthetic_exposure_mpl,
         image_flip:         getBVal("image_flip"),
         remove_satellites:  getBVal("remove_satellites"),
         rollback_on_pause:  rollback_on_pause,
