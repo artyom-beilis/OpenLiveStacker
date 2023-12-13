@@ -184,7 +184,11 @@ namespace ols {
             default:
                 index=0;
             }
-            return index * 100000 + f.width;
+            int kp = f.width * f.height / 1000;
+            if(kp > 2500) {// 2.5 MP 
+                kp = -kp;
+            }
+            return index * 100000 + kp;
 
         }
         void sort_formats()
