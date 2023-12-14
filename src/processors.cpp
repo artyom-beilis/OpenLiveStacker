@@ -230,6 +230,14 @@ namespace ols {
                 if(!ctl->flats_path.empty())
                     load_flats(ctl->flats_path,ctl->dark_flats_path);
                 break;
+            case StackerControl::ctl_pause:
+                // drop frames in case of pause
+                if(synthetic_exposure_mpl_ > 1) {
+                    BOOSTER_INFO("stacker") << "Dropping "<< synthetic_exposure_count_ << " non-synthetic frames due to pause";
+                    synthetic_frame_ = cv::Mat();
+                    synthetic_exposure_count_ = 0;  
+                }
+                break;
             default:
                 /// not much to do
                 ;
