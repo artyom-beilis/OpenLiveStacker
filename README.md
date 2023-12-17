@@ -9,15 +9,16 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
 - Platforms: Linux, PI and  Android, Windows services for Linux are working as well
 - Cameras:
     - Supported:
+        - ASI ZWO
+        - ToupTek and Meade (based on ToupTek)
         - UVC Based like webcam, sv105
-        - ASI ZWO support
-        - ToupTek support
-        - DSLR support using gphoto2 (experimental)
-        - Watch directoy for files (universal integration with ekos)
+        - DSLR/DSLM support using gphoto2
+        - Android Camera
+        - Watch directoy for files (universal integration with ekos, Linux only)
         - Sim - simulation for development
     - Planned to be supported:
-        - Android Camera
         - SVBony - linux only (android SDK was not released yet by SVBony)
+        - QHY - linux and Android
 - Featues:
     - Live Stacking
     - Auto/Manual stretch
