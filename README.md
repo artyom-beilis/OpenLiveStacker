@@ -5,7 +5,6 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
 ## Status
 
 - Beta, runs on Linux and Android.
-- Works with ASI ZWO, ToupTek and UVC Cameras, 
 - Platforms: Linux, PI and  Android, Windows services for Linux are working as well
 - Cameras:
     - Supported:
