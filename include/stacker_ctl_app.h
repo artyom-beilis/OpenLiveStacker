@@ -9,6 +9,7 @@
 #include <cppcms/url_dispatcher.h>
 #include <cppcms/service.h>
 #include <booster/log.h>
+#include <booster/regex.h>
 
 #include "server_sent_events.h"
 #include "util.h"
@@ -30,6 +31,35 @@ namespace ols {
             dispatcher().map("POST","/control/?",&StackerControlApp::control,this);
             dispatcher().map("POST","/stretch/?",&StackerControlApp::stretch,this);
             dispatcher().map("GET", "/status/?",&StackerControlApp::status,this);
+            dispatcher().map("DELETE", "/calibration/([A-Za-z0-9_.\\-]*)",&StackerControlApp::del_calibration,this,1);
+        }
+        void del_calibration(std::string id)
+        {
+            std::string db_path = calibration_path_ + "/index.json";
+            cppcms::json::value db;
+            {
+                std::ifstream js(db_path);
+                if(!js) 
+                    throw std::runtime_error("Failed to open " + db_path);
+                if(!db.load(js,true)) 
+                    throw std::runtime_error("Failed to parse " + db_path);
+            }
+            cppcms::json::array &items = db.array();
+            for(size_t i=0;i<items.size();i++) {
+                if(items[i].get<std::string>("id") == id) {
+                    std::string tiff = calibration_path_ + "/" + items[i].get<std::string>("path");
+                    BOOSTER_INFO("stacker") << "Removing " << tiff; 
+                    std::remove(tiff.c_str());
+                    items.erase(items.begin() + i);
+                    break;
+                }
+            }
+            {
+                std::ofstream js(db_path);
+                db.save(js,cppcms::json::readable);
+                js.close();
+            }
+
         }
         void status()
         {
@@ -68,6 +98,11 @@ namespace ols {
             cmd->stretch_gamma = content_.get("stretch_gamma",cmd->stretch_gamma);
             queue_->push(cmd);
         }
+        void validate_name(std::string const &name)
+        {
+            if(!booster::regex_match(name,valid_name_))
+                throw std::runtime_error("Invalid object name `"+name + "'");
+        }
         void start()
         {
             std::shared_ptr<StackerControl> cmd(new StackerControl());
@@ -80,6 +115,7 @@ namespace ols {
             cmd->height = format.height;
             cmd->calibration = content_.get("type","dso") == "calibration";
             cmd->name = content_.get<std::string>("name");
+            validate_name(cmd->name);
             cmd->save_inputs = content_.get("save_data",false);
             if(!cmd->calibration) {
                 if(!cmd->name.empty())
@@ -139,6 +175,7 @@ namespace ols {
         std::string calibration_path_;
         queue_pointer_type queue_;
         std::string status_ = "idle";
+        booster::regex valid_name_ = booster::regex("[A-Za-z0-9_.\\-]*");
     };
 
     class StackerStatsNotification: public cppcms::application {

@@ -974,6 +974,30 @@ function updateCalibFrames(data)
     updateCalibFramesById(data,'stack_darks');
     updateCalibFramesById(data,'stack_flats');
     updateCalibFramesById(data,'stack_dark_flats');
+    updateCalibTable(data)
+}
+
+function updateCalibTable(data)
+{
+    var bdy = '';
+    for(var i=0;i<data.length;i++) {
+        var fr = data[i];
+        var date = fr.date.split(' ')[0];
+        bdy += "<tr>";
+        bdy += `<td>${fr.id}</td><td>${fr.width}</td><td>${fr.height}</td><td>${date}</td>`;
+        bdy += `<td><button onclick="deleteCalibFrame('${fr.id}');">del</button></td>`;
+        bdy += "</tr>\n";
+    }
+    document.getElementById('calib_table').innerHTML = bdy;
+}
+
+function deleteCalibFrame(frame_id)
+{
+    requestConfirmation(`Are you shure you want to delete ${frame_id}`,()=> {
+        restCall('delete',`/api/stacker/calibration/${frame_id}`,null,(e)=>{ 
+            loadCalibFrames(); 
+        });
+    });
 }
 
 function loadCalibFrames()
@@ -1822,7 +1846,7 @@ function setDownloadURL(db_id)
 
 function selectConfig(cfg)
 {
-    var cfgs = ['astap','general','camera','profiles'];
+    var cfgs = ['astap','general','camera','profiles','calib'];
     for(var i=0;i<cfgs.length;i++) {
         var obj = document.getElementById('config_tab_' + cfgs[i]);
         if(cfgs[i] == cfg) {
@@ -1837,6 +1861,9 @@ function selectConfig(cfg)
     }
     else if(cfg=='profiles') {
         selectProfile();
+    }
+    else if(cfg == 'calib') {
+        loadCalibFrames();
     }
 }
 

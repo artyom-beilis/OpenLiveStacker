@@ -111,6 +111,7 @@
         <button onclick="selectConfig('camera');">Camera</button>
         <button onclick="selectConfig('general');">General</button>
         <button onclick="selectConfig('profiles');">Profiles</button>
+        <button onclick="selectConfig('calib');">Calib.</button>
         <button onclick="selectConfig('astap');">ASTAP</button>
     <p>
     <div id="config_tab_camera" class="config_tab" >
@@ -123,8 +124,8 @@
                 <td>&nbsp;</td>
                 <td>Range</td>
                 <td>Def.</td>
-            </td>
-        <td>
+            </tr>
+        <thead>
         <tbody id='cam_controls' >
         </tbody>
         </table>
@@ -185,6 +186,20 @@
             <button id='download_start' onclick='downloadStart()'>Download</button><button id='download_stop' onclick='downloadStop()'>Cancel</button>
             <span id='download_status'></span>
         </p>
+    </div>
+    <div id="config_tab_calib" class="config_tab" style="display:none">
+        <table>
+        <thead>
+            <tr class="stack_opt" >
+                <td>Name</td>
+                <td>Width</td>
+                <td>Height</td>
+                <td>Date</td>
+                <td>&nbsp;</td>
+            </tr>
+        </thead>
+        <tbody id="calib_table" ></tbody>
+        </table>
     </div>
 </div>
 <div class="config_div" id="plate_solve_div" style="display:none; background-color:transparent;">
