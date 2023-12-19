@@ -1441,6 +1441,9 @@ function startStack()
         restCall('post','/api/stacker/start',config,(e)=>{
             changeStackerStatus('stacking');
             showStack(false);
+            if(delay > 0 && !calib) {
+                showThumbLive(true);
+            }
         });
     };
     if(delay == 0) {
