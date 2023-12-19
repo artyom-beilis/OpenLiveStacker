@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <opencv2/core/hal/intrin.hpp>
 
 namespace ols {
     class UVCError : public CamError {
@@ -79,9 +80,28 @@ namespace ols {
                 frm.format = stream_mjpeg;
             }
             else if(frame->frame_format == UVC_COLOR_FORMAT_YUYV) {
-                frm.format = stream_yuv2;
                 if(size_t(frm.width * frm.height * 2) != frame->data_bytes)
                     set_error(frm,"Partial data in frame");
+                if(format_.format == stream_yuv2) {
+                    frm.format = stream_yuv2;
+                }
+                else if(format_.format == stream_mono8) {
+                    frm.format = stream_mono8;
+                    frm.data_size /= 2;
+                    unsigned char *p = (unsigned char *)(frm.data);
+                    size_t i=0;
+#ifdef USE_CV_SIMD
+                    size_t lmt= frm.data_size / 16;
+                    for(;i<lmt;i+=16) {
+                        cv::v_uint8x16 y,uv;
+                        cv::v_load_deinterleave(p+i*2,y,uv);
+                        cv::v_store(p+i,y);
+                    }
+#endif                    
+                    for(;i<frm.data_size;i++) {
+                        p[i] = p[i*2];
+                    }
+                }
             }
             else {
                 set_error(frm,"Invalid frame format");
@@ -127,12 +147,14 @@ namespace ols {
                 if(index == -1)
                     throw UVCError("No apropriate stream format for camera");
 
+                format_ = formats_[index];
+
                 int tries = 0;
                 uvc_error_t res;
                 while(tries < 5) {
                     res = uvc_get_stream_ctrl_format_size(devh_,
                             &ctrl_,
-                            (fmt.format == stream_yuv2 ? UVC_FRAME_FORMAT_YUYV : UVC_FRAME_FORMAT_MJPEG),
+                            (fmt.format != stream_mjpeg ? UVC_FRAME_FORMAT_YUYV : UVC_FRAME_FORMAT_MJPEG),
                             fmt.width,fmt.height,
                             formats_[index].framerate);
                     if(res == 0)
@@ -383,6 +405,7 @@ namespace ols {
                     type = stream_yuv2;
                 else
                     continue;
+                size_t start_format = formats_.size();
                 for(const uvc_frame_desc_t *p = format_desc->frame_descs;p;p=p->next) {
                     CamStreamFormat fmt;
                     fmt.format = type;
@@ -390,6 +413,14 @@ namespace ols {
                     fmt.height = p->wHeight;
                     fmt.framerate= 10000000 / p->dwDefaultFrameInterval;
                     formats_.push_back(fmt);
+                }
+                if(type == stream_yuv2) {
+                    size_t end_format = formats_.size();
+                    for(size_t i=start_format;i<end_format;i++) {
+                        CamStreamFormat fmt = formats_[i];
+                        fmt.format = stream_mono8;
+                        formats_.push_back(fmt);
+                    }
                 }
             }
         }
@@ -399,6 +430,7 @@ namespace ols {
         uvc_stream_ctrl_t ctrl_;
         bool stream_active_ = true;
         std::vector<CamStreamFormat> formats_;
+        CamStreamFormat format_;
         int frame_counter_ = 0;
         // protected by mutex
         std::mutex lock_;
