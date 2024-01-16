@@ -191,8 +191,13 @@ namespace ols {
         void start_stop()
         {
             std::string op = content_.get<std::string>("operation");
-            if(op == "open")
-                cam_->open_camera(content_.get<int>("id"));
+            if(op == "open") {
+                int cam_id = content_.get<int>("id",-1);
+                if(cam_id) {
+                    throw std::runtime_error("No camera was selected");
+                }
+                cam_->open_camera(cam_id);
+            }
             else if(op == "close")
                 cam_->close_camera();
             else 
