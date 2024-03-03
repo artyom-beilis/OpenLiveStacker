@@ -46,8 +46,10 @@ namespace ols {
         int frame_dr = 255;
         cv::Mat processed_frame;
         StretchInfo stretch;
+        //StatsInfo stats;
         bool live_is_stretched = false;
         int dropped = 0;
+        double integration_time_s;
     };
 
     struct LiveControl : public QueueData {

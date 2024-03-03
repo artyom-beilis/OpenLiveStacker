@@ -153,6 +153,9 @@ add_library(ols SHARED
     src/video_generator.cpp
     src/tiffmat.cpp
     src/processors.cpp
+    src/pre_processor.cpp
+    src/stacker_processor.cpp
+    src/post_processor.cpp
     src/common_utils.cpp
     src/util.cpp
     src/plate_solver.cpp

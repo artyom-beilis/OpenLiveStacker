@@ -21,12 +21,6 @@ namespace ols {
         bool enable_subpixel_registration = false;
         int  subpixel_factor_ = 1;
 
-        float high_per_=99.99f;
-        double gamma_limit_ = 4.0;
-        double mean_target_ = 0.25;
-        static constexpr int hist_bins=1024;
-        int counters_[hist_bins];
-        
 
         Stacker(int width,int height,int channels,int roi_x=-1,int roi_y=-1,int roi_size = -1,int exp_multiplier=1) : 
             frames_(0),
@@ -39,7 +33,6 @@ namespace ols {
                 enable_subpixel_registration = false;
             }
 
-            set_stretch(true,0,0,0.5f);
             fully_stacked_area_ = cv::Rect(0,0,width,height);
             fully_stacked_count_ = 0;
             if(roi_size == -1) {

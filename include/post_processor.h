@@ -15,6 +15,7 @@
 namespace ols {
     class PostProcessor {
     public:
+
         std::vector<int> get_histogramm()
         {
             std::vector<int> res(counters_,counters_+hist_bins);
@@ -333,6 +334,12 @@ namespace ols {
         }
 
     private:
+        float high_per_=99.99f;
+        double gamma_limit_ = 4.0;
+        double mean_target_ = 0.25;
+        static constexpr int hist_bins=1024;
+        int counters_[hist_bins];
+
         bool enable_stretch_ = true;
         float low_cut_ = 0.0f;
         float high_cut_ = 1.0f;

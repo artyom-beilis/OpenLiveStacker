@@ -68,6 +68,7 @@ namespace ols {
         queue_pointer_type video_display_queue_      = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type preprocessor_queue_       = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type stacker_queue_            = std::shared_ptr<queue_type>(new queue_type());
+        queue_pointer_type post_processor_queue_     = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type stack_display_queue_      = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type debug_save_queue_         = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type stacker_stats_queue_      = std::shared_ptr<queue_type>(new queue_type());
@@ -96,6 +97,7 @@ namespace ols {
         std::thread debug_save_thread_;
         std::thread preprocessor_thread_;
         std::thread stacker_thread_;
+        std::thread post_processor_thread_;
         
         std::shared_ptr<cppcms::service> web_service_;
 
