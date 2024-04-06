@@ -144,6 +144,7 @@ namespace ols {
             cmd->ra = content_.get("target.ra",cmd->ra);
             cmd->de = content_.get("target.de",cmd->de);
             cmd->synthetic_exposure_mpl = content_.get("synthetic_exposure_mpl",cmd->synthetic_exposure_mpl);
+            cmd->remove_gradient = content_.get("remove_gradient",cmd->remove_gradient);
             cmd->derotate_mirror = content_.get("image_flip",cmd->derotate_mirror);
             cmd->derotate = content_.get("field_derotation",cmd->derotate);
             cmd->rollback_on_pause = content_.get("rollback_on_pause",cmd->rollback_on_pause);

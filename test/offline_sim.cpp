@@ -129,6 +129,7 @@ namespace ols {
             cfg.calibration = v.get<bool>("calibration");
             cfg.derotate = v.get<bool>("derotate");
             cfg.derotate_mirror = v.get<bool>("derotate_mirror");
+            cfg.remove_gradient = v.get<bool>("remove_gradient",false);
             cfg.ra = v.get<double>("ra");
             cfg.de = v.get<double>("de");
             cfg.lat = v.get<double>("lat");

@@ -1418,6 +1418,7 @@ function startStack()
         synthetic_exposure_mpl: synthetic_exposure_mpl,
         image_flip:         getBVal("image_flip"),
         remove_satellites:  getBVal("remove_satellites"),
+        remove_gradient:    getBVal("remove_gradient"),
         rollback_on_pause:  rollback_on_pause,
         auto_stretch:       getBVal("auto_stretch"),
         stretch_low:        g_stretch.cut,

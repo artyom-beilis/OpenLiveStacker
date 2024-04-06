@@ -87,6 +87,7 @@ namespace ols {
 
         bool derotate = false; /// enable auto derote for AZ mount
         bool derotate_mirror = false; /// inverse direction for mirror image
+        bool remove_gradient = false; // remove linear gradient
         double ra=-1,de=-1,lat=-1,lon=-1; /// object data an
 
         double source_gamma = 1.0; /// to linear space gamma
