@@ -151,7 +151,8 @@ namespace ols
             std::vector<CamStreamFormat> res;
             std::vector<CamStreamType> video_formats;
             bool isColor = !(info_.model->flag & TOUPCAM_FLAG_MONO);
-            video_formats.push_back(stream_rgb24);
+            if(isColor)
+                video_formats.push_back(stream_rgb24);
             video_formats.push_back(isColor ? stream_raw16 : stream_mono16);
 
             unsigned preview = info_.model->preview; // number of preview resolution, same as Toupcam_get_ResolutionNumber()
@@ -159,7 +160,6 @@ namespace ols
             for (unsigned i = 0; i < preview; ++i)
             {
                 CamStreamFormat sfmt;
-                sfmt.framerate = info_.model->maxspeed;
                 sfmt.width = info_.model->res[i].width;
                 sfmt.height = info_.model->res[i].height;
                 sfmt.bin = (int)std::round(1.0 * info_.model->res[0].width / info_.model->res[i].width);
@@ -273,6 +273,7 @@ namespace ols
                 handle_error("Toupcam_PullImage",hr);
                 return;
             }
+
 /*            // printf("handle_frame: Toupcam_PullImage=(%ux%u)\n", w, h);
             hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FLUSH, 2);
             if (FAILED(hr))
@@ -372,12 +373,12 @@ namespace ols
                 e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_RAW)", hr);
                 return;
             }
-            int frameRate = format.framerate;
             /**
              * TOUPCAM_OPTION_FRAMERATE	limit the frame rate, range=[0, 63]. 0 (means no limit)
              */
+            // int frameRate = format.framerate;
             // For astroimage 0 seems no sense
-            if (frameRate < 1)
+            /*if (frameRate < 1)
                 frameRate = 1;
             else if (frameRate > 63)
                 frameRate = 0;
@@ -386,7 +387,7 @@ namespace ols
             {
                 e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_FRAMERATE)", hr);
                 return;
-            }
+            }*/
 
             setROI(format, e);
             if(e)
@@ -999,10 +1000,10 @@ namespace ols
             }
 
             // printf("\n\n\nsetROI: val= %f, roiW=%u, hoiH=%u\n", roiPercent_, );
-            unsigned roiW = sfmt.width;
+            unsigned roiW = sfmt.width * sfmt.bin;
             if(roiW < ROI_MIN_WIDTH_HEIGHT)
                 roiW = ROI_MIN_WIDTH_HEIGHT;
-            unsigned roiH = sfmt.height;
+            unsigned roiH = sfmt.height * sfmt.bin;
             if(roiH < ROI_MIN_WIDTH_HEIGHT)
                 roiH = ROI_MIN_WIDTH_HEIGHT;
 
