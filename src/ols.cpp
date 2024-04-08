@@ -179,7 +179,7 @@ void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
     last_frame_ts_ = now;
 
     received_ ++;
-    if(video_generator_queue_->items > 20) {
+    if(video_generator_queue_->items > 10) {
         dropped_since_last_update_ ++;
         BOOSTER_WARNING("stacker") << "Processing is overloaded, dropping frame #" << (++dropped_);
         return;
