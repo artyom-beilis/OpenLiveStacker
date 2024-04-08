@@ -156,7 +156,7 @@ namespace ols {
         int roi_num = 1; 
         int roi_den = 1; 
         // roi_num = 2, roi_den=3 -> 2/3
-        float framerate = 1.0f; // -1 for unknown
+        float framerate = -1.0f; // -1 for unknown
     };
 
     std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt);
