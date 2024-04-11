@@ -20,11 +20,21 @@ namespace ols {
         virtual ~ShutDownData() {}
     };
 
-    struct StatsData : public QueueData {
+    struct StatsBase  : public QueueData {
         int stacked = 0;
         int missed = 0;
         int dropped = 0;
         double since_saved_s = 0;
+        virtual ~StatsBase() {};
+    };
+
+    struct FrameForStacking : public StatsBase {
+        cv::Mat frame;
+        cv::Rect roi;
+        StretchInfo stretch;
+    };
+
+    struct StatsData : public StatsBase {
         std::vector<int> histogramm;
         virtual ~StatsData() {}
     };
