@@ -234,10 +234,17 @@ namespace ols {
                 uvc_error_t res;
                 do {
                     res = func(devh_,vals + i,codes[i]);
-                    if(res < 0 && codes[i] == UVC_GET_DEF) {
-                        vals[i] = vals[0];
-                        // fallback to current 
-                        res = UVC_SUCCESS;
+                    if(res < 0) {
+                        if(codes[i] == UVC_GET_DEF) {
+                            vals[i] = vals[0];
+                            // fallback to current 
+                            res = UVC_SUCCESS;
+                        }
+                        else if(codes[i] == UVC_GET_RES) {
+                            vals[i] = 1;
+                            // if not given substitute for 1
+                            res = UVC_SUCCESS;
+                        }
                     }
                     attempts ++;
                     if(res < 0)
