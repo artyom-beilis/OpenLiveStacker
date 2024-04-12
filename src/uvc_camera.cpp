@@ -14,10 +14,19 @@
 #include <opencv2/core/hal/intrin.hpp>
 
 namespace ols {
+    FILE *uvc_log_file = nullptr;
+    #define LOG(...) do { if( ::ols::uvc_log_file) { fprintf( ::ols::uvc_log_file,__VA_ARGS__); fflush(::ols::uvc_log_file); }} while(0)
+
     class UVCError : public CamError {
     public:
-        UVCError(std::string const &msg) : CamError(msg) {}
-        UVCError(std::string const &msg,uvc_error_t err) : CamError(msg + ":" + uvc_strerror(err)) {}
+        UVCError(std::string const &msg) : CamError(msg) 
+        {
+            LOG("UVC Error: %s\n",what());
+        }
+        UVCError(std::string const &msg,uvc_error_t err) : CamError(msg + ":" + uvc_strerror(err)) 
+        {
+            LOG("UVC Error: %s\n",what());
+        }
     };
 
 
@@ -29,6 +38,9 @@ namespace ols {
             name_(name),
             devh_(devh)
         {
+            if(uvc_log_file)
+                uvc_print_diag(devh_,uvc_log_file);
+            fflush(uvc_log_file);
         }
         UVCCamera(uvc_device_t *dev,std::string const &name) :
             name_(name)
@@ -36,6 +48,9 @@ namespace ols {
             uvc_error_t res = uvc_open(dev,&devh_);
             if(res < 0)
                 throw UVCError("Failed to open camera",res);
+            if(uvc_log_file)
+                uvc_print_diag(devh_,uvc_log_file);
+            fflush(uvc_log_file);
         }
         ~UVCCamera()
         {
@@ -176,6 +191,12 @@ namespace ols {
                 if(res < 0) {
                     throw UVCError("Failed to start stream : " + std::to_string(res),res);
                 }
+                if(uvc_log_file) {
+                    LOG("\nOpenning new stream %dx%d\n\n\n",fmt.width,fmt.height);
+                    uvc_print_stream_ctrl(&ctrl_,uvc_log_file);
+                    fflush(uvc_log_file);
+                }
+
                 stream_active_ = true;
             }
             catch(std::exception const &err) {
@@ -606,6 +627,10 @@ namespace ols {
     }
 };
 
+extern "C" void ols_set_uvc_driver_log(char const *log_path,int /*debug*/)
+{
+    ols::uvc_log_file = fopen(log_path,"w");
+}
 
 extern "C" ols::CameraDriver *ols_get_uvc_driver(int fd,ols::CamErrorCode *e)
 {
