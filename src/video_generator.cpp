@@ -106,7 +106,7 @@ namespace ols {
                             }
                         }
                         catch(std::exception const &e) {
-                            BOOSTER_ERROR("stacker") << "Failed to extract jpeg";
+                            BOOSTER_ERROR("stacker") << "Failed to extract jpeg:" << e.what();
                             return;
                         }
                     }

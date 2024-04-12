@@ -75,14 +75,17 @@ namespace ols {
             frm.data = frame->data;
             frm.data_size = frame->data_bytes;
             frm.frame_counter = frame_counter_ ++;
+            char err_msg[256];
 
             if(frame->frame_format == UVC_COLOR_FORMAT_MJPEG) {
                 frm.format = stream_mjpeg;
             }
             else if(frame->frame_format == UVC_COLOR_FORMAT_YUYV) {
-                if(size_t(frm.width * frm.height * 2) != frame->data_bytes)
-                    set_error(frm,"Partial data in frame");
-                if(format_.format == stream_yuv2) {
+                if(size_t(frm.width * frm.height * 2) != frame->data_bytes) {
+                    snprintf(err_msg,sizeof(err_msg),"Partial data in YUV frame %d, expected %d",int(frame->data_bytes),int(frm.width * frm.height * 2));
+                    set_error(frm,err_msg);
+                }
+                else if(format_.format == stream_yuv2) {
                     frm.format = stream_yuv2;
                 }
                 else if(format_.format == stream_mono8) {
