@@ -193,7 +193,7 @@ namespace ols {
             std::string op = content_.get<std::string>("operation");
             if(op == "open") {
                 int cam_id = content_.get<int>("id",-1);
-                if(cam_id) {
+                if(cam_id < 0) {
                     throw std::runtime_error("No camera was selected");
                 }
                 cam_->open_camera(cam_id);
