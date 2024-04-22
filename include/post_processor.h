@@ -199,7 +199,7 @@ namespace ols {
         {
             typedef  std::chrono::time_point<std::chrono::high_resolution_clock> tp;
             tp raw  = std::chrono::high_resolution_clock::now();
-            cv::Mat tmp = raw_image;
+            cv::Mat tmp = raw_image.clone();
             
             tp start = std::chrono::high_resolution_clock::now();
             tp wb_coeff,wb_apply;

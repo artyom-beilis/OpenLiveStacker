@@ -966,13 +966,13 @@ namespace ols {
             std::shared_ptr<CameraFrame> res;
             std::shared_ptr<CameraFrame> ps;
             try {
-                if(out_) {
+                if(out_ && last_frame_) {
                     auto p1 = std::chrono::high_resolution_clock::now();
                     std::pair<cv::Mat,StretchInfo> img;
                     if(calibration_)
                         img.first=last_frame_->frame;
                     else
-                        img = pp_->post_process_image(last_frame_->frame.clone(),last_frame_->roi);
+                        img = pp_->post_process_image(last_frame_->frame,last_frame_->roi);
                     auto p2 = std::chrono::high_resolution_clock::now();
                     auto frames = generate_output_frame(img);
                     res=frames.first;
@@ -980,9 +980,10 @@ namespace ols {
                     auto p3 = std::chrono::high_resolution_clock::now();
                     double gtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p2-p1).count();
                     double jtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p3-p2).count();
-                    BOOSTER_INFO("stacker") << "post processing took " << (1e3*gtime) << " ms, jpeg took=" << (1e3*jtime);
+                    double total_time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p3-p1).count();
+                    BOOSTER_INFO("stacker") << "post processing took " << (1e3 *total_time) <<"ms. proccessing " << (1e3*gtime) << " ms, jpeg took=" << (1e3*jtime);
                 }
-                if(stats_) {
+                if(stats_ && last_frame_) {
                     stats_->push(create_stats());
                 }
             }
@@ -1061,6 +1062,9 @@ namespace ols {
                     std::shared_ptr<StatsData> stats(new StatsData());
                     stats_->push(stats);
                 }
+                break;
+            case StackerControl::ctl_cancel:
+                last_frame_ = nullptr;
                 break;
             case StackerControl::ctl_save:
                 if(last_frame_) {
