@@ -1,0 +1,28 @@
+digraph {
+    Camera -> "Video Generator"
+    "User Control" -> "Video Generator"
+    "Video Generator" -> {
+            "Data Save"
+            "Live Video Stream"
+            "Plate Solver"
+            "PreProcessor"
+    }
+    "PreProcessor" -> {
+        "Stacker"
+        "Stats and Errors"
+    }
+    "Stacker" -> "PostProcessor"
+    "PostProcessor" -> {
+        "Stacked Video Stream"
+        "Stats and Errors"
+        "Plate Solver"
+    }
+    "Data Save" -> "Stats and Errors"
+    "Video Generator" [ label = "Video Generator\njpeg, bayer, yuv2 to rgb\n mjpeg generation\nlive stretch" ]
+    "Data Save" [label="Data Save\nfor post-processing"]
+    "Stats and Errors"  [label="Notify User\nstatistics and errors"]
+    "PreProcessor" [label="Pre-Processor\nflats, darks,\nfield rotation, float conversion\ngradient removal"]
+    "Stacker" [label="Stacker\nregistration, stacking"]
+    "PostProcessor" [label="PostProcessor\nstretching, mjpeg"]
+    "Plate Solver" [label="ASTAP\nimage storage"]
+}
