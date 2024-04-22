@@ -2,6 +2,22 @@
 #include "data_items.h"
 #include <thread>
 namespace ols {
+    inline void send_message(queue_pointer_type q,std::string const &id,std::string const &err)
+    {
+        if(q) {
+            std::shared_ptr<ErrorNotificationData> p(new ErrorNotificationData());
+            p->source = id;
+            p->message = err;
+            q->push(p);
+        }
+    }
+
+    inline void send_message(queue_pointer_type q,std::string const &id,std::exception const &e)
+    {
+        send_message(q,id,e.what());
+    }
+
+
     std::thread start_preprocessor(queue_pointer_type in,
                                    queue_pointer_type out,
                                    queue_pointer_type error_queue);

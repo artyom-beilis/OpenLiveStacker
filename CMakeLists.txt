@@ -152,7 +152,10 @@ add_library(ols SHARED
     src/ols.cpp
     src/video_generator.cpp
     src/tiffmat.cpp
-    src/processors.cpp
+    src/debug_save_processor.cpp
+    src/post_processor.cpp
+    src/pre_processor.cpp
+    src/stacker_processor.cpp
     src/common_utils.cpp
     src/util.cpp
     src/plate_solver.cpp
