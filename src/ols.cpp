@@ -226,7 +226,8 @@ void OpenLiveStacker::run()
 
     debug_save_thread_ = std::move(start_debug_saver(debug_save_queue_,stacker_stats_queue_,debug_dir_));
     preprocessor_thread_ = std::move(start_preprocessor(preprocessor_queue_,stacker_queue_,stacker_stats_queue_));
-    stacker_thread_ = std::move(start_stacker(stacker_queue_,
+    stacker_thread_ = std::move(start_stacker(stacker_queue_,pp_queue_));
+    pp_thread_ = std::move(start_post_processor(pp_queue_,
                                               stack_display_queue_,
                                               stacker_stats_queue_,
                                               plate_solving_queue_,
@@ -267,6 +268,7 @@ void OpenLiveStacker::stop()
     debug_save_thread_.join();
     preprocessor_thread_.join();
     stacker_thread_.join();
+    pp_thread_.join();
 
     camera_.reset();
     driver_.reset();

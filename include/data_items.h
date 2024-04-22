@@ -28,13 +28,14 @@ namespace ols {
         virtual ~StatsBase() {};
     };
 
-    struct FrameForStacking : public StatsBase {
+    struct StackedFrame : public StatsBase {
         cv::Mat frame;
         cv::Rect roi;
-        StretchInfo stretch;
     };
 
     struct StatsData : public StatsBase {
+        StatsData() {}
+        StatsData(StatsBase const &b) : StatsBase(b) {}
         std::vector<int> histogramm;
         virtual ~StatsData() {}
     };

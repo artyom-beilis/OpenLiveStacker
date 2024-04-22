@@ -1,6 +1,7 @@
 #include "data_items.h"
 #include "rotation.h"
 #include "stacker.h"
+#include "post_processor.h"
 #include "tiffmat.h"
 #include "common_utils.h"
 #include <booster/log.h>
@@ -612,12 +613,9 @@ namespace ols {
     
     class StackerProcessor {
     public:
-        StackerProcessor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,std::string data_dir) :
+        StackerProcessor(queue_pointer_type in,queue_pointer_type out) :
             in_(in),
-            out_(out),
-            stats_(stats),
-            plate_solving_(plate_solving),
-            data_dir_(data_dir)
+            out_(out)
         {
         }
         void run()
@@ -631,6 +629,179 @@ namespace ols {
                     break;
                 }
                 auto video_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
+                if(video_ptr) {
+                    std::shared_ptr<StackedFrame> res = handle_video(video_ptr);
+                    if(out_) {
+                        out_->push_or_replace(res);
+                    }
+                    continue;
+                }
+                auto config_ptr = std::dynamic_pointer_cast<StackerControl>(data_ptr);
+                if(config_ptr) {
+                    try {
+                        handle_config(config_ptr);
+                    }
+                    catch(std::exception const &e) {
+                        send_message(out_,"Config",e);
+                        BOOSTER_ERROR("stacker") << "Config change error:" <<e.what();
+                    }
+                }
+                if(out_)
+                    out_->push(data_ptr);
+            }
+        }
+
+        void send_updated_image()
+        {
+            if(out_) {
+                if(stacker_->stacked_count() > 0) {
+                    std::shared_ptr<StackedFrame> res(new StackedFrame());
+                    res->frame = stacker_->get_raw_stacked_image();
+                    res->roi = stacker_->fully_stacked_area();
+                    create_stats(res);
+                    out_->push(res);
+                }
+            }
+        }
+
+        void create_stats(std::shared_ptr<StatsBase> stats)
+        {
+            if(calibration_) {
+                stats->stacked = cframe_count_;
+            }
+            else {
+                stats->stacked = stacker_->stacked_count();
+                stats->missed  = stacker_->total_count() - stats->stacked;
+            }
+            stats->dropped = dropped_count_;
+        }
+
+        std::shared_ptr<StackedFrame> handle_video(std::shared_ptr<CameraFrame> video)
+        {
+            std::shared_ptr<StackedFrame> res(new StackedFrame());
+		    auto start = std::chrono::high_resolution_clock::now();
+            try {
+                dropped_count_ += video->dropped;
+                if(calibration_) {
+                    cframe_ +=  video->processed_frame;
+                    cframe_count_ ++;
+                    res->frame = cframe_.mul(cv::Scalar::all(1.0 / cframe_count_));
+                    auto end = std::chrono::high_resolution_clock::now();
+                    double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
+                    BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms, calibration frame #" << cframe_count_;
+                }
+                else {
+                    if(stacker_->stack_image(video->processed_frame,restart_)) {
+                        restart_ = false;
+		                auto p1 = std::chrono::high_resolution_clock::now();
+                        double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p1-start).count();
+                        res->frame = stacker_->get_raw_stacked_image();
+                        res->roi = stacker_->fully_stacked_area();
+                        BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms";
+                    }
+                    else {
+                        BOOSTER_INFO("stacker") << "Failed to stack frame";
+                        auto end = std::chrono::high_resolution_clock::now();
+                        double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
+                        BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms";
+                        return nullptr;
+                    }
+                }
+                create_stats(res);
+            }
+            catch(std::exception const &e) {
+                BOOSTER_ERROR("stacker") << "Stacking Failed:" << e.what();
+                return nullptr;
+            }
+            return res; 
+        }
+        void handle_config(std::shared_ptr<StackerControl> ctl)
+        {
+            switch(ctl->op) {
+            case StackerControl::ctl_init:
+                width_ = ctl->width;
+                height_ = ctl->height;
+                mono_ = ctl->mono;
+                version_ = 0;
+                channels_ = mono_ ? 1 : 3;
+                cv_type_ = mono_ ? CV_32FC1 : CV_32FC3;
+                calibration_ = ctl->calibration;
+                dropped_count_ = 0;
+                stacker_.reset();
+                if(calibration_) {
+                    cframe_ = cv::Mat(height_,width_,cv_type_);
+                    cframe_.setTo(0);
+                    cframe_count_ = 0;
+                }
+                else {
+                    stacker_.reset(new Stacker(width_,height_,channels_));
+                    stacker_->set_remove_satellites(ctl->remove_satellites);
+                    stacker_->set_rollback_on_pause(ctl->rollback_on_pause);
+                    restart_ = true;
+                }
+                break;
+            case StackerControl::ctl_pause:
+                restart_ = true;
+                if(stacker_) {
+                    stacker_->handle_pause();
+                    send_updated_image();
+                }
+                break;
+            case StackerControl::ctl_cancel:
+                if(stacker_) {
+                    stacker_.reset();
+                }
+                else if(calibration_) {
+                    calibration_ = false;
+                }
+                break;
+            default:
+                /// not much to do
+                ;
+            }
+        }
+    private:
+        queue_pointer_type in_,out_;
+        int width_,height_;
+        bool mono_;
+        int version_;
+        int channels_,cv_type_;
+        bool calibration_=false;
+        cv::Mat cframe_;
+        int cframe_count_;
+        int dropped_count_ = 0;
+        std::unique_ptr<Stacker> stacker_;
+        bool restart_;
+    };
+
+    std::thread start_stacker(queue_pointer_type in,queue_pointer_type out)
+    {
+        std::shared_ptr<StackerProcessor> p(new StackerProcessor(in,out));
+        return std::thread([=]() { p->run(); });
+    }
+
+    class PostProcessorProcessor {
+    public:
+        PostProcessorProcessor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,std::string data_dir) :
+            in_(in),
+            out_(out),
+            stats_(stats),
+            plate_solving_(plate_solving),
+            data_dir_(data_dir),
+            pp_(new PostProcessor())
+        {
+        }
+        void run()
+        {
+            while(true) {
+                auto data_ptr = in_->pop();
+                auto stop_ptr = std::dynamic_pointer_cast<ShutDownData>(data_ptr);
+                if(stop_ptr) {
+                    if(out_)
+                        out_->push(data_ptr);
+                    break;
+                }
+                auto video_ptr = std::dynamic_pointer_cast<StackedFrame>(data_ptr);
                 if(video_ptr) {
                     auto frames = handle_video(video_ptr);
                     auto res = frames.first;
@@ -652,6 +823,13 @@ namespace ols {
                     catch(std::exception const &e) {
                         send_message(stats_,"Config",e);
                         BOOSTER_ERROR("stacker") << "Config change error:" <<e.what();
+                    }
+                }
+                auto error_ptr = std::dynamic_pointer_cast<ErrorNotificationData>(data_ptr);
+                if(error_ptr){
+                    if(stats_) {
+                        stats_->push(error_ptr);
+                        continue;
                     }
                 }
                 if(out_)
@@ -676,10 +854,6 @@ namespace ols {
             f.close();
         }
         
-        std::shared_ptr<CameraFrame> generate_dummy_frame()
-        {
-            return ols::generate_dummy_frame(width_,height_,channels_);
-        }
 
         std::pair<std::shared_ptr<CameraFrame>,std::shared_ptr<CameraFrame> > generate_output_frame(std::pair<cv::Mat,StretchInfo> data,bool create_ps_frame=true)
         {
@@ -704,34 +878,20 @@ namespace ols {
             return std::make_pair(frame,plate_solving_frame);
         }
 
-        void send_updated_image()
-        {
-            if(out_) {
-                if(stacker_->stacked_count() > 0) {
-                    auto frames = generate_output_frame(stacker_->get_stacked_image());
-                    out_->push(frames.first);
-                    if(plate_solving_)
-                        plate_solving_->push(frames.second);
-                }
-                else
-                    out_->push(generate_dummy_frame());
-            }
-        }
-
         cv::Mat to16bit(cv::Mat m)
         {
             cv::Mat m2 = cv::max(0,m);
             double max_v;
             cv::minMaxLoc(m2,nullptr,&max_v);
             cv::Mat res;
-            m2.convertTo(res,channels_ == 3 ? CV_16UC3 : CV_16UC1,65535/max_v);
+            m2.convertTo(res,m.channels() == 3 ? CV_16UC3 : CV_16UC1,65535/max_v);
             return res;
         }
 
 
         void create_meta(std::ostream &m)
         {
-            int frames = stacker_->stacked_count();
+            int frames = last_frame_->stacked;
             double exp = get_exp_s();
             m << "Name            " << name_ << std::endl;
             m << "Time            " << timestamp() << std::endl;
@@ -767,8 +927,9 @@ namespace ols {
             std::string path = base_name + ".jpeg";
             std::string ipath = base_name + ".txt";
             std::string tpath = base_name + ".tiff";
-            save_tiff(to16bit(stacker_->get_raw_stacked_image()),tpath);
-            auto frames = generate_output_frame(stacker_->get_stacked_image(),false);
+            save_tiff(to16bit(last_frame_->frame),tpath);
+            auto img = pp_->post_process_image(last_frame_->frame,last_frame_->roi);
+            auto frames = generate_output_frame(img,false);
             auto frame = frames.first;
             std::ofstream f(path,std::ofstream::binary);
             f.write((char*)frame->jpeg_frame->data(),frame->jpeg_frame->size());
@@ -791,61 +952,35 @@ namespace ols {
 
         std::shared_ptr<StatsData> create_stats()
         {
-            std::shared_ptr<StatsData> stats(new StatsData());
-            if(calibration_) {
-                stats->stacked = cframe_count_;
-                stats->since_saved_s = get_exp_s() * (cframe_count_ - saved_count_);
+            std::shared_ptr<StatsData> stats(new StatsData(*last_frame_));
+            stats->since_saved_s = get_exp_s() * (stats->stacked - saved_count_);
+            if(stats->stacked>0 && !calibration_) {
+                stats->histogramm = std::move(pp_->get_histogramm());
             }
-            else {
-                stats->stacked = stacker_->stacked_count();
-                stats->missed  = stacker_->total_count() - stats->stacked;
-                stats->since_saved_s = get_exp_s() * (stacker_->stacked_count() - saved_count_) ;
-                if(stats->stacked>0)
-                    stats->histogramm = std::move(stacker_->get_histogramm());
-            }
-            stats->dropped = dropped_count_;
             return stats;
         }
 
-        std::pair<std::shared_ptr<CameraFrame>,std::shared_ptr<CameraFrame> > handle_video(std::shared_ptr<CameraFrame> video)
+        std::pair<std::shared_ptr<CameraFrame>,std::shared_ptr<CameraFrame> > handle_video(std::shared_ptr<StackedFrame> video)
         {
+            last_frame_ = video;
             std::shared_ptr<CameraFrame> res;
             std::shared_ptr<CameraFrame> ps;
-		    auto start = std::chrono::high_resolution_clock::now();
             try {
-                dropped_count_ += video->dropped;
-                if(calibration_) {
-                    cframe_ +=  video->processed_frame;
-                    cframe_count_ ++;
-                    res = video;
-                    auto end = std::chrono::high_resolution_clock::now();
-                    double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
-                    BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms, calibration frame #" << cframe_count_;
-                }
-                else {
-                    if(stacker_->stack_image(video->processed_frame,restart_)) {
-                        restart_ = false;
-		                auto p1 = std::chrono::high_resolution_clock::now();
-                        double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p1-start).count();
-                        double gtime = 0,jtime = 0;
-                        if(out_) {
-                            auto img = stacker_->get_stacked_image();
-                            auto p2 = std::chrono::high_resolution_clock::now();
-                            auto frames = generate_output_frame(img);
-                            res=frames.first;
-                            ps=frames.second;
-                            auto p3 = std::chrono::high_resolution_clock::now();
-                            gtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p2-p1).count();
-                            jtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p3-p2).count();
-                        }
-                        BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms, generation " << (1e3*gtime) << " ms, jpeg took=" << (1e3*jtime);
-                    }
-                    else {
-                        BOOSTER_INFO("stacker") << "Failed to stack frame";
-                        auto end = std::chrono::high_resolution_clock::now();
-                        double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(end-start).count();
-                        BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms";
-                    }
+                if(out_) {
+                    auto p1 = std::chrono::high_resolution_clock::now();
+                    std::pair<cv::Mat,StretchInfo> img;
+                    if(calibration_)
+                        img.first=last_frame_->frame;
+                    else
+                        img = pp_->post_process_image(last_frame_->frame.clone(),last_frame_->roi);
+                    auto p2 = std::chrono::high_resolution_clock::now();
+                    auto frames = generate_output_frame(img);
+                    res=frames.first;
+                    ps=frames.second;
+                    auto p3 = std::chrono::high_resolution_clock::now();
+                    double gtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p2-p1).count();
+                    double jtime = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p3-p2).count();
+                    BOOSTER_INFO("stacker") << "post processing took " << (1e3*gtime) << " ms, jpeg took=" << (1e3*jtime);
                 }
                 if(stats_) {
                     stats_->push(create_stats());
@@ -859,18 +994,17 @@ namespace ols {
         }
         void save_calibration()
         {
-            double factor = 1.0 / cframe_count_;
-            cv::Mat calib = cframe_.mul(cv::Scalar::all(factor)); 
+            cv::Mat calib = last_frame_->frame;
             double minV,maxV;
             cv::minMaxLoc(calib,&minV,&maxV);
             std::string tiff_path = output_path_ + "/" + name_ + ".tiff";
             std::string db_path = output_path_ + "/index.json";
-            BOOSTER_INFO("stacker") << "Saving calibration frame to " << tiff_path << " frame " << cframe_count_ << " maxv=" << maxV << " minv=" << minV;
+            BOOSTER_INFO("stacker") << "Saving calibration frame to " << tiff_path << " frame " << last_frame_->stacked << " maxv=" << maxV << " minv=" << minV;
             cppcms::json::value setup;
             setup["id"] = name_;
             setup["path"] = name_ + ".tiff";
             setup["date"] = timestamp();
-            setup["frames"] = cframe_count_;
+            setup["frames"] = last_frame_->stacked;
             setup["width"] = calib.cols;
             setup["height"] = calib.rows;
             BOOSTER_INFO("stacker") << "Saving calibration frame to " << tiff_path;
@@ -899,6 +1033,11 @@ namespace ols {
             db.save(res,cppcms::json::readable);
             res.close();
         }
+        std::shared_ptr<CameraFrame> generate_dummy_frame()
+        {
+            return ols::generate_dummy_frame(width_,height_,mono_ ? 1 : 3);
+        }
+
         void handle_config(std::shared_ptr<StackerControl> ctl)
         {
             switch(ctl->op) {
@@ -908,69 +1047,51 @@ namespace ols {
                 mono_ = ctl->mono;
                 saved_count_ = 0;
                 version_ = 0;
-                channels_ = mono_ ? 1 : 3;
-                cv_type_ = mono_ ? CV_32FC1 : CV_32FC3;
                 calibration_ = ctl->calibration;
                 output_path_ = ctl->output_path;
                 name_ = ctl->name;
                 dropped_count_ = 0;
-                stacker_.reset();
                 stack_info_ = *ctl;
-                if(calibration_) {
-                    cframe_ = cv::Mat(height_,width_,cv_type_);
-                    cframe_.setTo(0);
-                    cframe_count_ = 0;
-                }
-                else {
-                    stacker_.reset(new Stacker(width_,height_,channels_));
-                    stacker_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
-                    stacker_->set_remove_satellites(ctl->remove_satellites);
-                    stacker_->set_rollback_on_pause(ctl->rollback_on_pause);
-                    restart_ = true;
-                }
-                if(out_)
+                last_frame_ = nullptr;
+                pp_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
+                if(out_) {
                     out_->push(generate_dummy_frame());
+                }
                 if(stats_) {
                     std::shared_ptr<StatsData> stats(new StatsData());
                     stats_->push(stats);
                 }
                 break;
-            case StackerControl::ctl_pause:
-                restart_ = true;
-                if(stacker_) {
-                    stacker_->handle_pause();
-                    send_updated_image();
-                }
-                if(stats_) {
-                    stats_->push(create_stats());
-                }
-                break;
-            case StackerControl::ctl_cancel:
-                if(stacker_) {
-                    stacker_.reset();
-                }
-                else if(calibration_) {
-                    calibration_ = false;
-                }
-                break;
             case StackerControl::ctl_save:
-                if(stacker_) {
-                    save_stacked_image_and_send();
-                    saved_count_ = stacker_->stacked_count();
-                }
-                else if(calibration_) {
-                    save_calibration();
-                    saved_count_ = cframe_count_;
+                if(last_frame_) {
+                    if(calibration_) {
+                        save_calibration();
+                    }
+                    else {
+                        save_stacked_image_and_send();
+                    }
+                    saved_count_ = last_frame_->stacked;
                 }
                 if(stats_) {
                     stats_->push(create_stats());
                 }
                 break;
             case StackerControl::ctl_update:
-                if(stacker_) {
-                    stacker_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
+                if(!calibration_) {
+                    pp_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
                     BOOSTER_INFO("stacker") << "Getting to stretch settings in stacker auto="<<ctl->auto_stretch << " low="<<ctl->stretch_low << " high=" << ctl->stretch_high << " gamma=" << ctl->stretch_gamma;
-                    send_updated_image();
+                    if(last_frame_) {
+                        auto frames = handle_video(last_frame_);
+                        auto res = frames.first;
+                        auto ps  = frames.second;
+                        if(res && out_) {
+                            out_->push(res);
+                        }
+                        if(ps && plate_solving_) {
+                            plate_solving_->push(ps);
+                        }
+                    }
+                    
                 }
                 break;
             default:
@@ -984,24 +1105,25 @@ namespace ols {
         int width_,height_;
         bool mono_;
         int version_;
-        int channels_,cv_type_;
         bool calibration_=false;
         std::string output_path_,name_;
         cv::Mat cframe_;
         int cframe_count_;
         int dropped_count_ = 0;
-        std::unique_ptr<Stacker> stacker_;
-        bool restart_;
+        std::unique_ptr<PostProcessor> pp_;
+        std::shared_ptr<StackedFrame> last_frame_;
         int saved_count_ = 0;
         StackerControl stack_info_;
     };
 
-    std::thread start_stacker(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,std::string data_dir)
+    std::thread start_post_processor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,std::string data_dir)
     {
-        std::shared_ptr<StackerProcessor> p(new StackerProcessor(in,out,stats,plate_solving,data_dir));
+        std::shared_ptr<PostProcessorProcessor> p(new PostProcessorProcessor(in,out,stats,plate_solving,data_dir));
         return std::thread([=]() { p->run(); });
     }
-
+ 
+    
+    
     class DebugSaver {
     public:
         DebugSaver(queue_pointer_type in,queue_pointer_type err,std::string output_dir) :

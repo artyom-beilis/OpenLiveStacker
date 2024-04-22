@@ -36,6 +36,30 @@ namespace ols {
             }
         }
 
+        template<typename ItemType>
+        void push_or_replace(std::shared_ptr<ItemType> p)
+        {
+            std::unique_lock<std::mutex> guard(lock_);
+            if(cb_) {
+                cb_(p);
+                return;
+            }
+            if(!data_.empty()) {
+                auto &last = data_.back();
+                // replace last item if exactly the same type
+                if(std::dynamic_pointer_cast<std::shared_ptr<ItemType> >(last)) {
+                    last = p;
+                    return;
+                }
+            }
+            while(data_.size() >= limit_) {
+                cond_has_room_.wait(guard);
+            }
+            ++items;
+            data_.push(p);
+            cond_.notify_one();
+        }
+
         void push(T const &v)
         {
             std::unique_lock<std::mutex> guard(lock_);

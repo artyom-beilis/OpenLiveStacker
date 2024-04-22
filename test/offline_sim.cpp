@@ -28,7 +28,8 @@ namespace ols {
                 out->call_on_push([](std::shared_ptr<QueueData> ){});
             }
             std::thread t1 = start_preprocessor(input_queue_,stacker_queue_,nullptr);
-            std::thread t2 = start_stacker(stacker_queue_,out,nullptr,nullptr,output_dir_);
+            std::thread t2 = start_stacker(stacker_queue_,pp_queue_);
+            std::thread t3 = start_post_processor(pp_queue_,out,nullptr,nullptr,output_dir_);
             std::shared_ptr<StackerControl> ctl(new StackerControl(cfg_));
             std::cerr << cfg_.width << " " << cfg_.height << std::endl;
             input_queue_->push(ctl);
@@ -45,6 +46,7 @@ namespace ols {
             input_queue_->push(end);
             t1.join();
             t2.join();
+            t3.join();
         }
 
         std::string file_name(int frame_id,std::string const &ext)
@@ -157,6 +159,7 @@ namespace ols {
         // limit queue size for offline processing 
         queue_pointer_type input_queue_      = std::shared_ptr<queue_type>(new queue_type(10));
         queue_pointer_type stacker_queue_    = std::shared_ptr<queue_type>(new queue_type(10));
+        queue_pointer_type pp_queue_         = std::shared_ptr<queue_type>(new queue_type(10));
         StackerControl cfg_;
         CamBayerType bayer_;
     };
