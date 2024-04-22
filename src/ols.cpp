@@ -1,5 +1,6 @@
 #include "ols.h"
 #include <algorithm>
+#include <iomanip>
 #include <cppcms/json.h>
 #include <cppcms/applications_pool.h>
 #include <cppcms/mount_point.h>
@@ -37,7 +38,29 @@ OpenLiveStacker::OpenLiveStacker(std::string data_dir)
     }
 }
 
+std::string OpenLiveStacker::log_queues()
+{
+    std::vector<std::pair<queue_pointer_type,std::string> > queues = {
+        { video_generator_queue_, "video_generator" },
+        { video_display_queue_, "video_display" },
+        { preprocessor_queue_, "preprocessor" },
+        { stacker_queue_, "stacker" },
+        { pp_queue_, "pp" },
+        { stack_display_queue_, "stack_display" },
+        { debug_save_queue_, "debug_save" },
+        { stacker_stats_queue_, "stacker_stats" },
+        { plate_solving_queue_, "plate_solving" }
+    };
 
+    std::ostringstream ss;
+    for(auto &p:queues) {
+        size_t size = p.first->size();
+        if(size > 0) {
+            ss<<std::setw(5) << size << " " << p.second << "\n";
+        }
+    }
+    return ss.str(); 
+}
 OpenLiveStacker::~OpenLiveStacker()
 {
 }
@@ -182,6 +205,11 @@ void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
     if(video_generator_queue_->items > 10) {
         dropped_since_last_update_ ++;
         BOOSTER_WARNING("stacker") << "Processing is overloaded, dropping frame #" << (++dropped_);
+        auto now = booster::ptime::now();
+        if(booster::ptime::to_number(now - last_dropped_frame_ts_) > 1.0) {
+            BOOSTER_WARNING("stacker") << "Queues status\n" << log_queues();
+            last_dropped_frame_ts_ = now;
+        }
         return;
     }
     std::shared_ptr<CameraFrame> frame(new CameraFrame());

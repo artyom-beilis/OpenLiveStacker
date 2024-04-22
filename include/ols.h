@@ -57,6 +57,8 @@ namespace ols {
             return received_;
         }
 
+        std::string log_queues();
+
     private:
         void stop();
         void handle_video_frame(CamFrame const &cf);
@@ -82,6 +84,7 @@ namespace ols {
 
         int dropped_ = 0;
         int dropped_since_last_update_ = 0;
+        booster::ptime last_dropped_frame_ts_ = booster::ptime::now();
         booster::ptime last_frame_ts_;
         double max_framerate_ = 0;
         static std::atomic<int> received_;

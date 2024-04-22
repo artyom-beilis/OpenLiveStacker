@@ -47,7 +47,7 @@ namespace ols {
             if(!data_.empty()) {
                 auto &last = data_.back();
                 // replace last item if exactly the same type
-                if(std::dynamic_pointer_cast<std::shared_ptr<ItemType> >(last)) {
+                if(std::dynamic_pointer_cast<ItemType>(last)) {
                     last = p;
                     return;
                 }
@@ -58,6 +58,11 @@ namespace ols {
             ++items;
             data_.push(p);
             cond_.notify_one();
+        }
+        size_t size() 
+        {
+            std::unique_lock<std::mutex> guard(lock_);
+            return data_.size();
         }
 
         void push(T const &v)
