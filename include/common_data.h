@@ -1,5 +1,10 @@
 #pragma once
 namespace ols {
+    enum StackMethod {
+        stack_calibration,
+        stack_dso,
+        stack_planetary
+    };
     struct StretchInfo {
         double cut = 0;
         double gain = 1.0;

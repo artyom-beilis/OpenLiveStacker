@@ -113,11 +113,19 @@ namespace ols {
             cmd->bin = cam_->stream_format().bin;
             cmd->width = format.width;
             cmd->height = format.height;
-            cmd->calibration = content_.get("type","dso") == "calibration";
+            std::string method = content_.get("type","dso");
+            if(method == "dso")
+                cmd->method = stack_dso;
+            else if(method == "calibration")
+                cmd->method = stack_calibration;
+            else if(method == "planetary")
+                cmd->method = stack_planetary;
+            else
+                throw std::runtime_error("Unsupported stacking method:" + method);
             cmd->name = content_.get<std::string>("name");
             validate_name(cmd->name);
             cmd->save_inputs = content_.get("save_data",false);
-            if(!cmd->calibration) {
+            if(cmd->method != stack_calibration) {
                 if(!cmd->name.empty())
                     cmd->name += "_";
                 cmd->name += ftime("%Y%m%d_%H%M%S",time(nullptr));
@@ -143,6 +151,11 @@ namespace ols {
             cmd->lon = content_.get("location.lon",cmd->lon);
             cmd->ra = content_.get("target.ra",cmd->ra);
             cmd->de = content_.get("target.de",cmd->de);
+            cmd->deconv_sig = content_.get("deconv_sig",cmd->deconv_sig);
+            cmd->deconv_iters = content_.get("deconv_iters",cmd->deconv_iters);
+            cmd->unsharp_sig = content_.get("unsharp_sig",cmd->unsharp_sig);
+            cmd->unsharp_strength = content_.get("unsharp_strength",cmd->unsharp_strength);
+            
             cmd->synthetic_exposure_mpl = content_.get("synthetic_exposure_mpl",cmd->synthetic_exposure_mpl);
             cmd->remove_gradient = content_.get("remove_gradient",cmd->remove_gradient);
             cmd->derotate_mirror = content_.get("image_flip",cmd->derotate_mirror);

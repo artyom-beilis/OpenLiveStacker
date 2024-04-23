@@ -448,7 +448,7 @@ namespace ols {
                 mono_ = ctl->mono;
                 channels_ = mono_ ? 1 : 3;
                 cv_type_ = mono_ ? CV_32FC1 : CV_32FC3;
-                calibration_ = ctl->calibration;
+                calibration_ = ctl->method == stack_calibration;
                 synthetic_exposure_mpl_ = 1;
                 synthetic_frame_ = cv::Mat();
                 synthetic_exposure_count_ = 0;

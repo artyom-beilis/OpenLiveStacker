@@ -129,7 +129,7 @@ namespace ols {
                 version_ = 0;
                 channels_ = mono_ ? 1 : 3;
                 cv_type_ = mono_ ? CV_32FC1 : CV_32FC3;
-                calibration_ = ctl->calibration;
+                calibration_ = ctl->method == stack_calibration;
                 dropped_count_ = 0;
                 stacker_.reset();
                 if(calibration_) {

@@ -23,7 +23,8 @@ namespace ols {
             stats_(stats),
             plate_solving_(plate_solving),
             data_dir_(data_dir),
-            pp_(new PostProcessor())
+            //pp_(new PostProcessor())
+            pp_(new PlanetaryPostProcessor())
         {
         }
         void run()
@@ -283,13 +284,19 @@ namespace ols {
                 mono_ = ctl->mono;
                 saved_count_ = 0;
                 version_ = 0;
-                calibration_ = ctl->calibration;
+                calibration_ = ctl->method == stack_calibration;
                 output_path_ = ctl->output_path;
                 name_ = ctl->name;
                 dropped_count_ = 0;
                 stack_info_ = *ctl;
                 last_frame_ = nullptr;
+                if(ctl->method == stack_planetary)
+                    pp_.reset(new PlanetaryPostProcessor());
+                else if(ctl->method == stack_calibration || ctl->method == stack_dso)
+                    pp_.reset(new PostProcessor());
                 pp_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
+                pp_->set_deconv(ctl->deconv_sig,ctl->deconv_iters);
+                pp_->set_unsharp_mask(ctl->unsharp_sig,ctl->unsharp_strength);
                 if(out_) {
                     out_->push(generate_dummy_frame());
                 }
@@ -318,6 +325,8 @@ namespace ols {
             case StackerControl::ctl_update:
                 if(!calibration_) {
                     pp_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
+                    pp_->set_deconv(ctl->deconv_sig,ctl->deconv_iters);
+                    pp_->set_unsharp_mask(ctl->unsharp_sig,ctl->unsharp_strength);
                     BOOSTER_INFO("stacker") << "Getting to stretch settings in stacker auto="<<ctl->auto_stretch << " low="<<ctl->stretch_low << " high=" << ctl->stretch_high << " gamma=" << ctl->stretch_gamma;
                     if(last_frame_) {
                         auto frames = handle_video(last_frame_);
@@ -349,7 +358,7 @@ namespace ols {
         cv::Mat cframe_;
         int cframe_count_;
         int dropped_count_ = 0;
-        std::unique_ptr<PostProcessor> pp_;
+        std::unique_ptr<PostProcessorBase> pp_;
         std::shared_ptr<StackedFrame> last_frame_;
         int saved_count_ = 0;
         StackerControl stack_info_;

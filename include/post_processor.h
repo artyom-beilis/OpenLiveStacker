@@ -12,38 +12,25 @@
 #include <opencv2/imgcodecs.hpp>
 #endif
 
-
 namespace ols {
-
-    struct PostProcessor {
+    class PostProcessorBase {
     public:
-        float high_per_=99.99f;
-        double gamma_limit_ = 4.0;
-        double mean_target_ = 0.25;
-        static constexpr int hist_bins=1024;
-        int counters_[hist_bins];
         
-
-        PostProcessor()
+        virtual void set_stretch(bool /*auto_stretch*/,float /*low_index*/,float /*high_index*/,float /*stretch_index*/) 
         {
-            set_stretch(true,0,0,0.5f);
+        }
+        virtual void set_deconv(float /*sigma*/,int /*iterations*/) 
+        {
+        }
+        virtual void set_unsharp_mask(float /*sigma*/,float /*strength*/)
+        {
+        }
+        virtual std::vector<int> get_histogramm() {
+            return std::vector<int>();
         }
 
-        void set_stretch(bool auto_stretch,float low_index,float high_index,float stretch_index)
-        {
-            enable_stretch_ = auto_stretch;
-            
-            high_cut_ = std::max(1.0f,std::min(32.0f,high_index));
-            low_cut_  = std::min(high_cut_ - 0.001f,std::max(0.0f,low_index));
-            target_gamma_ = std::max(1.0f,std::min(8.0f,stretch_index));
-        }
-
-        std::vector<int> get_histogramm()
-        {
-            std::vector<int> res(counters_,counters_+hist_bins);
-            return res;
-        }
-       
+        virtual std::pair<cv::Mat,StretchInfo> post_process_image(cv::Mat raw_image,cv::Rect fully_stacked_area) = 0;
+        virtual ~PostProcessorBase() {}
 
         static double tdiff(std::chrono::time_point<std::chrono::high_resolution_clock> const &a,
                             std::chrono::time_point<std::chrono::high_resolution_clock> const &b)
@@ -51,6 +38,8 @@ namespace ols {
             double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(b-a).count();
             return time * 1000;
         }
+
+
 
         float sum_rgb_line(float *p,int N,float line_sums[3])
         {
@@ -95,22 +84,40 @@ namespace ols {
             return maxv;
         }
 
-        void scale_mono_and_clip(cv::Mat &m,float f1)
+
+        void calc_wb(cv::Mat img,float scale[3])
         {
-            float *p = (float *)m.data;
-            int N = m.rows*m.cols;
-            int i=0;
-#ifdef USE_CV_SIMD
-            cv::v_float32x4 w = cv::v_setall_f32(f1);
-            cv::v_float32x4 zero = cv::v_setzero_f32();
-            cv::v_float32x4 one  = cv::v_setall_f32(1.0f);
-            int limit = N/4*4;
-            for(;i<limit;i+=4,p+=4) {
-                cv::v_store(p,cv::v_max(zero,cv::v_min(one,cv::v_load(p+0)*w)));
+            float *base = (float*)img.data;
+            int stride = img.step1(0);
+            int rows = img.rows;
+            int cols = img.cols;
+            float maxV = 0;
+            scale[0]=scale[1]=scale[2] = 0;
+            for(int r=0;r<rows;r++) {
+                float *p = base + stride*r;
+                float line_max = sum_rgb_line(p,cols*3,scale);
+                maxV = std::max(maxV,line_max);
             }
-#endif            
-            for(;i<N;i++,p++) {
-                p[0] = std::max(0.0f,std::min(1.0f,p[0] * f1));
+            // normalize once again
+            float smax = std::max(scale[0],std::max(scale[1],scale[2]));
+            float smin = std::min(scale[0],std::min(scale[1],scale[2]));
+            if(smin > 0) {
+                for(int i=0;i<3;i++)
+                    scale[i] = smax / scale[i];
+            }
+            else {
+                for(int i=0;i<3;i++)
+                    scale[i] = 1.0;
+            }
+            BOOSTER_INFO("stacker") << "WB " << scale[0]<<"," << scale[1] << "," << scale[2];
+        }
+
+        void apply_wb(cv::Mat img,cv::Rect area)
+        {
+            if(img.channels() == 3) {
+                float scale[3];
+                calc_wb(img(area),scale);
+                scale_rgb_and_clip(img,scale[0],scale[1],scale[2]);
             }
         }
 
@@ -139,6 +146,209 @@ namespace ols {
                 p[2] = std::max(0.0f,std::min(1.0f,p[2] * f3));
             }
         }
+
+    };
+
+    struct PlanetaryPostProcessor : public PostProcessorBase {
+    public:
+        PlanetaryPostProcessor() {
+            set_deconv(3,10);
+            set_unsharp_mask(3,1.5);
+        }
+        virtual void set_deconv(float sigma,int iterations) override
+        {
+            int size = std::ceil(sigma)*2+1;
+            deconv_kern_ = limit_kern(size);
+            deconv_sigma_ = sigma;
+            deconv_iters_ = std::max(0,std::min(50,iterations));
+        }
+        virtual void set_unsharp_mask(float sigma,float strength) override
+        {
+            int size = std::ceil(sigma)*2+1;
+            unsharp_size_ = limit_kern(size);
+            unsharp_sigma_ = sigma;
+            unsharp_strength_ = std::max(0.0f,std::min(5.0f,strength));
+        }
+        virtual std::pair<cv::Mat,StretchInfo> post_process_image(cv::Mat raw_image,cv::Rect fully_stacked_area) override
+        {
+            auto p1 = std::chrono::high_resolution_clock::now();
+            cv::Mat img = raw_image.clone();
+            apply_wb(img,fully_stacked_area);
+            stretch(img);
+            auto p2 = std::chrono::high_resolution_clock::now();
+            if(deconv_kern_ > 1 && deconv_iters_ > 1) {
+                apply_deconv(img);
+            }
+            auto p3 = std::chrono::high_resolution_clock::now();
+            if(unsharp_size_ > 1 && unsharp_strength_ > 0.0f) {
+                apply_unsharp(img);
+            }
+            auto p4 = std::chrono::high_resolution_clock::now();
+            BOOSTER_INFO("stacker") << "Planetary post processing wb/stretch:" << tdiff(p1,p2) <<" ms, deconvolution " << tdiff(p2,p3) << "ms, unsharp " << tdiff(p3,p4) <<" ms";
+            return std::make_pair(img,StretchInfo());
+        }
+        void stretch(cv::Mat &img)
+        {
+            double maxV=1.0;
+            cv::minMaxLoc(img.reshape(1),nullptr,&maxV);
+            double scale = 1.0 / maxV * 0.8;
+            if(scale > 1.0) {
+                img = img.mul(cv::Scalar::all(scale));
+                fprintf(stderr,"Scale=%f\n",scale);
+            }
+        }
+    private:
+        void mpl_eps_clip(cv::Mat &am,cv::Mat &bm,float eps)
+        {
+            int N = am.channels()*am.rows*am.cols;
+            int i=0;
+            float *a=reinterpret_cast<float*>(am.data);
+            float *b=reinterpret_cast<float*>(bm.data);
+            #ifdef USE_CV_SIMD
+            int limit = N/4*4;
+            cv::v_float32x4 veps = cv::v_setall_f32(eps);
+            cv::v_float32x4 zero = cv::v_setall_f32(0.0f);
+            cv::v_float32x4 one  = cv::v_setall_f32(1.0f);
+            for(;i<limit;i+=4) {
+                cv::v_float32x4 val =  cv::v_load(a+i) * (cv::v_load(b+i) + veps);
+                val = cv::v_max(zero,cv::v_min(one,val));
+                cv::v_store(a+i,val);
+            }
+            #endif
+            for(;i<N;i++) {
+                a[i]=std::max(0.0f,std::min(1.0f,a[i]*(b[i]+eps)));
+            }
+        }
+        void devide_eps(cv::Mat am,cv::Mat bm,cv::Mat &cm,float eps)
+        {
+            cm.create(am.rows,am.cols,am.channels()==1 ? CV_32FC1 : CV_32FC3);
+            int N = am.channels()*am.rows*am.cols;
+            int i=0;
+            float *a=reinterpret_cast<float*>(am.data);
+            float *b=reinterpret_cast<float*>(bm.data);
+            float *c=reinterpret_cast<float*>(cm.data);
+            #ifdef USE_CV_SIMD
+            int limit = N/4*4;
+            cv::v_float32x4 veps = cv::v_setall_f32(eps);
+            for(;i<limit;i+=4) {
+                cv::v_float32x4 val =  cv::v_load(a+i) / (cv::v_load(b+i) + veps);
+                cv::v_store(c+i,val);
+            }
+            #endif
+            for(;i<N;i++) {
+                c[i]=a[i]/(b[i]+eps);
+            }
+        }
+        void apply_unsharp(cv::Mat &image)
+        {
+            cv::Mat blur;
+            cv::GaussianBlur(image,blur,cv::Size(unsharp_size_,unsharp_size_),unsharp_sigma_);
+            int N = image.channels()*image.rows*image.cols;
+            int i=0;
+            float *a=reinterpret_cast<float*>(image.data);
+            float *b=reinterpret_cast<float*>(blur.data);
+            float iw = unsharp_strength_ + 1.0f;
+            #ifdef USE_CV_SIMD
+            int limit = N/4*4;
+            cv::v_float32x4 zero = cv::v_setzero_f32();
+            cv::v_float32x4 one  = cv::v_setall_f32(1.0f);
+            cv::v_float32x4 iw_v = cv::v_setall_f32(iw);
+            cv::v_float32x4 s_v  = cv::v_setall_f32(unsharp_strength_);
+            for(;i<limit;i+=4) {
+                cv::v_float32x4 val =  cv::v_load(a+i) * iw_v - cv::v_load(b+i)*s_v;
+                val = cv::v_max(zero,cv::v_min(one,val));
+                cv::v_store(a+i,val);
+            }
+            #endif
+            for(;i<N;i++) {
+                float val = iw * a[i] - unsharp_strength_ * b[i];
+                val = std::max(0.0f,std::min(1.0f,val));
+                a[i] = val;
+            }
+            
+        }
+
+        // Richardson-Lucy deconvolution
+        void apply_deconv(cv::Mat &image)
+        {
+            cv::Mat im_deconv(image.rows,image.cols,image.channels() == 3 ? CV_32FC3 : CV_32FC1,cv::Scalar::all(0.5));
+            cv::Mat conv,relative_blur,tmp;
+            float eps = 1e-12;
+            cv::Size ksize(deconv_kern_,deconv_kern_);
+            for(int i=0;i<deconv_iters_;i++) {
+                // psf blur
+                cv::GaussianBlur(im_deconv,conv,ksize,deconv_sigma_);
+                // relative_blur = image/(conv+eps)
+                devide_eps(image,conv,relative_blur,eps);
+                // psf' blur - gaussian kernel is symmetric
+                cv::GaussianBlur(relative_blur,tmp,ksize,deconv_sigma_);
+                // im_deconv = clip(im_deconv * (tmp+eps),0,1)
+                mpl_eps_clip(im_deconv,tmp,eps);  
+            }
+            image = im_deconv;
+        }
+        int limit_kern(int size)
+        {
+            return std::max(1,std::min(11,(size % 2)*2 + 1));
+        }
+        int deconv_kern_ = 1;
+        float deconv_sigma_ = 1.0f;
+        int deconv_iters_ = 1;
+
+        int unsharp_size_ = 1;
+        float unsharp_sigma_ = 1.0f;
+        float unsharp_strength_ = 0.0f;
+    };
+
+    struct PostProcessor : public PostProcessorBase{
+    public:
+        float high_per_=99.99f;
+        double gamma_limit_ = 4.0;
+        double mean_target_ = 0.25;
+        static constexpr int hist_bins=1024;
+        int counters_[hist_bins];
+        
+
+        PostProcessor()
+        {
+            set_stretch(true,0,0,0.5f);
+        }
+
+        void set_stretch(bool auto_stretch,float low_index,float high_index,float stretch_index) override
+        {
+            enable_stretch_ = auto_stretch;
+            
+            high_cut_ = std::max(1.0f,std::min(32.0f,high_index));
+            low_cut_  = std::min(high_cut_ - 0.001f,std::max(0.0f,low_index));
+            target_gamma_ = std::max(1.0f,std::min(8.0f,stretch_index));
+        }
+
+        std::vector<int> get_histogramm() override
+        {
+            std::vector<int> res(counters_,counters_+hist_bins);
+            return res;
+        }
+       
+
+        void scale_mono_and_clip(cv::Mat &m,float f1)
+        {
+            float *p = (float *)m.data;
+            int N = m.rows*m.cols;
+            int i=0;
+#ifdef USE_CV_SIMD
+            cv::v_float32x4 w = cv::v_setall_f32(f1);
+            cv::v_float32x4 zero = cv::v_setzero_f32();
+            cv::v_float32x4 one  = cv::v_setall_f32(1.0f);
+            int limit = N/4*4;
+            for(;i<limit;i+=4,p+=4) {
+                cv::v_store(p,cv::v_max(zero,cv::v_min(one,cv::v_load(p+0)*w)));
+            }
+#endif            
+            for(;i<N;i++,p++) {
+                p[0] = std::max(0.0f,std::min(1.0f,p[0] * f1));
+            }
+        }
+
 
         void offset_scale_and_clip(cv::Mat &m,float offset,float scale)
         {
@@ -195,21 +405,13 @@ namespace ols {
             }
         }
 
-        std::pair<cv::Mat,StretchInfo> post_process_image(cv::Mat raw_image,cv::Rect fully_stacked_area)
+        std::pair<cv::Mat,StretchInfo> post_process_image(cv::Mat raw_image,cv::Rect fully_stacked_area) override
         {
             typedef  std::chrono::time_point<std::chrono::high_resolution_clock> tp;
-            tp raw  = std::chrono::high_resolution_clock::now();
             cv::Mat tmp = raw_image.clone();
-            
             tp start = std::chrono::high_resolution_clock::now();
-            tp wb_coeff,wb_apply;
-            if(raw_image.channels() == 3) {
-                float scale[3];
-                calc_wb(tmp(fully_stacked_area),scale);
-                wb_coeff = std::chrono::high_resolution_clock::now();
-                scale_rgb_and_clip(tmp,scale[0],scale[1],scale[2]);
-                wb_apply = std::chrono::high_resolution_clock::now();
-            }
+            apply_wb(tmp,fully_stacked_area);
+            tp wb_apply = std::chrono::high_resolution_clock::now();
             double gscale=1.0;
             double goffset = 0.0;
             double mean = 0.5;
@@ -235,7 +437,7 @@ namespace ols {
             }
             tp apply_stretch =  std::chrono::high_resolution_clock::now();
 
-            BOOSTER_INFO("stacker") << "get img=" << tdiff(raw,start) << "ms calc wb=" << tdiff(start,wb_coeff) <<"ms apply wb=" << tdiff(wb_coeff,wb_apply) << "ms calc stretch" << tdiff(wb_apply,calc_stretch) 
+            BOOSTER_INFO("stacker") << "apply wb=" << tdiff(start,wb_apply) << "ms calc stretch" << tdiff(wb_apply,calc_stretch) 
                 << "ms stretch="<<tdiff(calc_stretch,apply_stretch) << "ms";
 
             StretchInfo stretch;
@@ -321,32 +523,6 @@ namespace ols {
             BOOSTER_INFO("stacker") << "Scale " << scale << " offset=" << (-offset) << " relative cut =" << (-offset*scale) ;
         }
 
-        void calc_wb(cv::Mat img,float scale[3])
-        {
-            float *base = (float*)img.data;
-            int stride = img.step1(0);
-            int rows = img.rows;
-            int cols = img.cols;
-            float maxV = 0;
-            scale[0]=scale[1]=scale[2] = 0;
-            for(int r=0;r<rows;r++) {
-                float *p = base + stride*r;
-                float line_max = sum_rgb_line(p,cols*3,scale);
-                maxV = std::max(maxV,line_max);
-            }
-            // normalize once again
-            float smax = std::max(scale[0],std::max(scale[1],scale[2]));
-            float smin = std::min(scale[0],std::min(scale[1],scale[2]));
-            if(smin > 0) {
-                for(int i=0;i<3;i++)
-                    scale[i] = smax / scale[i];
-            }
-            else {
-                for(int i=0;i<3;i++)
-                    scale[i] = 1.0;
-            }
-            BOOSTER_INFO("stacker") << "WB " << scale[0]<<"," << scale[1] << "," << scale[2];
-        }
 
 
         bool enable_stretch_ = true;

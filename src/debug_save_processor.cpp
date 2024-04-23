@@ -125,7 +125,7 @@ namespace ols {
                     v["darks"] = ctl->darks_path;
                     v["flats"] = ctl->flats_path;
                     v["dark_flats"] = ctl->dark_flats_path;
-                    v["calibration"] = ctl->calibration;
+                    v["method"] = std::vector<std::string>({"calibration","dso","planetary"}).at(ctl->method);
                     v["derotate"] = ctl->derotate;
                     v["derotate_mirror"] = ctl->derotate_mirror;
                     v["remove_gradient"] = ctl->remove_gradient;
@@ -133,6 +133,12 @@ namespace ols {
                     v["de"] = ctl->de;
                     v["lat"] = ctl->lat;
                     v["lon"] = ctl->lon;
+                    
+                    v["deconv_sig"] = ctl->deconv_sig;
+                    v["deconv_iters"] = ctl->deconv_iters;
+                    v["unsharp_sig"] = ctl->unsharp_sig;
+                    v["unsharp_strength"] = ctl->unsharp_strength;
+
                     v["source_gamma"] = ctl->source_gamma;
                     v["auto_stretch"] = ctl->auto_stretch;
                     v["stretch_low"] = ctl->stretch_low;

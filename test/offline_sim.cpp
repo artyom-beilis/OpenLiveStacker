@@ -128,7 +128,17 @@ namespace ols {
             cfg.height = v.get<int>("height");
             cfg.mono = v.get<bool>("mono",false);
             cfg.synthetic_exposure_mpl = v.get<int>("synthetic_exposure_mpl",cfg.synthetic_exposure_mpl);
-            cfg.calibration = v.get<bool>("calibration");
+            std::string method = v.get("method","undefined");
+            if(method == "undefined")
+                cfg.method = v.get<bool>("calibration") ? stack_calibration : stack_dso;
+            else if(method == "calibration")
+                cfg.method = stack_calibration;
+            else if(method == "dso")
+                cfg.method = stack_dso;
+            else if(method == "planetary")
+                cfg.method = stack_planetary;
+            else
+                throw std::runtime_error("Invalid stack method " + method);
             cfg.derotate = v.get<bool>("derotate");
             cfg.derotate_mirror = v.get<bool>("derotate_mirror");
             cfg.remove_gradient = v.get<bool>("remove_gradient",false);
@@ -147,7 +157,7 @@ namespace ols {
             cfg.remove_satellites = v.get("remove_satellites",cfg.remove_satellites);
             bayer_ = bayer_type_from_str(v.get<std::string>("bayer","NA"));
 
-            if(!cfg.calibration)
+            if(cfg.method != stack_calibration)
                 cfg.output_path =  output_dir_ + "/" + cfg.name;
             else
                 cfg.output_path =  output_dir_;

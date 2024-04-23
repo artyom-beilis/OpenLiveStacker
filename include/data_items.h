@@ -92,7 +92,7 @@ namespace ols {
         int height = 0;
         int synthetic_exposure_mpl = 1;
         bool mono = false; // is mono data
-        bool calibration = false;  /// Collect calibration data
+        StackMethod method = stack_dso;
         bool remove_satellites = false; // apply sat removal algorithm
         bool rollback_on_pause = false; // remove last frame on pause
 
@@ -100,6 +100,11 @@ namespace ols {
         bool derotate_mirror = false; /// inverse direction for mirror image
         bool remove_gradient = false; // remove linear gradient
         double ra=-1,de=-1,lat=-1,lon=-1; /// object data an
+
+        double deconv_sig = 0.0;
+        int    deconv_iters = 10;
+        double unsharp_sig = 0.0;
+        double unsharp_strength = 0.0;
 
         double source_gamma = 1.0; /// to linear space gamma
 
