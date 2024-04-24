@@ -160,14 +160,14 @@ namespace ols {
             int size = std::ceil(sigma)*2+1;
             deconv_kern_ = limit_kern(size);
             deconv_sigma_ = sigma;
-            deconv_iters_ = std::max(0,std::min(50,iterations));
+            deconv_iters_ = std::max(0,std::min(30,iterations));
         }
         virtual void set_unsharp_mask(float sigma,float strength) override
         {
             int size = std::ceil(sigma)*2+1;
             unsharp_size_ = limit_kern(size);
             unsharp_sigma_ = sigma;
-            unsharp_strength_ = std::max(0.0f,std::min(5.0f,strength));
+            unsharp_strength_ = std::max(0.0f,std::min(10.0f,strength));
         }
         virtual std::pair<cv::Mat,StretchInfo> post_process_image(cv::Mat raw_image,cv::Rect fully_stacked_area) override
         {
@@ -289,7 +289,8 @@ namespace ols {
         }
         int limit_kern(int size)
         {
-            return std::max(1,std::min(11,(size % 2)*2 + 1));
+            int new_size = std::max(1,std::min(11,(size / 2)*2 + 1));
+            return new_size;
         }
         int deconv_kern_ = 1;
         float deconv_sigma_ = 1.0f;

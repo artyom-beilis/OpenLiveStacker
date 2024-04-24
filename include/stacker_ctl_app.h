@@ -30,6 +30,7 @@ namespace ols {
             dispatcher().map("POST","/start/?",&StackerControlApp::start,this);
             dispatcher().map("POST","/control/?",&StackerControlApp::control,this);
             dispatcher().map("POST","/stretch/?",&StackerControlApp::stretch,this);
+            dispatcher().map("POST","/sharpen/?",&StackerControlApp::sharpen,this);
             dispatcher().map("GET", "/status/?",&StackerControlApp::status,this);
             dispatcher().map("DELETE", "/calibration/([A-Za-z0-9_.\\-]*)",&StackerControlApp::del_calibration,this,1);
         }
@@ -86,6 +87,16 @@ namespace ols {
             }
             else
                 throw std::runtime_error("Unknown operation " + op);
+            queue_->push(cmd);
+        }
+        void sharpen()
+        {
+            std::shared_ptr<StackerControl> cmd(new StackerControl());
+            cmd->op = StackerControl::ctl_update;
+            cmd->deconv_sig = content_.get("deconv_sig",cmd->deconv_sig);
+            cmd->deconv_iters = content_.get("deconv_iters",cmd->deconv_iters);
+            cmd->unsharp_sig = content_.get("unsharp_sig",cmd->unsharp_sig);
+            cmd->unsharp_strength = content_.get("unsharp_strength",cmd->unsharp_strength);
             queue_->push(cmd);
         }
         void stretch()

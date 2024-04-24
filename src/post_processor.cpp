@@ -328,6 +328,7 @@ namespace ols {
                     pp_->set_deconv(ctl->deconv_sig,ctl->deconv_iters);
                     pp_->set_unsharp_mask(ctl->unsharp_sig,ctl->unsharp_strength);
                     BOOSTER_INFO("stacker") << "Getting to stretch settings in stacker auto="<<ctl->auto_stretch << " low="<<ctl->stretch_low << " high=" << ctl->stretch_high << " gamma=" << ctl->stretch_gamma;
+                    BOOSTER_INFO("stacker") << "New deconf config " << ctl->deconv_sig << "," << ctl->deconv_iters << " unsharp " << ctl->unsharp_sig << "," << ctl->unsharp_strength;
                     if(last_frame_) {
                         auto frames = handle_video(last_frame_);
                         auto res = frames.first;

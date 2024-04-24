@@ -4,6 +4,8 @@ var global_height = 0;
 var global_bin = 0;
 var global_download_progress = null;
 var global_zoom = 1.0;
+var g_sharpen_sent = 0.0;
+var g_sharpen_delay = false;
 var g_stacker_status = 'closed';
 var g_show_thumb_live = false;
 var g_stats = null;
@@ -319,13 +321,17 @@ function listCameras(cameras)
 function updateStackSelect()
 {
     var type = getVal('type');
-    var elements = document.getElementsByClassName('dso_config');
-    var new_style = type == 'dso' ? '' : 'none';
+    var elements = document.getElementsByClassName('stack_opt');
     for(var i=0;i<elements.length;i++) {
-        elements[i].style.display = new_style;
+        elements[i].style.display = 'none';
     }
-    new_style = type != 'dso' ? '' : 'none';
-    elements = document.getElementsByClassName('calib_config');
+    if(type == 'dso')
+        elements = document.getElementsByClassName('dso_config');
+    else if(type == 'calibration')
+        elements = document.getElementsByClassName('calib_config');
+    else if(type == 'planetary')
+        elements = document.getElementsByClassName('plan_config');
+    new_style = '';
     for(var i=0;i<elements.length;i++) {
         elements[i].style.display = new_style;
     }
@@ -367,8 +373,10 @@ function changeStackerStatus(new_status)
         save: false,
         live: false,
         pp: false,
+        sharp: false,
         stats: false
     };
+    var type = getVal('type');
     if(new_status == 'closed') {
         ui_ctl.stack = false;
         ui_ctl.solve = false;
@@ -378,6 +386,7 @@ function changeStackerStatus(new_status)
         ui_ctl.save=false;
         ui_ctl.cancel=false;
         ui_ctl.pp=false;
+        ui_ctl.shapr=false;
         ui_ctl.live = false;
         ui_ctl.stats = false;
     }
@@ -394,6 +403,7 @@ function changeStackerStatus(new_status)
         ui_ctl.save=false;
         ui_ctl.cancel=false;
         ui_ctl.pp=false;
+        ui_ctl.sharp=false;
         ui_ctl.live = false;
         ui_ctl.stats = false;
     }
@@ -408,7 +418,8 @@ function changeStackerStatus(new_status)
         ui_ctl.pause = true;
         ui_ctl.resume = false;
         ui_ctl.save = true;
-        ui_ctl.pp = true;
+        ui_ctl.pp = type == 'dso';
+        ui_ctl.sharp = type == 'planetary';
         ui_ctl.live = true;
         ui_ctl.stats = true;
     }
@@ -422,7 +433,8 @@ function changeStackerStatus(new_status)
         ui_ctl.cancel = true;
         ui_ctl.resume = true;
         ui_ctl.save = true;
-        ui_ctl.pp = true;
+        ui_ctl.pp = type == 'dso';
+        ui_ctl.sharp = type == 'planetary';
         ui_ctl.live = true;
         ui_ctl.stats = true;
     }
@@ -1191,6 +1203,7 @@ function openConfigTab(name)
         config: showConfig,
         stack : showStack,
         pp:     showPP,
+        sharp:  showSharp,
         solve:  showSolve
     };
     for(var n in tabCtl) {
@@ -1206,6 +1219,20 @@ function showStack(v)
         loadCalibFrames();
     }
 	document.getElementById('stack').style.display = v ? 'inline' : 'none';
+}
+
+function showSharp(v)
+{
+	document.getElementById('sharp_control').style.display = v ? 'inline' : 'none';
+}
+
+function updateShrapCtl(base_id,digits,value)
+{
+    var sv=parseFloat(value).toFixed(digits);
+    document.getElementById("out_" + base_id).value = sv;
+    if(g_stacker_status == 'stacking' || g_stacker_status == 'paused') { 
+        updateSharpen();
+    }
 }
 
 function showPP(v)
@@ -1335,6 +1362,34 @@ function updateAutoPP()
 }
 
 
+function configSharpenning(config)
+{
+    config.deconv_sig = parseFloat(getVal("deconv_sigma")); 
+    config.deconv_iters = parseInt(getVal("deconv_iters"));
+    config.unsharp_sig = parseFloat(getVal("unsharp_sigma"));
+    config.unsharp_strength = parseFloat(getVal("unsharp_strenght"));
+}
+
+function updateSharpen()
+{
+    var config={};
+    configSharpenning(config);
+    var now = new Date().getTime();
+    if(now - g_sharpen_sent >= 2000) {
+        g_sharpen_sent = now;
+        console.log("Sending sharpen config " + JSON.stringify(config));
+        restCall('post','/api/stacker/sharpen',config,(e)=>{});
+    }
+    else if(!g_sharpen_delay) {
+        var delay = 2000 - (now - g_sharpen_sent);
+        console.log("Sharpen config delay by " + delay); 
+        setTimeout(()=> { 
+            g_sharpen_delay = false;
+            updateSharpen()
+        },delay);
+        g_sharpen_delay = true;
+    }
+}
 
 function updatePP()
 {
@@ -1352,31 +1407,40 @@ function updatePP()
 
 function startStack()
 {
-    var darks = getVal('darks');
-    if(darks == 'N/A') {
-        darks = null;
+    var type = getVal('type');
+    var darks = null,flats = null, dark_flats = null;
+    if(type != 'calibration') {
+        darks = getVal('darks');
+        if(darks == 'N/A') {
+            darks = null;
+        }
+        flats = getVal('flats');
+        if(flats == 'N/A') {
+            flats = null;
+        }
+        dark_flats = getVal('dark_flats');
+        if(dark_flats == 'N/A') {
+            dark_flats = null;
+        }
     }
-    var flats = getVal('flats');
-    if(flats == 'N/A') {
-        flats = null;
+    var ra=null,de=null,lat=null,lon=null,synthetic_exposure_mpl=1;
+    var field_derotation=false,image_flip=false,remove_satellites=false,remove_gradient=false;
+    if(type == 'dso') {
+        ra=parseRA(getVal("ra"));
+        de=parseDEC(getVal("de"));
+        lat = parseFloat(getVal("lat"));
+        lon = parseFloat(getVal("lon"));
+        synthetic_exposure_mpl = parseFloat(getVal("synthetic_exposure_mpl"));
+        field_derotation = getBVal("field_derotation");
+        image_flip =         getBVal("image_flip");
+        remove_satellites =  getBVal("remove_satellites");
+        remove_gradient =    getBVal("remove_gradient");
     }
-    var dark_flats = getVal('dark_flats');
-    if(dark_flats == 'N/A') {
-        dark_flats = null;
-    }
-    var ra=parseRA(getVal("ra"));
-    var de=parseDEC(getVal("de"));
-    var lat = parseFloat(getVal("lat"));
-    var lon = parseFloat(getVal("lon"));
     var delay = getStartDelay();
-    var synthetic_exposure_mpl = parseFloat(getVal("synthetic_exposure_mpl"));
     if(isNaN(synthetic_exposure_mpl))
         synthetic_exposure_mpl = 1
     var rollback_on_pause = delay > 0;
-    var field_derotation = getBVal("field_derotation");
-    var type = getVal('type');
-    var calib = type != 'dso';
-    if(field_derotation && !calib) {
+    if(field_derotation && type=='dso') {
         if(isNaN(lat) || isNaN(lon)) {
             showError('Need Geolocation for derotation support\n(see settings-general menu)');
             return;
@@ -1394,7 +1458,7 @@ function startStack()
     var name = getVal('name').trim();
     var obj = getVal('object').trim();
 
-    if(!calib) {
+    if(type != 'dso') {
         if(name == '')
             name = obj;
         else if(obj != '')
@@ -1406,7 +1470,7 @@ function startStack()
         showError('Name and Object should contain only English letters, digits, "_", "-" and "."')
         return;
     }
-    if(calib && name=='') {
+    if(type == 'calibration' && name=='') {
         showError('Provide name for calibration frame');
         return;
     }
@@ -1416,9 +1480,9 @@ function startStack()
         save_data:          getBVal("save_data"),
         field_derotation:   field_derotation,
         synthetic_exposure_mpl: synthetic_exposure_mpl,
-        image_flip:         getBVal("image_flip"),
-        remove_satellites:  getBVal("remove_satellites"),
-        remove_gradient:    getBVal("remove_gradient"),
+        image_flip:         image_flip,
+        remove_satellites:  remove_satellites,
+        remove_gradient:    remove_gradient,
         rollback_on_pause:  rollback_on_pause,
         auto_stretch:       getBVal("auto_stretch"),
         stretch_low:        g_stretch.cut,
@@ -1438,11 +1502,13 @@ function startStack()
         dark_flats : dark_flats
     };
 
+    configSharpenning(config);
+
     var doStackFunc = ()=> {
         restCall('post','/api/stacker/start',config,(e)=>{
             changeStackerStatus('stacking');
             showStack(false);
-            if(delay > 0 && !calib) {
+            if(delay > 0 && type!='calibration') {
                 showThumbLive(true);
             }
         });

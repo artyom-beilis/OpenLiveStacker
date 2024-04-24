@@ -39,6 +39,10 @@
         background: url(/media/img/stretch.png) no-repeat center center;
         background-size: 10mm 10mm;
     }
+    .sharp_background {
+        background: url(/media/img/sharp.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
     .solve_background {
         background: url(/media/img/solve.png) no-repeat center center;
         background-size: 10mm 10mm;
@@ -132,6 +136,13 @@
         right:0;
         padding:0 0 0 0;
         z-index:-2;
+    }
+    .range_inp {
+        width:50%;
+    }
+    .range_title {
+        display: inline-block;
+        width:20%;
     }
     .config_div {
         position:absolute;
