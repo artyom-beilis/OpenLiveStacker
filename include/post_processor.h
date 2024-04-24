@@ -176,15 +176,17 @@ namespace ols {
             apply_wb(img,fully_stacked_area);
             stretch(img);
             auto p2 = std::chrono::high_resolution_clock::now();
+            gauss_time_ = 0;
             if(deconv_kern_ > 1 && deconv_iters_ > 1) {
                 apply_deconv(img);
             }
+            double deconv_g = gauss_time_;
             auto p3 = std::chrono::high_resolution_clock::now();
             if(unsharp_size_ > 1 && unsharp_strength_ > 0.0f) {
                 apply_unsharp(img);
             }
             auto p4 = std::chrono::high_resolution_clock::now();
-            BOOSTER_INFO("stacker") << "Planetary post processing wb/stretch:" << tdiff(p1,p2) <<" ms, deconvolution " << tdiff(p2,p3) << "ms, unsharp " << tdiff(p3,p4) <<" ms";
+            BOOSTER_INFO("stacker") << "Planetary post processing wb/stretch:" << tdiff(p1,p2) <<" ms, deconvolution " << tdiff(p2,p3) << "ms (blur " << deconv_g << " ms) , unsharp " << tdiff(p3,p4) <<" ms";
             return std::make_pair(img,StretchInfo());
         }
         void stretch(cv::Mat &img)
@@ -239,10 +241,19 @@ namespace ols {
                 c[i]=a[i]/(b[i]+eps);
             }
         }
+
+        void gaussian_blur(cv::Mat src,cv::Mat &tgt,int size,float sigma)
+        {
+            auto start =  std::chrono::high_resolution_clock::now();
+            cv::GaussianBlur(src,tgt,cv::Size(size,size),sigma);
+            auto end =  std::chrono::high_resolution_clock::now();
+            gauss_time_ += tdiff(start,end);
+        }
+
         void apply_unsharp(cv::Mat &image)
         {
             cv::Mat blur;
-            cv::GaussianBlur(image,blur,cv::Size(unsharp_size_,unsharp_size_),unsharp_sigma_);
+            gaussian_blur(image,blur,unsharp_size_,unsharp_sigma_);
             int N = image.channels()*image.rows*image.cols;
             int i=0;
             float *a=reinterpret_cast<float*>(image.data);
@@ -274,14 +285,13 @@ namespace ols {
             cv::Mat im_deconv(image.rows,image.cols,image.channels() == 3 ? CV_32FC3 : CV_32FC1,cv::Scalar::all(0.5));
             cv::Mat conv,relative_blur,tmp;
             float eps = 1e-12;
-            cv::Size ksize(deconv_kern_,deconv_kern_);
             for(int i=0;i<deconv_iters_;i++) {
                 // psf blur
-                cv::GaussianBlur(im_deconv,conv,ksize,deconv_sigma_);
+                gaussian_blur(im_deconv,conv,deconv_kern_,deconv_sigma_);
                 // relative_blur = image/(conv+eps)
                 devide_eps(image,conv,relative_blur,eps);
                 // psf' blur - gaussian kernel is symmetric
-                cv::GaussianBlur(relative_blur,tmp,ksize,deconv_sigma_);
+                gaussian_blur(relative_blur,tmp,deconv_kern_,deconv_sigma_);
                 // im_deconv = clip(im_deconv * (tmp+eps),0,1)
                 mpl_eps_clip(im_deconv,tmp,eps);  
             }
@@ -299,6 +309,7 @@ namespace ols {
         int unsharp_size_ = 1;
         float unsharp_sigma_ = 1.0f;
         float unsharp_strength_ = 0.0f;
+        double gauss_time_ = 0.0;
     };
 
     struct PostProcessor : public PostProcessorBase{
