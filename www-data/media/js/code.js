@@ -1372,23 +1372,32 @@ function configSharpenning(config)
 
 function updateSharpen()
 {
-    var config={};
-    configSharpenning(config);
+    g_sharpen_sent = new Date().getTime();
+    if(g_sharpen_delay)
+        return;
+    updateSharpenCheckSetTimeout(2100.0);
+}
+
+function updateSharpenCheckSetTimeout(to)
+{
+    g_sharpen_delay = true;
+    setTimeout(()=> { 
+            g_sharpen_delay = false;
+            updateSharpenCheck();
+    },to);
+}
+
+function updateSharpenCheck()
+{
     var now = new Date().getTime();
-    if(now - g_sharpen_sent >= 2000) {
-        g_sharpen_sent = now;
+    var reminder = now - g_sharpen_sent;
+    if(reminder >= 2000) {
+        configSharpenning(config);
         console.log("Sending sharpen config " + JSON.stringify(config));
         restCall('post','/api/stacker/sharpen',config,(e)=>{});
+        return;
     }
-    else if(!g_sharpen_delay) {
-        var delay = 2000 - (now - g_sharpen_sent);
-        console.log("Sharpen config delay by " + delay); 
-        setTimeout(()=> { 
-            g_sharpen_delay = false;
-            updateSharpen()
-        },delay);
-        g_sharpen_delay = true;
-    }
+    updateSharpenCheckSetTimeout(2100 - reminder);
 }
 
 function updatePP()
