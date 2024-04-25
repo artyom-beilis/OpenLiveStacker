@@ -69,9 +69,38 @@
     <tr class="dso_config stack_opt" ><td>Remove Gradient</td><td><input class="saved_input" id="stack_remove_gradient" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Remove Satellites</td><td><input class="saved_input" id="stack_remove_satellites" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Target</td><td>RA:<input class="val_input" id="stack_ra" type="text" ></td><td>DE:<input class="val_input" id="stack_de" type="text" ></td></tr>
+
+    <tr class="dso_config stack_opt plan_config" ><td colspan="3" style="text-align:center;"><b>Calibration</b></td></tr>
     <tr class="dso_config stack_opt plan_config" ><td>Darks</td><td colspan="2"><select id="stack_darks" onchange="saveCalibValue(this);" ></select></td></tr>
     <tr class="dso_config stack_opt plan_config" ><td>Flats</td><td colspan="2"><select id="stack_flats" onchange="saveCalibValue(this);"></select></td></tr>
     <tr class="dso_config stack_opt plan_config" ><td>Dark Flats</td><td colspan="2"><select id="stack_dark_flats" onchange="saveCalibValue(this); "></select></td></tr>
+    
+    <tr class="dso_config stack_opt plan_config" ><td colspan="3" style="text-align:center;"><b>Filters</b></td></tr>
+    <tr class="stack_opt plan_config" ><td>Drop First Frames</td><td><input class="saved_input" id="stack_filters_remove_first" type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr class="dso_config stack_opt plan_config" >
+        <td>Min Stat Size</td>
+        <td><input class="saved_input" type="range" id="stack_filters_min_stat_size" min="3" max="30" step="1" value="10" oninput="updateFltSlider('filters_min_stat_size');" ></td>
+        <td><output id="out_filters_min_stat_size">10</output></td>
+    </tr>
+    <tr class="dso_config stack_opt plan_config" >
+        <td>Sharpness %</td>
+        <td><input class="saved_input" type="range" id="stack_filters_sharpness_percentile" min="10" max="100" step="10" value="100" oninput="updateFltSlider('filters_sharpness_percentile');" ></td>
+        <td><output id="out_filters_sharpness_percentile">100</output></td>
+    </tr>
+    <tr class="dso_config stack_opt plan_config" >
+        <td>Reg. Quality %</td>
+        <td><input class="saved_input" type="range" id="stack_filters_reg_score_percentile" min="10" max="100" step="10" value="100" oninput="updateFltSlider('filters_reg_score_percentile');" ></td>
+        <td><output id="out_filters_reg_score_percentile">100</output></td>
+    </tr>
+    <tr class="dso_config stack_opt plan_config" >
+        <td>Brightness Std</td>
+        <td><input class="saved_input" type="range" id="stack_filters_avg_brightness_sigma" min="1" max="5" step="0.5" value="5" oninput="updateFltSlider('filters_avg_brightness_sigma');" ></td>
+        <td><output id="out_filters_avg_brightness_sigma">all</output></td>
+    </tr>
+
+    
+
+    <tr class="dso_config stack_opt plan_config calib_config" ><td colspan="3" style="text-align:center;"><b>Misc</b></td></tr>
     <tr class="stack_opt dso_config calib_config plan_config" ><td>Save All Frames</td><td><input class="saved_input" id="stack_save_data" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr class="calib_config stack_opt" style='display:none'>
         <td>White Screen</td>

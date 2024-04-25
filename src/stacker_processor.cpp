@@ -154,9 +154,11 @@ namespace ols {
                     stacker_.reset(new Stacker(width_,height_,channels_));
                     stacker_->set_remove_satellites(ctl->remove_satellites);
                     stacker_->set_rollback_on_pause(ctl->rollback_on_pause);
-                    if(ctl->method == stack_planetary) {
-                        stacker_->set_filters(true,5,50,50,-1);
-                    }
+                    stacker_->set_filters(ctl->filters.remove_first,
+                                          ctl->filters.min_stat_size,
+                                          ctl->filters.sharpness_percentile,
+                                          ctl->filters.reg_score_percentile,
+                                          ctl->filters.avg_brightness_sigma);
                     restart_ = true;
                 }
                 break;

@@ -109,6 +109,8 @@ namespace ols {
         bool remove_gradient = false; // remove linear gradient
         double ra=-1,de=-1,lat=-1,lon=-1; /// object data an
 
+        Filters filters;
+
         double deconv_sig = 3.0;
         int    deconv_iters = 10;
         double unsharp_sig = 3.0;

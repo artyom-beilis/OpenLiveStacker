@@ -155,6 +155,14 @@ namespace ols {
             cfg.stretch_high = v.get<double>("stretch_high");
             cfg.stretch_gamma = v.get<double>("stretch_gamma");
             cfg.remove_satellites = v.get("remove_satellites",cfg.remove_satellites);
+            
+            cfg.filters.remove_first=v.get("filters.remove_first",cfg.filters.remove_first);
+            cfg.filters.min_stat_size=v.get("filters.min_stat_size",cfg.filters.min_stat_size);
+            cfg.filters.sharpness_percentile=v.get("filters.sharpness_percentile",cfg.filters.sharpness_percentile);
+            cfg.filters.reg_score_percentile=v.get("filters.reg_score_percentile",cfg.filters.reg_score_percentile);
+            cfg.filters.avg_brightness_sigma=v.get("filters.avg_brightness_sigma",cfg.filters.avg_brightness_sigma);
+
+
             bayer_ = bayer_type_from_str(v.get<std::string>("bayer","NA"));
 
             if(cfg.method != stack_calibration)

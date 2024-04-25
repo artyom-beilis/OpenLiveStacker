@@ -145,6 +145,13 @@ namespace ols {
                     v["stretch_high"] = ctl->stretch_high;
                     v["stretch_gamma"] = ctl->stretch_gamma;
                     v["remove_satellites" ] = ctl->remove_satellites;
+                    
+                    v["filters"]["remove_first"] = ctl->filters.remove_first;
+                    v["filters"]["min_stat_size"] = ctl->filters.min_stat_size;
+                    v["filters"]["sharpness_percentile"] = ctl->filters.sharpness_percentile;
+                    v["filters"]["reg_score_percentile"] = ctl->filters.reg_score_percentile;
+                    v["filters"]["avg_brightness_sigma"] = ctl->filters.avg_brightness_sigma;
+
                     std::ofstream info(dirname_ + "/info.json");
                     v.save(info,cppcms::json::readable);
                 }
@@ -162,6 +169,10 @@ namespace ols {
                         v["stretch_low"] = ctl->stretch_low;
                         v["stretch_high"] = ctl->stretch_high;
                         v["stretch_gamma"] = ctl->stretch_gamma;
+                        v["deconv_sig"] = ctl->deconv_sig;
+                        v["deconv_iters"] = ctl->deconv_iters;
+                        v["unsharp_sig"] = ctl->unsharp_sig;
+                        v["unsharp_strength"] = ctl->unsharp_strength;
                         v.save(info,cppcms::json::readable);
                     }
                 }

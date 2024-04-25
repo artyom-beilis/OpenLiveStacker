@@ -1378,6 +1378,14 @@ function updateSharpen()
     updateSharpenCheckSetTimeout(2100.0);
 }
 
+function updateFltSlider(name)
+{
+    var val = document.getElementById('stack_' + name).value;
+    if(name == 'filters_avg_brightness_sigma' && parseFloat(val) == 5)
+        val = 'all';
+    document.getElementById('out_' + name).value = val;
+}
+
 function updateSharpenCheckSetTimeout(to)
 {
     g_sharpen_delay = true;
@@ -1445,6 +1453,24 @@ function startStack()
         remove_satellites =  getBVal("remove_satellites");
         remove_gradient =    getBVal("remove_gradient");
     }
+    var filters = {
+        remove_first:false,
+        min_stat_size:10,
+        sharpness_percentile:100,
+        reg_score_percentile:100,
+        avg_brightness_sigma:-1,
+    };
+    if(type != 'calibration') {
+        if(type == 'planetary') {
+            filters.remove_first = getBVal('filters_remove_first');
+        }
+        filters.min_stat_size = parseInt(getVal('filters_min_stat_size'));
+        filters.sharpness_percentile = parseFloat(getVal('filters_sharpness_percentile'));
+        filters.reg_score_percentile = parseFloat(getVal('filters_reg_score_percentile'));
+        filters.avg_brightness_sigma = parseFloat(getVal('filters_avg_brightness_sigma'));
+        if(filters.avg_brightness_sigma >= 5.0)
+            filters.avg_brightness_sigma = -1;
+    }
     var delay = getStartDelay();
     if(isNaN(synthetic_exposure_mpl))
         synthetic_exposure_mpl = 1
@@ -1506,6 +1532,7 @@ function startStack()
             ra:             ra,
             de:             de,
         },
+        filters : filters,
         darks : darks,
         flats : flats,
         dark_flats : dark_flats

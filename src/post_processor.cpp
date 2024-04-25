@@ -154,6 +154,12 @@ namespace ols {
             m << " - derotate           " << stack_info_.derotate << std::endl;
             m << " - derotate_mirror    " << stack_info_.derotate_mirror << std::endl;
             m << " - remove_gradient    " << stack_info_.remove_gradient << std::endl;
+            m << "Filters:" << std::endl;
+            m << " - Drop first        " << stack_info_.filters.remove_first << std::endl;
+            m << " - Stat Size         " << stack_info_.filters.min_stat_size << std::endl;
+            m << " - Sharp %           " << stack_info_.filters.sharpness_percentile << std::endl;
+            m << " - Reg Score %       " << stack_info_.filters.reg_score_percentile << std::endl;
+            m << " - Brightness Sigma  " << stack_info_.filters.avg_brightness_sigma << std::endl;
             m << "Target:" << std::endl;
             m << " - RA " << stack_info_.ra << std::endl;
             m << " - DE " << stack_info_.de << std::endl;
