@@ -51,6 +51,15 @@ namespace ols {
                     }
                     continue;
                 }
+                auto stats_ptr = std::dynamic_pointer_cast<StatsBase>(data_ptr);
+                if(stats_ptr) {
+                    if(stats_ && last_frame_) {
+                        StatsBase &last_stats = *last_frame_;
+                        last_stats = *stats_ptr;
+                        stats_->push(create_stats());
+                    }
+                    continue;
+                }
                 auto config_ptr = std::dynamic_pointer_cast<StackerControl>(data_ptr);
                 if(config_ptr) {
                     try {

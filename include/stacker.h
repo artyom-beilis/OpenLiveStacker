@@ -7,8 +7,9 @@
 
 #include "simd_utils.h"
 
+//#define DEBUG_SCORES            
 //#define DEBUG
-#ifdef DEBUG
+#if defined(DEBUG) || defined(DEBUG_SCORES)
 #include <opencv2/imgcodecs.hpp>
 #endif
 
@@ -31,6 +32,8 @@ namespace ols {
                 subpixel_factor_ = 1;
                 enable_subpixel_registration = false;
             }
+
+            quality_roi_ = cv::Rect(width/4,height/4,width/2,height/2); 
 
             fully_stacked_area_ = cv::Rect(0,0,width,height);
             fully_stacked_count_ = 0;
@@ -74,6 +77,16 @@ namespace ols {
             sum_ = cv::Mat(height*subpixel_factor_,width*subpixel_factor_,cv_type_);
             sum_.setTo(0);
             make_fft_blur();
+        }
+
+        void set_filters(bool throw_frames,int frames_to_judge,
+                         float sharp_percetile,float reg_percentile,float brightness_sigma)
+        {
+            throw_first_frames_ = throw_frames;
+            min_size_to_judge_ = std::max(3,frames_to_judge);
+            sharp_percentile_ = std::max(0.1f,std::min(1.0f,sharp_percetile / 100.0f));
+            reg_percentile_ = std::max(0.1f,std::min(1.0f,reg_percentile / 100.0f));
+            brightness_sigma_ = brightness_sigma <= 0 ? -1.0f : std::min(0.5f,std::max(5.0f,brightness_sigma));
         }
 
         void set_rollback_on_pause(bool v)
@@ -156,6 +169,200 @@ namespace ols {
                     prev_frame_max_.copyTo(frame_max_);
             }
         }
+
+        bool check_reg_score(double score)
+        {
+            if(reg_percentile_ >= 1.0f) {
+                return true;
+            }
+            bool res = add_score_and_check(reg_scores_,score,reg_percentile_,"reg");
+            if(!res) {
+                BOOSTER_INFO("stacker") << "Registration score isn't high enough, skipping";
+            }
+            return res;
+        }
+        bool check_avg_brightness(cv::Mat frame,cv::Point2f shift)
+        {
+            if(brightness_sigma_ < 0)
+                return true;
+            double avg = calc_avg_brightness(frame,shift);
+            if(avg < 0)
+                return false;
+            avg_sum_ += avg;
+            avg_sum2_ += avg*avg;
+            avg_count_ ++;
+
+            if(avg_count_ < min_size_to_judge_)
+                return true;
+
+            double expected_avg = avg_sum_ / avg_count_;
+            double std_dev = std::sqrt(avg_sum2_ / avg_count_ -  expected_avg * expected_avg);
+            double sigma_dist = std::abs(avg - expected_avg) / (std_dev + 1e-12);
+            bool decision =  sigma_dist > brightness_sigma_;
+            if(!decision) {
+                BOOSTER_INFO("stacker") << "Skipping avg brightness ins't withing limits: " << avg << ", expected " << expected_avg << " +- " << std_dev << "*"<<brightness_sigma_ << "=" << (std_dev * brightness_sigma_);
+            }
+            return decision;
+        }
+        bool check_sharp_score(cv::Mat frame,cv::Point2f shift,double &score)
+        {
+            score = 0;
+            if(sharp_percentile_ >= 1.0f)
+                return true;
+            score = calc_sharpness_score(frame,shift);
+            if(score < 0) {
+                BOOSTER_INFO("stacker") << "Shift too big to esimate sharpness quality";
+                return false;
+            }
+            bool res = add_score_and_check(sharp_scores_,score,sharp_percentile_,"sharp");
+            if(!res) {
+                BOOSTER_INFO("stacker") << "Image ins't sharp enought, skipping";
+            }
+            return res;
+        }
+
+        bool add_score_and_check(std::vector<double> &v,double score,double per,char const *
+#ifdef DEBUG_SCORES            
+            type
+#endif            
+        )
+        {
+            insert_sorted(v,score);
+            bool res = true;
+            double th=0;
+            if(int(v.size()) >= min_size_to_judge_) {
+                th = v[(1.0f - per) * v.size()];
+                res = score >= th;
+            }
+#ifdef DEBUG_SCORES            
+            std::ostringstream ss;
+            ss << type << ": ";
+            for(auto val:v)
+                ss << val << ",";
+            ss<<"  New score " << score << " th="<< th << " decision=" << (res ?  "ok" : "fail") << " for per " << (per * 100);
+            BOOSTER_INFO("stacker") << ss.str();
+#endif
+            return res;
+        }
+        void insert_sorted(std::vector<double> &v,double value)
+        {
+            v.insert(std::upper_bound(v.begin(),v.end(),value),value);
+        }
+        double calc_avg_brightness(cv::Mat frame,cv::Point2f shift)
+        {
+            int r0 = quality_roi_.y - shift.y;
+            int c0 = quality_roi_.x - shift.x;
+            int r1 = r0 + quality_roi_.height;
+            int c1 = c0 + quality_roi_.width;
+            if(r0 < 0 || c0 < 0 || r1 > frame.rows || c1 > frame.cols) {
+                return -1.0;
+            }
+            int step = frame.cols * frame.channels();
+            float *p = reinterpret_cast<float*>(frame.data);
+            if(frame.channels() > 1)
+                p++; // use green
+            double sum = 0;
+#ifdef DEBUG_SCORES            
+            cv::Mat tmp(quality_roi_.height/4,quality_roi_.width/4,CV_32FC1);
+            float maxv = 0;
+#endif            
+            for(int r=r0;r<r1;r+=4) {
+                float *line0 = p + r*step;
+                if(frame.channels() == 1) {
+                    for(int c=c0;c<c1;c+=4) {
+                        sum += line0[c];
+#ifdef DEBUG_SCORES
+                        float v = line0[c];
+                        maxv=std::max(v,maxv);
+                        tmp.at<float>((r-r0)/4,(c-c0)/4) = v;
+#endif                        
+                    }
+                }
+                else {
+                    for(int c=c0;c<c1;c+=4) {
+                        sum += line0[3*c];
+#ifdef DEBUG_SCORES
+                        float v = line0[3*c];
+                        maxv=std::max(v,maxv);
+                        tmp.at<float>((r-r0)/4,(c-c0)/4) = v;
+#endif                        
+                    }
+                }
+            }
+#ifdef DEBUG_SCORES            
+            cv::Mat res;
+            tmp.convertTo(res,CV_8UC1,255.0/maxv);
+            cv::imwrite("/tmp/sample_" + std::to_string(sharp_scores_.size()) + ".png",res);
+#endif            
+            return 16 * sum / ((r1-r0)*(c1-c0));
+        }
+        double calc_sharpness_score(cv::Mat frame,cv::Point2f shift)
+        {
+            int r0 = quality_roi_.y - shift.y;
+            int c0 = quality_roi_.x - shift.x;
+            int r1 = r0 + quality_roi_.height;
+            int c1 = c0 + quality_roi_.width;
+            if(r0 < 0 || c0 < 0 || r1 > frame.rows || c1 > frame.cols) {
+                return -1.0;
+            }
+            int step = frame.cols * frame.channels();
+            float *p = reinterpret_cast<float*>(frame.data);
+            if(frame.channels() > 1)
+                p++; // use green
+            double sum = 0;
+#ifdef DEBUG_SCORES            
+            cv::Mat tmp(quality_roi_.height/4,quality_roi_.width/4,CV_32FC1);
+            float maxv = 0;
+#endif            
+            for(int r=r0;r<r1-2;r+=4) {
+                float *line0 = p + r*step;
+                float *line1 = p + (r+2)*step;
+                if(frame.channels() == 1) {
+                    for(int c=c0;c<c1+2;c+=4) {
+                        float dx = line0[c] - line0[c+2];
+                        float dy = line0[c] - line1[c];
+                        sum += dx*dx+dy*dy;
+#ifdef DEBUG_SCORES
+                        float v = dx*dx+dy*dy;
+                        maxv=std::max(v,maxv);
+                        tmp.at<float>((r-r0)/4,(c-c0)/4) = v;
+#endif                        
+                    }
+                }
+                else {
+                    for(int c=c0;c<c1+2;c+=4) {
+                        float dx = line0[3*c] - line0[3*c+6];
+                        float dy = line0[3*c] - line1[3*c];
+                        sum += dx*dx+dy*dy;
+#ifdef DEBUG_SCORES
+                        float v = dx*dx+dy*dy;
+                        maxv=std::max(v,maxv);
+                        tmp.at<float>((r-r0)/4,(c-c0)/4) = v;
+#endif                        
+                    }
+                }
+            }
+#ifdef DEBUG_SCORES            
+            cv::Mat res;
+            tmp.convertTo(res,CV_8UC1,255.0/maxv);
+            BOOSTER_INFO("stacker") << "MAX VAL !!!!!!!!!!!!!!!!! " << maxv;
+            cv::imwrite("/tmp/edges_" + std::to_string(sharp_scores_.size()) + ".png",res);
+#endif            
+            return sum;
+        }
+
+        void reset_1st_frame() 
+        {
+            BOOSTER_INFO("stacker") << "Replacing 1st frame with best frame";
+            cv::mulSpectrums(best_fft_,fft_kern_,fft_roi_,0);
+            sum_.setTo(0);
+            fully_stacked_count_ = prev_fully_stacked_count_ = 0;
+            fully_stacked_area_ = cv::Rect(0,0,sum_.cols,sum_.rows);
+            add_image(best_frame_,cv::Point2f(0,0));
+            reset_step(cv::Point2f(0,0));
+            quality_roi_.x -= int(best_shift_.x);
+            quality_roi_.y -= int(best_shift_.y);
+        }
         
         bool stack_image(cv::Mat frame,bool restart_position = false)
         {
@@ -177,29 +384,59 @@ namespace ols {
                 return true;
             }
             bool added = true;
+            double sharp_score = 0;
             if(frames_ == 0) {
                 add_image(frame,cv::Point2f(0,0));
+                check_sharp_score(frame,cv::Point2f(0,0),sharp_score);
+                check_avg_brightness(frame,cv::Point2f(0,0));
                 fft_roi_ = calc_fft(frame,true);
+                best_score_ = sharp_score;
+                best_shift_ = cv::Point2f(0,0);
                 frames_ = 1;
                 reset_step(cv::Point2f(0,0));
             }
             else {
                 cv::Mat fft_frame = calc_fft(frame,false);
-                cv::Point2f shift = get_dx_dy(fft_frame);
+                double reg_score = 0;
+                cv::Point2f shift = get_dx_dy(fft_frame,reg_score);
                 BOOSTER_INFO("stacker") <<"Registration at "<< frames_ <<":" << shift << std::endl;
-                if(restart_position) {
-                    add_image(frame,shift);
-                    reset_step(shift);
-                    frames_ ++;
+                bool to_add = restart_position || check_step(shift);
+                if(to_add) {
+                    bool sharp = check_sharp_score(frame,shift,sharp_score);
+                    bool avg   = check_avg_brightness(frame,shift);
+                    bool reg   = check_reg_score(reg_score);
+                    to_add = sharp && reg && avg;
                 }
-                else {
-                    if(check_step(shift)) {
-                        add_image(frame,shift);
-                        frames_ ++;
+                if(to_add) {
+                    if(throw_first_frames_ && thrown_frames_ < min_size_to_judge_) {
+                        added = false;
+                        thrown_frames_ ++;
+                        BOOSTER_INFO("stacker") << "Throwing " << thrown_frames_ << " out of " << min_size_to_judge_;
+                        if(sharp_percentile_ < 1.0) {
+                            if(sharp_score > best_score_) {
+                                best_score_ = sharp_score;
+                                best_frame_ = frame;
+                                best_fft_ = fft_frame;
+                                best_shift_ = shift;
+                            }
+                        }
+                        if(thrown_frames_ == min_size_to_judge_) {
+                            BOOSTER_INFO("stacker") << "Reached " << thrown_frames_ << " frames to throw";
+                            if(best_score_ != 0) {
+                                reset_1st_frame();
+                            }
+                            best_frame_.release();
+                            best_fft_.release();
+                        }
                     }
                     else {
-                        added = false;
+                        add_image(frame,shift);
+                        reset_step(shift);
+                        frames_ ++;
                     }
+                }
+                else {
+                    added = false;
                 }
             }
             return added;
@@ -333,7 +570,7 @@ namespace ols {
             }
         }
 
-        cv::Point2f get_dx_dy(cv::Mat dft)
+        cv::Point2f get_dx_dy(cv::Mat dft,double &max_score)
         {
             cv::Mat shift;
             cv::Mat dspec;
@@ -353,7 +590,7 @@ namespace ols {
 #endif        
 
             cv::Point pos;
-            cv::minMaxLoc(shift,nullptr,nullptr,nullptr,&pos);
+            cv::minMaxLoc(shift,nullptr,&max_score,nullptr,&pos);
             if(enable_subpixel_registration)
                 return fft_pos2d(fft_pos(pos.y),fft_pos(pos.x),shift);
             else
@@ -493,6 +730,7 @@ namespace ols {
         int total_count_ = 0;
         bool has_darks_;
         cv::Rect fully_stacked_area_;
+        cv::Rect quality_roi_;
         int fully_stacked_count_ = 0;
         bool remove_satellites_ = false;
         cv::Mat frame_max_;
@@ -513,6 +751,25 @@ namespace ols {
         int manual_exposure_counter_ = 0;
         int exp_multiplier_;
         cv::Mat manual_frame_;
+        
+        // setup of filters
+
+        float sharp_percentile_ = 1.0;
+        float reg_percentile_ = 1.0;
+        float brightness_sigma_ = -1.0f;
+
+        std::vector<double> sharp_scores_;
+        std::vector<double> reg_scores_;
+        double avg_sum_ = 0, avg_sum2_ = 0;
+        int avg_count_ = 0;
+        bool throw_first_frames_ = false;
+        int thrown_frames_ = 0;
+        int min_size_to_judge_ = 10;
+
+        cv::Mat best_fft_;
+        cv::Mat best_frame_;
+        cv::Point2f best_shift_;
+        double best_score_;
 
         int channels_;
         int cv_type_;

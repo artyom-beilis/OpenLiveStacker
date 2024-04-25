@@ -36,6 +36,28 @@ namespace ols {
             }
         }
 
+        template<typename Func>
+        void push_or_update(T const &p,Func update_func)
+        {
+            std::unique_lock<std::mutex> guard(lock_);
+            if(cb_) {
+                cb_(p);
+                return;
+            }
+            if(!data_.empty()) {
+                auto &last = data_.back();
+                if(update_func(last)) {
+                    return;
+                }
+            }
+            while(data_.size() >= limit_) {
+                cond_has_room_.wait(guard);
+            }
+            ++items;
+            data_.push(p);
+            cond_.notify_one();
+        }
+
         template<typename ItemType>
         void push_or_replace(std::shared_ptr<ItemType> p)
         {

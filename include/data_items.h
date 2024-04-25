@@ -72,6 +72,14 @@ namespace ols {
         virtual ~LiveControl() {}
     };
 
+    struct Filters {
+        bool remove_first = false;
+        int  min_stat_size = 10;
+        double sharpness_percentile = 100.0;
+        double reg_score_percentile = 100.0;
+        double avg_brightness_sigma = -1.0;
+    };
+
     struct StackerControl : public QueueData {
         enum ControlType {
             ctl_init,     /// start stacking

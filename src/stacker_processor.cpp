@@ -35,8 +35,21 @@ namespace ols {
                 auto video_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
                 if(video_ptr) {
                     std::shared_ptr<StackedFrame> res = handle_video(video_ptr);
-                    if(out_) {
-                        out_->push_or_replace(res);
+                    if(res) {
+                        if(out_)
+                            out_->push_or_replace(res);
+                    }
+                    else {
+                        std::shared_ptr<StatsBase> s(new StatsBase());
+                        create_stats(s);
+                        out_->push_or_update(s,[=](data_pointer_type &last) -> bool {
+                            auto lframe = std::dynamic_pointer_cast<StatsBase>(last);
+                            if(lframe) {
+                                *lframe = *s;
+                                return true;
+                            }
+                            return false;
+                        });
                     }
                     continue;
                 }
@@ -141,6 +154,9 @@ namespace ols {
                     stacker_.reset(new Stacker(width_,height_,channels_));
                     stacker_->set_remove_satellites(ctl->remove_satellites);
                     stacker_->set_rollback_on_pause(ctl->rollback_on_pause);
+                    if(ctl->method == stack_planetary) {
+                        stacker_->set_filters(true,5,50,50,-1);
+                    }
                     restart_ = true;
                 }
                 break;
