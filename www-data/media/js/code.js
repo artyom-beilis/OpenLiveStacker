@@ -1493,12 +1493,13 @@ function startStack()
     var name = getVal('name').trim();
     var obj = getVal('object').trim();
 
-    if(type != 'dso') {
+    if(type == 'dso') {
         if(name == '')
             name = obj;
         else if(obj != '')
             name = name + '_' + obj;
     }
+
     name = name.replace(/ /g,'_');
     const name_pat = /^[A-Za-z0-9_.\-]*$/g;
     if(!name.match(name_pat)) {
@@ -1560,7 +1561,7 @@ function startStack()
     }
     var ws = parseFloat(document.getElementById('white_delay').value);
     ws = isNaN(ws) ? 0 : ws;
-    if(ws > 0 && delay > 0 && calib) {
+    if(ws > 0 && delay > 0 && type=='calibration') {
         setTimeout(()=> { ctlStack('pause')},(delay + ws) * 1000);
         setTimeout(()=> { document.getElementById('white_screen').style.display='none' },(delay *2 + ws) * 1000);
         document.getElementById('white_screen').style.display='block';
