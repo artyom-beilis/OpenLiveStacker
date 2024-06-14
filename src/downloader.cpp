@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include "zlib.h"
+#include <stdint.h>
 
 #ifdef WITH_CURL            
 #include <curl/curl.h>
