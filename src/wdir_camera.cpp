@@ -23,6 +23,10 @@
 #include "libraw_wrapper.h"
 #endif
 
+#ifdef WITH_CFITSIO
+#include "fitsmat.h"
+#endif
+
 namespace ols {
     class WDIRError : public CamError {
     public:
@@ -133,13 +137,19 @@ namespace ols {
                 auto res = load_libraw(fname);
                 img = res.first; 
                 frm.bayer  = res.second;
-                printf("%d %d\n",img.rows,img.cols);
             }
-#endif                
+#endif 
+#ifdef WITH_CFITSIO
+            else if(ends_with(fname,".fits")) {
+                auto res = load_fits(fname);
+                img = res.first; 
+                frm.bayer  = res.second;
+            }
+#endif                                       
             else
                 img = cv::imread(fname);
             if(img.cols != width_ || img.rows != height_) {
-                BOOSTER_INFO("stacker") << "Image size is not correct";
+                BOOSTER_INFO("stacker") << "Image size is not correct got " << img.rows<<"x"<<img.cols << " expecting " << height_<<"x"<<width_;
                 return;
             }
             if(int(img.elemSize() / img.elemSize1()) != ((mono_ || raw_) ? 1 : 3)) {
