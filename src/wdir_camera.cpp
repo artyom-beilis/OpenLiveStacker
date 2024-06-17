@@ -233,7 +233,8 @@ namespace ols {
                             catch(std::exception const &e) {
                                 BOOSTER_ERROR("stacker") << "Failed to read:" << fname << " ->" << e.what();
                             }
-                            std::remove(fname.c_str());
+                            if(!keep_images_)
+                                std::remove(fname.c_str());
                         }
                         if(stream_active_ == 0)
                             break;
@@ -268,7 +269,7 @@ namespace ols {
         /// list of camera controls that the camera supports
         virtual std::vector<CamOptionId> supported_options(CamErrorCode &)
         {
-            std::vector<CamOptionId> opts = {};
+            std::vector<CamOptionId> opts = {opt_keep_images};
             return opts;
         }
         /// get camera control
@@ -277,19 +278,36 @@ namespace ols {
             CamParam r;
             memset(&r,0,sizeof(r));
             r.option = id;
-            e=CamErrorCode("Unimplemented: " + cam_option_id_to_name(id));
+            if(id == opt_keep_images) {
+                r.option = id;
+                r.type = type_bool;
+                r.min_val = 0;
+                r.max_val = 1;
+                r.step_size = 1;
+                r.cur_val = keep_images_;
+                r.def_val = 0;
+            }
+            else {
+                e=CamErrorCode("Unimplemented: " + cam_option_id_to_name(id));
+            }
             return r;
         }
         /// set camera control
-        virtual void set_parameter(CamOptionId id,double /*value*/,CamErrorCode &e)
+        virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e)
         {
-            e = "Unimplemented" +  cam_option_id_to_name(id);
+            if(id == opt_keep_images) {
+                keep_images_ = !!value;
+            }
+            else {
+                e = "Unimplemented" +  cam_option_id_to_name(id);
+            }
         }
     private:
         std::string dir_;
         int width_,height_;
         CamStreamType stream_;
         CamBayerType bayer_;
+        bool keep_images_ = false;
 
         int bpp_;
         bool mono_;
