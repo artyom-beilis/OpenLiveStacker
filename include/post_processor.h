@@ -4,7 +4,6 @@
 #include <opencv2/core/hal/intrin.hpp>
 #include <booster/log.h>
 #include "common_data.h"
-
 #include "simd_utils.h"
 
 //#define DEBUG
@@ -502,19 +501,21 @@ namespace ols {
                     break;
                 }
             }
-            int end = hp / 2;
-            int max_diff = 0;
+            int end = hp - 1;
+            int max_val = 0;
+            int max_pos = 0;
             for(int i=0;i<end-1;i++) {
-                int diff = counters_[i+1] - counters_[i];
-                max_diff = std::max(diff,max_diff);
+                int val = counters_[i];
+                if(val > max_val) {
+                    max_pos = i;
+                    max_val = val;
+                }
             }
-            int lp = 0;
-            for(int i=0;i<end-1;i++) {
-                lp = i;
-                int diff = counters_[i+1] - counters_[i];
-                if(diff * 10 >= max_diff)
-                    break;
+            int lp = max_pos;
+            while(lp > 1 && counters_[lp-1] * 2 >= max_val) {
+                lp--;
             }
+
             scale = (hist_bins-1.0)/hp;
             offset = -lp/(hist_bins - 1.0);
             
