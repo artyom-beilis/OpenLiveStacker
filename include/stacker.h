@@ -469,7 +469,6 @@ namespace ols {
                     }
                     else {
                         add_image(frame,shift);
-                        reset_step(shift);
                         frames_ ++;
                     }
                 }
