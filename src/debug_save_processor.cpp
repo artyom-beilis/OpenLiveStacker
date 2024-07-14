@@ -129,6 +129,7 @@ namespace ols {
                     v["derotate"] = ctl->derotate;
                     v["derotate_mirror"] = ctl->derotate_mirror;
                     v["remove_gradient"] = ctl->remove_gradient;
+                    v["remove_hot_pixels"] = ctl->remove_hot_pixels;
                     v["ra"] = ctl->ra;
                     v["de"] = ctl->de;
                     v["lat"] = ctl->lat;

@@ -8,6 +8,7 @@
 #include <fstream>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
+#include "hot_removal.h"
 
 
 namespace ols {
@@ -86,6 +87,11 @@ namespace ols {
                     if(ext == "tiff") {
                         img = load_tiff(path);
                         dr = (1ll << (8*img.elemSize1())) - 1;
+                        if(cfg_.mono || bayer_ != bayer_na) {
+                            if(cfg_.remove_hot_pixels){
+                                img = remove_hot_pixels(img);
+                            }
+                        }
                         if(bayer_ != bayer_na) {
                             cv::Mat rgb;
                             switch(bayer_) {
@@ -142,6 +148,7 @@ namespace ols {
             cfg.derotate = v.get<bool>("derotate");
             cfg.derotate_mirror = v.get<bool>("derotate_mirror");
             cfg.remove_gradient = v.get<bool>("remove_gradient",false);
+            cfg.remove_hot_pixels = v.get<bool>("remove_hot_pixels",false);
             cfg.ra = v.get<double>("ra");
             cfg.de = v.get<double>("de");
             cfg.lat = v.get<double>("lat");

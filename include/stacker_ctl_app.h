@@ -169,6 +169,7 @@ namespace ols {
             
             cmd->synthetic_exposure_mpl = content_.get("synthetic_exposure_mpl",cmd->synthetic_exposure_mpl);
             cmd->remove_gradient = content_.get("remove_gradient",cmd->remove_gradient);
+            cmd->remove_hot_pixels = content_.get("remove_hot_pixels",cmd->remove_hot_pixels);
             cmd->derotate_mirror = content_.get("image_flip",cmd->derotate_mirror);
             cmd->derotate = content_.get("field_derotation",cmd->derotate);
             cmd->rollback_on_pause = content_.get("rollback_on_pause",cmd->rollback_on_pause);

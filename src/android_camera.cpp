@@ -302,25 +302,7 @@ namespace ols {
             sort_formats();
             return formats_;
         }
-/*
-        std::pair<cv::Mat,CamBayerType> to_rgb(std::pair<cv::Mat,CamBayerType> const &raw)
-        {
-            cv::Mat rgb,result;
-            cv::Mat bayer = raw.first;
-            switch(raw.second) {
-            case bayer_rg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerBG2BGR); break; // COLOR_BayerRGGB2BGR = COLOR_BayerBG2BGR
-            case bayer_gr:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGB2BGR); break; // COLOR_BayerGRBG2BGR = COLOR_BayerGB2BGR
-            case bayer_bg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerRG2BGR); break; // COLOR_BayerBGGR2BGR = COLOR_BayerRG2BGR
-            case bayer_gb:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGR2BGR); break; // COLOR_BayerGBRG2BGR = COLOR_BayerGR2BGR
-            default:
-                throw std::runtime_error("Invalid bayer patter");
-            }
-            if(format_.bin == 1)
-                return std::make_pair(rgb,bayer_na);
-            cv::resize(rgb,result,cv::Size(format_.width,format_.height),0.0,0.0,cv::INTER_AREA);
-            return std::make_pair(result,bayer_na);
-        }
-*/
+
         void mono_bin2(unsigned char *p,int stride,int rows,int cols,uint16_t *out)
         {
             for(int r=0,r2=0;r<rows;r++,r2+=2,p+= 2 * stride) {

@@ -1,5 +1,6 @@
 #include "video_generator.h"
 #include "live_stretch.h"
+#include "hot_removal.h"
 #include <booster/log.h>
 #include <booster/posix_time.h>
 #include <opencv2/imgcodecs.hpp>
@@ -143,12 +144,16 @@ namespace ols {
             case stream_raw16:
                 {
                     cv::Mat bayer(frame->format.height,frame->format.width,(bpp==1 ? CV_8UC1 : CV_16UC1),frame->source_frame->data());
-                    cv::Mat rgb;
+                    cv::Mat desp,rgb;
+                    if(remove_hot_pixels_) 
+                        desp = remove_hot_pixels(bayer,false);
+                    else
+                        desp = bayer;
                     switch(frame->bayer) {
-                    case bayer_rg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerBG2BGR); break; // COLOR_BayerRGGB2BGR = COLOR_BayerBG2BGR
-                    case bayer_gr:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGB2BGR); break; // COLOR_BayerGRBG2BGR = COLOR_BayerGB2BGR
-                    case bayer_bg:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerRG2BGR); break; // COLOR_BayerBGGR2BGR = COLOR_BayerRG2BGR
-                    case bayer_gb:  cv::cvtColor(bayer,rgb,cv::COLOR_BayerGR2BGR); break; // COLOR_BayerGBRG2BGR = COLOR_BayerGR2BGR
+                    case bayer_rg:  cv::cvtColor(desp,rgb,cv::COLOR_BayerBG2BGR); break; // COLOR_BayerRGGB2BGR = COLOR_BayerBG2BGR
+                    case bayer_gr:  cv::cvtColor(desp,rgb,cv::COLOR_BayerGB2BGR); break; // COLOR_BayerGRBG2BGR = COLOR_BayerGB2BGR
+                    case bayer_bg:  cv::cvtColor(desp,rgb,cv::COLOR_BayerRG2BGR); break; // COLOR_BayerBGGR2BGR = COLOR_BayerRG2BGR
+                    case bayer_gb:  cv::cvtColor(desp,rgb,cv::COLOR_BayerGR2BGR); break; // COLOR_BayerGBRG2BGR = COLOR_BayerGR2BGR
                     default:
                         BOOSTER_ERROR("stacker") << "Invalid bayer patter";
                     }
@@ -161,8 +166,11 @@ namespace ols {
             case stream_mono16:
                 {
                     cv::Mat mono(frame->format.height,frame->format.width,(bpp==1 ? CV_8UC1 : CV_16UC1),frame->source_frame->data());
+                    cv::Mat desp = mono;
+                    if(remove_hot_pixels_)
+                        desp = remove_hot_pixels(mono,true);
                     frame->frame_dr = (bpp==1 ? 255 : 65535);
-                    handle_jpeg_stack(frame,mono,true);
+                    handle_jpeg_stack(frame,desp,true);
                     frame->raw = mono;
                 }
                 break;
@@ -207,6 +215,7 @@ namespace ols {
                     switch(ctl_ptr->op) {
                     case StackerControl::ctl_init:
                         stacking_active_ = true;
+                        remove_hot_pixels_ = ctl_ptr->remove_hot_pixels; 
                         stacking_in_process_ = true;
                         debug_active_ = ctl_ptr->save_inputs;
                         break;
@@ -221,6 +230,7 @@ namespace ols {
                     case StackerControl::ctl_cancel:
                         stacking_active_ = false;
                         stacking_in_process_ = false;
+                        remove_hot_pixels_ = false;
                         break;
                     case StackerControl::ctl_save:
                     case StackerControl::ctl_update:
@@ -256,6 +266,7 @@ namespace ols {
         bool stacking_active_ = false;
         bool stacking_in_process_ = false;
         bool debug_active_ = false;
+        bool remove_hot_pixels_ = false;
         bool live_auto_stretch_ = true;
         float cached_factor_ = -1;
         booster::ptime cached_factor_updated_;

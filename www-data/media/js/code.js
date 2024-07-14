@@ -1442,6 +1442,7 @@ function startStack()
     }
     var ra=null,de=null,lat=null,lon=null,synthetic_exposure_mpl=1;
     var field_derotation=false,image_flip=false,remove_satellites=false,remove_gradient=false;
+    var remove_hot_pixels=getBVal('remove_hot_pixels');
     if(type == 'dso') {
         ra=parseRA(getVal("ra"));
         de=parseDEC(getVal("de"));
@@ -1462,6 +1463,7 @@ function startStack()
     };
     if(type != 'calibration') {
         if(type == 'planetary') {
+            remove_hot_pixels=false;
             filters.remove_first = getBVal('filters_remove_first');
         }
         filters.min_stat_size = parseInt(getVal('filters_min_stat_size'));
@@ -1519,6 +1521,7 @@ function startStack()
         image_flip:         image_flip,
         remove_satellites:  remove_satellites,
         remove_gradient:    remove_gradient,
+        remove_hot_pixels:  remove_hot_pixels,
         rollback_on_pause:  rollback_on_pause,
         auto_stretch:       getBVal("auto_stretch"),
         stretch_low:        g_stretch.cut,
