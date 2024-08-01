@@ -10,6 +10,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <chrono>
 #include <thread>
 #include <algorithm>
 #include <queue>
@@ -534,7 +535,16 @@ namespace ols {
                         break;
                     }
                     handle_cmd_queue();
-                    trigger();
+                    std::thread capture_with_delay([&] {
+                        // simple sleep method which allows stopping early
+                        for (int i = 0; i < capture_delay_; i++) {
+                            if (stop_) {
+                                return;
+                            }
+                            std::this_thread::sleep_for(std::chrono::seconds(1));
+                        }
+                        trigger();
+                    });
                     for(int i=0;i<N;i++) {
                         std::unique_lock<std::recursive_mutex> guard(clock_);
                         GPFile f(files[i],cam_,ctx_);
@@ -560,6 +570,7 @@ namespace ols {
                             f.del();
                         }
                     }
+                    capture_with_delay.join();
                 }
             }
             catch(std::exception const &e) {
@@ -610,6 +621,7 @@ namespace ols {
                     opts.push_back(opt_capturetarget);
             }
             opts.push_back(opt_keep_images);
+            opts.push_back(opt_capture_delay);
             return opts;
         }
         std::string opt_to_name(CamOptionId id)
@@ -657,6 +669,18 @@ namespace ols {
                         return r;
                     }
                     break;
+                case opt_capture_delay:
+                    {
+                        CamParam r;
+                        r.option = id;
+                        r.type = type_number;
+                        r.min_val = 0;
+                        r.max_val = 30;
+                        r.step_size = 1;
+                        r.cur_val = capture_delay_;
+                        r.def_val = 0;
+                        return r;
+                    }
                 default:
                     {
                         std::string name = opt_to_name(id);
@@ -692,6 +716,11 @@ namespace ols {
                         keep_images_ = !!value;
                     }
                     break;
+                case opt_capture_delay:
+                    {
+                        capture_delay_ = value;
+                    }
+                    break;
                 default:
                     {
                         std::string name = opt_to_name(id);
@@ -713,6 +742,7 @@ namespace ols {
         CamStreamFormat format_;
         int frame_counter_ = 0;
         int keep_images_ = 0;
+        int capture_delay_ = 0;
         // protected by mutex
         std::mutex lock_;
         std::recursive_mutex clock_;
