@@ -540,10 +540,10 @@ namespace ols {
                     std::thread capture_with_delay([&] {
                         // simple sleep method which allows stopping early
                         for (int i = 0; i < capture_delay_; i++) {
+                            std::this_thread::sleep_for(std::chrono::seconds(1));
                             if (stop_) {
                                 return;
                             }
-                            std::this_thread::sleep_for(std::chrono::seconds(1));
                         }
                         trigger();
                     });
