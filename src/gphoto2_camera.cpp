@@ -525,7 +525,11 @@ namespace ols {
                 trigger();
                 while(true) {
                     CameraFilePath files[MAX_FILES];
-                    int N = wait_event(files);
+                    int N = 0;
+                    // don't move on until we actually get the files
+                    while (N == 0 && !stop_) {
+                        N = wait_event(files);
+                    }
                     if(stop_) {
                         break;
                     }
