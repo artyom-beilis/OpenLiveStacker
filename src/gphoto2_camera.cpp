@@ -324,6 +324,9 @@ namespace ols {
         {
             int fno = 0;
             while(fno <= 0 || wait_multiple) {
+                if (stop_) {
+                    return fno;
+                }
                 CameraEventType ev = GP_EVENT_UNKNOWN;
                 void *ptr = NULL;
                 int status;
@@ -352,7 +355,7 @@ namespace ols {
                     break;
                 case GP_EVENT_CAPTURE_COMPLETE:
                     LOG("EV:Capture Done\n");
-                    if (fno > 0 || stop_) {
+                    if (fno > 0) {
                         return fno;
                     }
                     break;
