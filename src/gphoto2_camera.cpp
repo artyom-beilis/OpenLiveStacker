@@ -352,7 +352,10 @@ namespace ols {
                     break;
                 case GP_EVENT_CAPTURE_COMPLETE:
                     LOG("EV:Capture Done\n");
-                    return fno;
+                    if (fno > 0 || stop_) {
+                        return fno;
+                    }
+                    break;
                 default:
                     LOG("EV:Other %d\n",int(ev));
                     break;
@@ -526,11 +529,7 @@ namespace ols {
                 trigger();
                 while(true) {
                     CameraFilePath files[MAX_FILES];
-                    int N = 0;
-                    // don't move on until we actually get the files
-                    while (N == 0 && !stop_) {
-                        N = wait_event(files);
-                    }
+                    int N = wait_event(files);
                     if(stop_) {
                         break;
                     }
