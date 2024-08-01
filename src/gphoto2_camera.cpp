@@ -760,7 +760,7 @@ namespace ols {
             if(!camera_list_.empty()) {
                 return camera_list_;
             }
-	        gp_camera_new(&camera_);
+            gp_camera_new(&camera_);
             int ret = gp_camera_init(camera_,ctx_);
             if(!check(ret,"init",e)) {
                 gp_camera_free(camera_);
@@ -804,7 +804,7 @@ extern "C" {
     void ols_set_gphoto2_driver_log(char const *log_path,int debug)
     {
         ols::error_stream = fopen(log_path,"w");
-	    gp_log_add_func(debug ? GP_LOG_DEBUG : GP_LOG_ERROR , ols::errordumper, NULL);
+        gp_log_add_func(debug ? GP_LOG_DEBUG : GP_LOG_ERROR , ols::errordumper, NULL);
     }
 
 #ifdef ANDROID_SUPPORT
