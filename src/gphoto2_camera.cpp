@@ -537,16 +537,13 @@ namespace ols {
                         break;
                     }
                     handle_cmd_queue();
-                    std::thread capture_with_delay([&] {
-                        // simple sleep method which allows stopping early
-                        for (int i = 0; i < capture_delay_; i++) {
-                            std::this_thread::sleep_for(std::chrono::seconds(1));
-                            if (stop_) {
-                                return;
-                            }
-                        }
+
+                    bool delay_enabled = capture_delay_ > 0;
+                    auto time_before_downloading_files = std::chrono::steady_clock::now();
+                    if (!delay_enabled) {
                         trigger();
-                    });
+                    }
+
                     for(int i=0;i<N;i++) {
                         std::unique_lock<std::recursive_mutex> guard(clock_);
                         GPFile f(files[i],cam_,ctx_);
@@ -572,7 +569,21 @@ namespace ols {
                             f.del();
                         }
                     }
-                    capture_with_delay.join();
+
+                    if (delay_enabled) {
+                        std::chrono::duration time_elapsed = std::chrono::steady_clock::now() - time_before_downloading_files;
+                        std::chrono::duration time_remaining = std::chrono::seconds(capture_delay_) - time_elapsed;
+                        std::chrono::duration half_second = std::chrono::milliseconds(500);
+                        while (time_remaining.count() > 0) {
+                            std::chrono::duration time_to_sleep = time_remaining < half_second ? time_remaining : half_second;
+                            std::this_thread::sleep_for(time_to_sleep);
+                            if (stop_) {
+                                return;
+                            }
+                            time_remaining -= time_to_sleep;
+                        }
+                        trigger();
+                    }
                 }
             }
             catch(std::exception const &e) {
