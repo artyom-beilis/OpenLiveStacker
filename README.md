@@ -54,7 +54,7 @@ Please refer to <https://github.com/artyom-beilis/OpenLiveStacker/wiki/Open-Live
 
 Here the packages you can install on apt based distributions
 
-    apt-get install libgphoto2-dev git python3 cmake libuvc-dev libtiff-dev libpcre3-dev libcurl4-openssl-dev zlib1g-dev libraw-dev libopencv-dev libopencv-imgcodecs-dev libopencv-imgproc-dev bulld-essential libpcre3-dev zlib1g-dev libcfitsio-dev
+    apt-get install libgphoto2-dev git python3 cmake libuvc-dev libtiff-dev libpcre3-dev libcurl4-openssl-dev zlib1g-dev libraw-dev libopencv-dev libopencv-imgcodecs-dev libopencv-imgproc-dev build-essential libpcre3-dev zlib1g-dev libcfitsio-dev
 
 For installing CppCMS please refer to: <http://cppcms.com/wikipp/en/page/cppcms_1x_build>, in the nutshell
 
