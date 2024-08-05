@@ -10,6 +10,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <chrono>
 #include <thread>
 #include <algorithm>
 #include <queue>
@@ -323,6 +324,9 @@ namespace ols {
         {
             int fno = 0;
             while(fno <= 0 || wait_multiple) {
+                if (stop_) {
+                    return fno;
+                }
                 CameraEventType ev = GP_EVENT_UNKNOWN;
                 void *ptr = NULL;
                 int status;
@@ -351,7 +355,10 @@ namespace ols {
                     break;
                 case GP_EVENT_CAPTURE_COMPLETE:
                     LOG("EV:Capture Done\n");
-                    return fno;
+                    if (fno > 0) {
+                        return fno;
+                    }
+                    break;
                 default:
                     LOG("EV:Other %d\n",int(ev));
                     break;
@@ -530,7 +537,13 @@ namespace ols {
                         break;
                     }
                     handle_cmd_queue();
-                    trigger();
+
+                    bool delay_enabled = capture_delay_ > 0;
+                    auto time_before_downloading_files = std::chrono::steady_clock::now();
+                    if (!delay_enabled) {
+                        trigger();
+                    }
+
                     for(int i=0;i<N;i++) {
                         std::unique_lock<std::recursive_mutex> guard(clock_);
                         GPFile f(files[i],cam_,ctx_);
@@ -555,6 +568,21 @@ namespace ols {
                         if(!keep_images_) {
                             f.del();
                         }
+                    }
+
+                    if (delay_enabled) {
+                        std::chrono::duration time_elapsed = std::chrono::steady_clock::now() - time_before_downloading_files;
+                        std::chrono::duration time_remaining = std::chrono::seconds(capture_delay_) - time_elapsed;
+                        std::chrono::duration half_second = std::chrono::milliseconds(500);
+                        while (time_remaining.count() > 0) {
+                            std::chrono::duration time_to_sleep = time_remaining < half_second ? time_remaining : half_second;
+                            std::this_thread::sleep_for(time_to_sleep);
+                            if (stop_) {
+                                return;
+                            }
+                            time_remaining -= time_to_sleep;
+                        }
+                        trigger();
                     }
                 }
             }
@@ -606,6 +634,7 @@ namespace ols {
                     opts.push_back(opt_capturetarget);
             }
             opts.push_back(opt_keep_images);
+            opts.push_back(opt_capture_delay);
             return opts;
         }
         std::string opt_to_name(CamOptionId id)
@@ -653,6 +682,18 @@ namespace ols {
                         return r;
                     }
                     break;
+                case opt_capture_delay:
+                    {
+                        CamParam r;
+                        r.option = id;
+                        r.type = type_number;
+                        r.min_val = 0;
+                        r.max_val = 30;
+                        r.step_size = 1;
+                        r.cur_val = capture_delay_;
+                        r.def_val = 0;
+                        return r;
+                    }
                 default:
                     {
                         std::string name = opt_to_name(id);
@@ -688,6 +729,11 @@ namespace ols {
                         keep_images_ = !!value;
                     }
                     break;
+                case opt_capture_delay:
+                    {
+                        capture_delay_ = value;
+                    }
+                    break;
                 default:
                     {
                         std::string name = opt_to_name(id);
@@ -709,6 +755,7 @@ namespace ols {
         CamStreamFormat format_;
         int frame_counter_ = 0;
         int keep_images_ = 0;
+        int capture_delay_ = 0;
         // protected by mutex
         std::mutex lock_;
         std::recursive_mutex clock_;
@@ -726,7 +773,7 @@ namespace ols {
             if(!camera_list_.empty()) {
                 return camera_list_;
             }
-	        gp_camera_new(&camera_);
+            gp_camera_new(&camera_);
             int ret = gp_camera_init(camera_,ctx_);
             if(!check(ret,"init",e)) {
                 gp_camera_free(camera_);
@@ -770,7 +817,7 @@ extern "C" {
     void ols_set_gphoto2_driver_log(char const *log_path,int debug)
     {
         ols::error_stream = fopen(log_path,"w");
-	    gp_log_add_func(debug ? GP_LOG_DEBUG : GP_LOG_ERROR , ols::errordumper, NULL);
+        gp_log_add_func(debug ? GP_LOG_DEBUG : GP_LOG_ERROR , ols::errordumper, NULL);
     }
 
 #ifdef ANDROID_SUPPORT

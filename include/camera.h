@@ -77,6 +77,7 @@ namespace ols {
         opt_viewfinder,
         opt_capturetarget,
         opt_keep_images,
+        opt_capture_delay,
         /// Android
         opt_zoom,
         /// External non-device specific options start HERE!
