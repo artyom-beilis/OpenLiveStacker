@@ -571,11 +571,11 @@ namespace ols {
                     }
 
                     if (delay_enabled) {
-                        std::chrono::duration time_elapsed = std::chrono::steady_clock::now() - time_before_downloading_files;
-                        std::chrono::duration time_remaining = std::chrono::seconds(capture_delay_) - time_elapsed;
-                        std::chrono::duration half_second = std::chrono::milliseconds(500);
+                        auto time_elapsed = std::chrono::steady_clock::now() - time_before_downloading_files;
+                        auto time_remaining = std::chrono::seconds(capture_delay_) - time_elapsed;
+                        auto half_second = std::chrono::milliseconds(500);
                         while (time_remaining.count() > 0) {
-                            std::chrono::duration time_to_sleep = time_remaining < half_second ? time_remaining : half_second;
+                            auto time_to_sleep = time_remaining < half_second ? time_remaining : half_second;
                             std::this_thread::sleep_for(time_to_sleep);
                             if (stop_) {
                                 return;
