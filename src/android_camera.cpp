@@ -27,8 +27,34 @@ namespace ols {
     static FILE *error_stream = NULL;
     #define LOG(...) do { if( ::ols::error_stream) { fprintf( ::ols::error_stream,__VA_ARGS__); fflush(::ols::error_stream); }} while(0)
 
+    struct ExecGuard {
+        ExecGuard(char const *name,int l) : name_(name),line_(l)
+        {
+            gettimeofday(&t1_,nullptr);
+            int m=(t1_.tv_sec % 3600) / 60;
+            int s=t1_.tv_sec % 60;
+            int ms=t1_.tv_usec / 1000;
+            LOG("enter %s:%d at %d:%d.%03d\n",name_,line_,m,s,ms);
+        }
+        ~ExecGuard()
+        {
+            gettimeofday(&t2_,nullptr);
+            double sec = (t2_.tv_sec + t2_.tv_usec * 1e-6) - (t1_.tv_sec + t1_.tv_usec*1e-6);
+            int m=(t2_.tv_sec % 3600) / 60;
+            int s=t2_.tv_sec % 60;
+            int ms=t2_.tv_usec / 1000;
+            LOG("leave %s:%d at %d:%d.%03d passed %0.3fms\n",name_,line_,m,s,ms,sec*1000);
+        }
+        char const *name_;
+        int line_;
+        struct timeval t1_,t2_;
+    };
+
+    #define GUARD ExecGuard gwrd(__func__,__LINE__) 
+
     static char const *camera_status_message(camera_status_t status)
     {
+        GUARD;
         char const *e = "";
         switch(status) {
         case ACAMERA_ERROR_UNKNOWN: e = "ACAMERA_ERROR_UNKNOWN"; break;
@@ -70,33 +96,40 @@ namespace ols {
     extern "C" {
         static void ac_on_discnnected(void *,ACameraDevice *)
         {
+            GUARD;
             LOG("Camera disconnected\n");
         }
         static void ac_on_error(void *,ACameraDevice *,int error)
         {
+            GUARD;
             LOG("Camera error %d\n",error);
         }
         static void ac_image_callback(void* context, AImageReader* reader);
         static void ac_cap_ready(void *,ACameraCaptureSession *)
         {
+            GUARD;
             LOG("Capture ready\n");
         }
         static void ac_cap_closed(void *,ACameraCaptureSession *)
         {
+            GUARD;
             LOG("Capture closed\n");
         }
         static void ac_cap_active(void *,ACameraCaptureSession *)
         {
+            GUARD;
             LOG("Capture active\n");
         }
     }
   
     class AndroidCamera : public Camera {
     public:
+        typedef std::unique_lock<std::recursive_mutex> cam_guard_type;
         /// for Android
         AndroidCamera(std::string const &id,std::string const &name,ACameraManager *manager) :
             id_(id), name_(name), manager_(manager)
         {
+            GUARD;
             ACameraDevice_StateCallbacks callbacks = ACameraDevice_StateCallbacks();
             callbacks.context = this;
             callbacks.onDisconnected = ac_on_discnnected;
@@ -122,6 +155,7 @@ namespace ols {
         }
         virtual ~AndroidCamera()
         {
+            GUARD;
             CamErrorCode e;
             stop_stream(e);
             if(e) {
@@ -141,14 +175,16 @@ namespace ols {
             }
         }
         /// Camera name
-        virtual std::string name(CamErrorCode &) 
+        virtual std::string name(CamErrorCode &)  override
         {
+            GUARD;
             return name_;
         }
         /// Return list of suppored video formats
 
         static char const *astream_format(int fmt)
         {
+            GUARD;
             char const *strfmt = "Unidentified";
             switch(fmt) {
                 case AIMAGE_FORMAT_RGBA_8888        : strfmt = "RGBA_8888"; break; 
@@ -175,6 +211,7 @@ namespace ols {
 
         static int to_val(CamStreamFormat f) 
         {
+            GUARD;
             int index;
             switch(f.format) {
             case stream_raw16:  index = 9; break;
@@ -193,17 +230,20 @@ namespace ols {
         }
         void sort_formats()
         {
+            GUARD;
            std::stable_sort(formats_.begin(),formats_.end(),[](CamStreamFormat l,CamStreamFormat r) {
                return to_val(l) > to_val(r);
            });
         }
 
-        virtual std::vector<CamStreamFormat> formats(CamErrorCode &e)
+        virtual std::vector<CamStreamFormat> formats(CamErrorCode &e) override
         {
+            GUARD;
             if(!formats_.empty())
                 return formats_;
 
             try {
+                cam_guard_type g(camera_lock_);
                 ACameraMetadata_const_entry entry = ACameraMetadata_const_entry();
                 camera_status_t res = ACameraMetadata_getConstEntry(meta_,ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,&entry);
                 check("ACameraMetadata_getConstEntry ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS",res);
@@ -297,6 +337,7 @@ namespace ols {
             }
             catch(std::exception const &err)  {
                 e = err.what();
+                LOG("error %s\n",err.what());
                 formats_.clear();
             }
             sort_formats();
@@ -305,6 +346,7 @@ namespace ols {
 
         void mono_bin2(unsigned char *p,int stride,int rows,int cols,uint16_t *out)
         {
+            GUARD;
             for(int r=0,r2=0;r<rows;r++,r2+=2,p+= 2 * stride) {
                 for(int c=0,c2=0;c<cols;c++,c2+=2) {
                     *out ++ = (uint16_t(p[c2]) + p[c2+1] + p[c2+stride] + p[c2+stride + 1])*64;
@@ -313,6 +355,7 @@ namespace ols {
         }
         void mono_bin3(unsigned char *p,int stride,int rows,int cols,uint16_t *out)
         {
+            GUARD;
             int stride2 = stride * 2;
             for(int r=0,r3=0;r<rows;r++,r3+=3,p+= 3 * stride) {
                 for(int c=0,c3=0;c<cols;c++,c3+=3) {
@@ -323,8 +366,9 @@ namespace ols {
                 }
             }
         }
-        void handle_frame(void *data,int len)
+        void handle_frame(void *data,int len,int stride)
         {
+            GUARD;
             struct timeval tv;
             gettimeofday(&tv,nullptr);
             CamFrame frm;
@@ -344,8 +388,22 @@ namespace ols {
                     handle_error("Invalid frame size");
                     return;
                 }
-                frm.data = data;
-                frm.data_size = size;
+                if(format_.width == stride) {
+                    frm.data = data;
+                    frm.data_size = size;
+                }
+                else {
+                    if((stride * (format_.height-1) + format_.width) > len || stride < format_.width) {
+                        LOG("Invalid stride %d for frame %dx%d of size %d\n",stride,format_.width,format_.height,len);
+                        handle_error("invalid frame stride");
+                        return;
+                    }
+                    cv::Mat in(format_.height,format_.width,CV_8UC1,data,stride);
+                    out_.create(format_.height,format_.width,CV_8UC1);
+                    in.copyTo(out_);
+                    frm.data = out_.data;
+                    frm.data_size = out_.rows*out_.cols;
+                }
             }
             else if(format_.format == stream_mono16) {
                 int size = yuv_max_w_ * yuv_max_h_;
@@ -359,7 +417,12 @@ namespace ols {
                     handle_error("Image size mistmatch for mono16 from yuv");
                     return;
                 }
-                cv::Mat in(yuv_max_h_,yuv_max_w_,CV_8UC1,data);
+                if((yuv_max_h_-1) * stride + yuv_max_w_ > len) {
+                    LOG("Image size mistmatch for mono16 from yuv h=%d stride=%d len=%d\n",yuv_max_h_,stride,len);
+                    handle_error("Image size mistmatch for mono16 from yuv");
+                    return;
+                }
+                cv::Mat in(yuv_max_h_,yuv_max_w_,CV_8UC1,data,stride);
                 out_.create(format_.height,format_.width,CV_16UC1);
                 switch(format_.bin) {
                 case 2: mono_bin2(in.data,in.step[0],format_.height,format_.width,(uint16_t*)out_.data); break;
@@ -408,14 +471,17 @@ namespace ols {
 
             frm.frame_counter = frame_counter_++;
             {
+                GUARD;
                 std::unique_lock<std::mutex> guard(lock_);
                 if(callback_) {
+                    GUARD;
                     callback_(frm);
                 }
             }
         }
         void handle_error(const char *msg)
         {
+            GUARD;
             CamFrame frm = CamFrame();
             frm.format = stream_error;
             frm.data = msg;
@@ -423,12 +489,15 @@ namespace ols {
             std::unique_lock<std::mutex> guard(lock_);
             if (callback_)
             {
+                GUARD;
                 callback_(frm);
             }
         }
 
         void image_callback(AImageReader *reader)
         {
+            GUARD;
+            cam_guard_type g(camera_lock_);
             AImage *image = nullptr;
             auto status = AImageReader_acquireNextImage(reader, &image);
             if(status != AMEDIA_OK) {
@@ -442,7 +511,11 @@ namespace ols {
                     LOG("Failed to get plane data media_status code=%d\n",int(status));
                 }
                 else {
-                    handle_frame(data,len);
+                    int32_t row_stride = 0;
+                    AImage_getPlaneRowStride(image,0,&row_stride);
+                    LOG("handling frame of size %d\n",len);
+                    handle_frame(data,len,row_stride);
+                    LOG("handling frame done\n");
                 }
                 
             }
@@ -455,6 +528,8 @@ namespace ols {
 
         void configure_capture()
         {
+            GUARD;
+            cam_guard_type g(camera_lock_);
             int fmt,w = format_.width,h = format_.height;
             switch(format_.format){
             case stream_mjpeg: 
@@ -511,6 +586,8 @@ namespace ols {
 
         void start_catpure()
         {
+            GUARD;
+            cam_guard_type g(camera_lock_);
             camera_status_t res;
             ACameraCaptureSession_stateCallbacks capture_callbacks = ACameraCaptureSession_stateCallbacks();
             capture_callbacks.onClosed = ac_cap_closed;
@@ -526,6 +603,9 @@ namespace ols {
 
         void stop_capture()
         {
+            GUARD;
+            cam_guard_type g(camera_lock_);
+            LOG("stop capture\n");
             if(capture_session_) {
                 ACameraCaptureSession_stopRepeating(capture_session_);
                 ACameraCaptureSession_close(capture_session_);
@@ -535,6 +615,8 @@ namespace ols {
 
         void cleanup_capture()
         {
+            GUARD;
+            cam_guard_type g(camera_lock_);
             stop_capture();
             if(output_target_) {
                 ACaptureRequest_removeTarget(request_,output_target_);
@@ -558,11 +640,15 @@ namespace ols {
                 AImageReader_delete(reader_);
                 reader_ = nullptr;
             }
+            LOG("Celaup done\n");
         }
 
         /// Start a video stream with provided callback 
-        virtual void start_stream(CamStreamFormat format,frame_callback_type callback,CamErrorCode &e) 
+        virtual void start_stream(CamStreamFormat format,frame_callback_type callback,CamErrorCode &e) override
         {
+            GUARD;
+            cam_guard_type g(camera_lock_);
+            LOG("Starting new stream %d,%d\n",format.width,format.height);
             if(stream_active_ != 0) {
                 stop_stream(e);
                 if(e)
@@ -571,6 +657,7 @@ namespace ols {
             format_ = format;
             {
                 std::unique_lock<std::mutex> guard(lock_);
+                GUARD;
                 callback_ = callback;
             }
             stream_active_ = 1;
@@ -579,6 +666,7 @@ namespace ols {
                 configure_capture();
             }
             catch(std::exception const &er) {
+                LOG("Config catpure failed %s\n",er.what());
                 cleanup_capture();
                 e=er.what();
                 {
@@ -591,8 +679,10 @@ namespace ols {
 
 
         /// stop the stream - once function ends callback will not be called any more
-        virtual void stop_stream(CamErrorCode &)
+        virtual void stop_stream(CamErrorCode &) override
         {
+            GUARD;
+            cam_guard_type g(camera_lock_);
             if(stream_active_ == 0)
                 return;
             {
@@ -600,6 +690,7 @@ namespace ols {
                 callback_ = nullptr;
             }
 
+            LOG("stopping stream\n");
             cleanup_capture();
             
             /// stop capture there
@@ -608,6 +699,7 @@ namespace ols {
         
         void make_modes(std::vector<std::string> &supported_names,std::vector<uint8_t> &codes,ACameraMetadata_const_entry &entry,std::vector<std::string> const &names)
         {
+            GUARD;
             for(unsigned i=0;i<entry.count;i++) {
                 unsigned v = entry.data.u8[i];
                 if(v>=names.size())
@@ -618,8 +710,10 @@ namespace ols {
         }
 
         /// list of camera controls that the camera supports
-        virtual std::vector<CamOptionId> supported_options(CamErrorCode &/*ec*/)
+        virtual std::vector<CamOptionId> supported_options(CamErrorCode &/*ec*/) override
         {
+            GUARD;
+            cam_guard_type g(camera_lock_);
             std::vector<CamOptionId> opts;
 
             ACameraMetadata_const_entry entry;
@@ -689,6 +783,7 @@ namespace ols {
         }
         void get_array_size(ACameraMetadata_const_entry &entry)
         {
+            GUARD;
             camera_status_t res = ACAMERA_OK;
             entry = ACameraMetadata_const_entry();
             res = ACameraMetadata_getConstEntry(meta_,ACAMERA_DISTORTION_CORRECTION_MODE, &entry);
@@ -701,8 +796,10 @@ namespace ols {
             check("ACTIVE_ARRAY_SIZE",res);
         }
         /// get camera control
-        virtual CamParam get_parameter(CamOptionId id,bool current_only,CamErrorCode &e) 
+        virtual CamParam get_parameter(CamOptionId id,bool current_only,CamErrorCode &e) override
         {
+            GUARD;
+            cam_guard_type g(camera_lock_);
             try {
                 CamParam r;
                 r.option = id;
@@ -832,11 +929,14 @@ namespace ols {
         }
         static std::vector<std::string> awb_modes()
         {
+            GUARD;
             return std::vector<std::string>{"off","auto","incandescent","fluorescent","warm-fluorescent","daylight","cloudy-daylight","twilight","shade"};
         }
         /// set camera control
-        virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e)
+        virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e) override
         {
+            GUARD;
+            cam_guard_type g(camera_lock_);
             try {
                 camera_status_t res = ACAMERA_OK;
                 switch(id) {
@@ -956,6 +1056,7 @@ namespace ols {
         std::vector<CamStreamFormat> formats_;
         CamStreamFormat format_;
         int frame_counter_ = 0;
+        std::recursive_mutex camera_lock_;
         // protected by mutex
         std::mutex lock_;
         frame_callback_type callback_; 
@@ -963,6 +1064,7 @@ namespace ols {
     extern "C" { 
         static void ac_image_callback(void* context, AImageReader* reader)
         {
+            GUARD;
             static_cast<AndroidCamera*>(context)->image_callback(reader);
         }
     }
@@ -971,6 +1073,7 @@ namespace ols {
     public:
         AndroidDriver()
         {
+            GUARD;
             manager_ = ACameraManager_create();
             if(!manager_) {
                 throw std::runtime_error("ACameraManager_create failed");
@@ -979,11 +1082,13 @@ namespace ols {
         }
         ~AndroidDriver()
         {
+            GUARD;
             if(manager_)
                 ACameraManager_delete(manager_);
         }
         virtual std::vector<std::string> list_cameras(CamErrorCode &e) 
         {
+            GUARD;
             if(!names_list_.empty()) {
                 return names_list_;
             }
