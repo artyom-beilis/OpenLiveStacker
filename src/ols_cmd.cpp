@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
+#include "allocator.h"
 
 bool parse_key_value(std::string arg,cppcms::json::value &cfg)
 {
@@ -84,6 +85,7 @@ int main(int argc,char **argv)
         std::string driver;
         std::string driver_opt;
         std::string astap_exe,astap_db;
+        int mem_limit_mb = 0;
 
         if(argc<2) {
             std::cerr << 
@@ -108,6 +110,7 @@ int main(int argc,char **argv)
                 return 1;
             }
         }
+        mem_limit_mb = cfg.get<int>("mem_limit_mb",0);
         driver = cfg.get<std::string>("driver");
         path = cfg.get("libdir","");
         astap_exe = cfg.get("astap.exe","astap_cli");
@@ -130,15 +133,19 @@ int main(int argc,char **argv)
         if(!driver_opt.empty()) {
             driver_opt_ptr = driver_opt.c_str();
         }
-
-        ols::CameraDriver::load_driver(driver,path,driver_opt_ptr,cfg.get("camera.log","/tmp/ols_camera.log"),cfg.get("camera.debug",false));
-        ols::PlateSolver::init(astap_db,astap_exe);
-        ols::OpenLiveStacker stacker;
-        stacker.http_ip = cfg.get("http.ip",stacker.http_ip);
-        stacker.http_port = cfg.get("http.port",stacker.http_port);
-        stacker.init(driver);
-        stacker.run();
-        stacker.shutdown();
+       
+        ols::AllocatorGuard alloc_guard(mem_limit_mb > 0);
+        { 
+            ols::CameraDriver::load_driver(driver,path,driver_opt_ptr,cfg.get("camera.log","/tmp/ols_camera.log"),cfg.get("camera.debug",false));
+            ols::PlateSolver::init(astap_db,astap_exe);
+            ols::OpenLiveStacker stacker;
+            stacker.mem_limit_mb = mem_limit_mb;
+            stacker.http_ip = cfg.get("http.ip",stacker.http_ip);
+            stacker.http_port = cfg.get("http.port",stacker.http_port);
+            stacker.init(driver);
+            stacker.run();
+            stacker.shutdown();
+        }
     }
     catch(std::exception const &e) {
         std::cerr << "failed:" << e.what() << std::endl;

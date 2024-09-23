@@ -1,6 +1,7 @@
 #include "ols.h"
 #include "plate_solver.h"
 #include "util.h"
+#include "allocator.h"
 #include <sstream>
 #include <booster/log.h>
 #include <android/log.h>
@@ -40,6 +41,7 @@ extern "C" {
             char const *document_root,      /// Document root for html files
             char const *http_ip,            /// IP to bind to, default should be 127.0.0.1
             int http_port,                  /// port to bind to, default should be 8080
+            int mem_limit_mb,               /// memory size limit in MB, 0 for no limit
             char const *driver_dir,         /// location of OLS drivers to load from
             char const *driver,             /// driver name
             char const *driver_config,      /// driver config option
@@ -58,6 +60,8 @@ extern "C" {
             std::string camera_log = dp + "/" + driver + "_camera.log"; 
             rename(camera_log.c_str(),(camera_log + ".1").c_str());
 
+            ols::AllocatorGuard wgrd(mem_limit_mb > 0);
+
             ols::CameraDriver::load_driver(driver,driver_dir,driver_config,camera_log,debug_driver);
             BOOSTER_ERROR("ols") <<"Driver loaded" << driver;
             ols::OpenLiveStacker::disableCVThreads();
@@ -68,6 +72,7 @@ extern "C" {
 
             g_stacker.reset(new ols::OpenLiveStacker(data_path));
             g_stacker->http_port = http_port;
+            g_stacker->mem_limit_mb = mem_limit_mb;
             g_stacker->http_ip = http_ip;
             g_stacker->document_root = document_root;
             g_stacker->init(driver,driver_parameter);
