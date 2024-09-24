@@ -4,6 +4,7 @@
     "sim" : {
         "path" : "sim"
     },
+    "mem_limit_mb" : 0,
     "wdir" : {
         "width" : 2028,
         "height": 1520,

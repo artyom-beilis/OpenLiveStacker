@@ -10,8 +10,10 @@
 #include "processors.h"
 #include "common_utils.h"
 #include "plate_solver.h"
+#include "allocator.h"
 #include "plate_solver_ctl_app.h"
 #include "astap_db_download_app.h"
+#include "allocator.h"
 
 namespace ols {
 
@@ -202,9 +204,27 @@ void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
     last_frame_ts_ = now;
 
     received_ ++;
-    if(video_generator_queue_->items > 10) {
+
+    bool drop_mem = false,drop_queue = false;
+    size_t allocated_mb = 0;
+    if(mem_limit_mb > 0) {
+        size_t mem_limit_bytes = size_t(1024ull*1024ull) * mem_limit_mb;
+        size_t allocated = AllocatorGuard::allocated();
+        allocated_mb = allocated >> 20;
+        if(allocated >= mem_limit_bytes) {
+            drop_mem = true;
+        }
+    }
+    int queue_items = video_generator_queue_->items;
+    constexpr int queue_size_limit = 10;
+    if(queue_items > queue_size_limit) {
+        drop_queue = true;
+    }
+
+    if(drop_queue || drop_mem) {
         dropped_since_last_update_ ++;
-        BOOSTER_WARNING("stacker") << "Processing is overloaded, dropping frame #" << (++dropped_);
+        BOOSTER_WARNING("stacker") << "Processing is overloaded, dropping frame #" << (++dropped_) 
+            << " Mem used " << allocated_mb << "MB out of " << mem_limit_mb << " Items in queue " << queue_items << " out of " << queue_size_limit;
         auto now = booster::ptime::now();
         if(booster::ptime::to_number(now - last_dropped_frame_ts_) > 1.0) {
             BOOSTER_WARNING("stacker") << "Queues status\n" << log_queues();

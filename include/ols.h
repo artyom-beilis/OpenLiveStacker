@@ -25,6 +25,7 @@ namespace ols {
 
         static void disableCVThreads();
 
+        int mem_limit_mb = 0;
         int http_port = 8080;
         std::string http_ip = "0.0.0.0";
         std::string document_root = "www-data";

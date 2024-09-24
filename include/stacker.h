@@ -578,7 +578,15 @@ namespace ols {
                 double reg_score = 0;
                 cv::Point2f shift = get_dx_dy(fft_frame,reg_score);
                 BOOSTER_INFO("stacker") <<"Registration at "<< frames_ <<":" << shift << std::endl;
-                bool to_add = restart_position || check_step(shift);
+                bool to_add;
+                if(restart_position) {
+                    to_add = true;
+                    reset_step(shift);
+                }
+                else {
+                    to_add = check_step(shift);
+                }
+                
                 if(to_add) {
                     auto start = std::chrono::high_resolution_clock::now();
                     bool sharp = check_sharp_score_and_avg_brightness(frame,shift,sharp_score,brightness);

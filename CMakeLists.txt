@@ -163,6 +163,7 @@ add_library(ols SHARED
     src/plate_solver.cpp
     src/server_sent_events.cpp
     src/downloader.cpp
+    src/allocator.cpp
     ${OLS_EXTRA}
     )
 
@@ -268,7 +269,7 @@ install(TARGETS ols ols_driver_sim
 if(NOT ANDROID_BUILD)
 
     add_executable(test_camera test/test_camera.cpp)
-    add_executable(ols_cmd test/ols_cmd.cpp)
+    add_executable(ols_cmd src/ols_cmd.cpp)
     add_executable(offline_ols test/offline_sim.cpp)
     add_executable(ols_plate_solver_test test/plate_solver_test.cpp)
     target_link_libraries(test_camera ols)

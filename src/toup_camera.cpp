@@ -96,6 +96,7 @@ namespace ols
     class ToupcamCamera : public Camera
     {
     public:
+        typedef std::unique_lock<std::recursive_mutex> cam_guard_type;
         /// for Android
         ToupcamCamera(std::string const &android_id,std::string const &camera_name, CamErrorCode &e)
         {
@@ -141,13 +142,14 @@ namespace ols
             hcam_ = NULL;
         }
         /// Camera name
-        virtual std::string name(CamErrorCode &)
+        virtual std::string name(CamErrorCode &) override
         {
             return name_;
         }
         /// Return list of suppored video formats
-        virtual std::vector<CamStreamFormat> formats(CamErrorCode &)
+        virtual std::vector<CamStreamFormat> formats(CamErrorCode &) override
         {
+            cam_guard_type g(camera_lock_);
             std::vector<CamStreamFormat> res;
             std::vector<CamStreamType> video_formats;
             bool isColor = !(info_.model->flag & TOUPCAM_FLAG_MONO);
@@ -205,6 +207,7 @@ namespace ols
         }
         void handle_error(std::string const &info,int code)
         {
+            cam_guard_type g(camera_lock_);
             CamFrame frm = {};
             std::string msg =make_message(info,code);
             frm.format = stream_error;
@@ -218,6 +221,7 @@ namespace ols
         }
         void handle_frame()
         {
+            cam_guard_type g(camera_lock_);
             CamFrame frm;
             int hr;
             int nW = 1, nH = 1;
@@ -314,8 +318,9 @@ namespace ols
         }
 
         /// Start a video stream with provided callback
-        virtual void start_stream(CamStreamFormat format, frame_callback_type callback, CamErrorCode &e)
+        virtual void start_stream(CamStreamFormat format, frame_callback_type callback, CamErrorCode &e) override
         {
+            cam_guard_type g(camera_lock_);
             //std::stringstream ss;
             int hr;
             //ss << format;
@@ -454,8 +459,9 @@ namespace ols
         }
 
         /// stop the stream - once function ends callback will not be called any more
-        virtual void stop_stream(CamErrorCode &e)
+        virtual void stop_stream(CamErrorCode &e) override
         {
+            cam_guard_type g(camera_lock_);
             // printf("\n\nstop_stream\n");
             if (stream_active_ == 0)
                 return;
@@ -482,8 +488,9 @@ namespace ols
         }
 
         /// list of camera controls that the camera supports
-        virtual std::vector<CamOptionId> supported_options(CamErrorCode &)
+        virtual std::vector<CamOptionId> supported_options(CamErrorCode &) override
         {
+            cam_guard_type g(camera_lock_);
             std::vector<CamOptionId> opts;
             // printf("\n\nsupported_options %llx\n", info_.model->flag);
             // Unconditionally supported
@@ -519,8 +526,10 @@ namespace ols
             return opts;
         }
         /// get camera control
-        virtual CamParam get_parameter(CamOptionId id, bool /*current_only*/, CamErrorCode &e)
+        virtual CamParam get_parameter(CamOptionId id, bool /*current_only*/, CamErrorCode &e) override
         {
+            cam_guard_type g(camera_lock_);
+            
             // printf("\n\nget_parameter: %s\n", cam_option_id_to_string_id(id).c_str());
             HRESULT hr;
             CamParam r = {};
@@ -680,7 +689,7 @@ namespace ols
                 // printf("Toupcam_get_Temperature = %d -> %d\n", hr, temp);
 
                 r.cur_val = std::round(10.0 * temp * TOUPCAM_2_OLS_TEMP) / 10.0; // in 0.1℃ units (32 means 3.2℃, -35 means -3.5℃).
-                r.def_val = TOUPCAM_TEC_TARGET_DEF * TOUPCAM_2_OLS_TEMP;
+                r.def_val = 0;
             }
             break;
             case opt_cooler_target:
@@ -693,10 +702,12 @@ namespace ols
                     e = make_message("Failed to Toupcam_get_Temperature", hr);
                     return r;
                 }
+                
 
-                r.min_val = TOUPCAM_TEC_TARGET_MIN * TOUPCAM_2_OLS_TEMP; // Toupcam API in 0.1℃ units (32 means 3.2℃, -35 means -3.5℃)
-                r.max_val = TOUPCAM_TEC_TARGET_MAX * TOUPCAM_2_OLS_TEMP;
-                r.def_val = TOUPCAM_TEC_TARGET_DEF * TOUPCAM_2_OLS_TEMP;
+                // values from old sdk
+                r.min_val = -50; // Toupcam API in 0.1℃ units (32 means 3.2℃, -35 means -3.5℃)
+                r.max_val = 40; 
+                r.def_val = 0;
                 r.cur_val = temp * TOUPCAM_2_OLS_TEMP;
                 r.step_size = TOUPCAM_2_OLS_TEMP;
             }
@@ -766,9 +777,10 @@ namespace ols
             return r;
         }
         /// set camera control
-        virtual void set_parameter(CamOptionId id, double value, CamErrorCode &e)
+        virtual void set_parameter(CamOptionId id, double value, CamErrorCode &e) override
         {
             // printf("\n\nset_parameter: %s -> %f\n", cam_option_id_to_string_id(id).c_str(), value);
+            cam_guard_type g(camera_lock_);
             HRESULT hr = -1;
 
             switch (id)
@@ -1155,6 +1167,7 @@ namespace ols
         CamBayerType bayerPattern_ = bayer_na;
         bool auto_wb_ = false;
         // protected by mutex
+        std::recursive_mutex camera_lock_;
         std::mutex lock_;
         frame_callback_type callback_;
     };
