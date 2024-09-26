@@ -32,46 +32,6 @@ bool parse_key_value(std::string arg,cppcms::json::value &cfg)
 
 }
 
-//#define DEBUG_ALLOCATOR
-#ifdef DEBUG_ALLOCATOR
-
-static cv::MatAllocator *stda = nullptr;
-
-
-
-static std::atomic<int> counter_a;
-static std::atomic<size_t> memory_use;
-static std::atomic<size_t> memory_max;
-
-
-class MyAlloc : public cv::MatAllocator
-{
-public:
-    virtual cv::UMatData *  allocate (int dims, const int *sizes, int type, void *data, size_t *step, cv::AccessFlag flags, cv::UMatUsageFlags usageFlags) const override
-    {
-        cv::UMatData *p = stda->allocate(dims,sizes,type,data,step,flags,usageFlags);
-        p->currAllocator = this;
-        memory_use += p->size;
-        memory_max = std::max(size_t(memory_max),size_t(memory_use));
-        std::cerr << "A1 " << int(counter_a++) << " total " << memory_use / 1024 / 1024 << " max=" << memory_max / 1024 / 1024<< std::endl;
-        return p;
-    }
-    virtual bool allocate (cv::UMatData *data, cv::AccessFlag accessflags, cv::UMatUsageFlags usageFlags) const override 
-    {
-        std::cerr << "A2 " << int(counter_a++) << std::endl;
-        return stda->allocate(data,accessflags,usageFlags);
-    }
-    virtual void deallocate   (   cv::UMatData *  data    )   const override
-    {
-        memory_use -= data->size;
-        std::cerr << "D " << int(--counter_a) << " total " << memory_use / 1024 / 1024 << std::endl;
-        stda->deallocate(data);
-    }
-
-} alloc_inst;
-
-#endif
-
 int main(int argc,char **argv)
 {   
     try {
