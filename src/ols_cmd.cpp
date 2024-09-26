@@ -36,11 +36,6 @@ int main(int argc,char **argv)
 {   
     try {
 
-#ifdef DEBUG_ALLOCATOR
-        stda = cv::Mat::getStdAllocator();
-        cv::Mat::setDefaultAllocator(&alloc_inst);
-#endif        
-
         std::string path;
         std::string driver;
         std::string driver_opt;
