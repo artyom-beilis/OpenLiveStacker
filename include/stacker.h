@@ -173,7 +173,7 @@ namespace ols {
             }
             cv::dft(gray,dft,cv::DFT_COMPLEX_OUTPUT);
             if(first_frame) {
-                cv::mulSpectrums(dft,fft_kern_,dft,0);
+                mask_fft(dft);
             }
 #ifdef DEBUG
             {
@@ -189,6 +189,11 @@ namespace ols {
             }
 #endif        
             return dft;
+        }
+
+        void mask_fft(cv::Mat dft)
+        {
+            cv::mulSpectrums(dft,fft_kern_,dft,0);
         }
 
         int fft_pos(int x)
@@ -767,15 +772,11 @@ namespace ols {
     public:
         DynamicStacker(int w,int h,int c) :StackerBase(w,h,c) 
         {
-            fully_stacked_ = cv::Rect(0,0,width_,height_);
+            int border_w = width_ / 8;
+            int border_h = height_ / 8;
+            move_limit_ = window_size_ / 8;
+            fully_stacked_ = cv::Rect(border_w,border_h,width_-2*border_w,height_ - 2*border_h);
         }
-
-        struct FrameBatch {
-            cv::Point2f shift;
-            cv::Mat frame;
-            int count;
-            cv::Rect fov;
-        };
 
         virtual void set_filters(bool throw_frames,int frames_to_judge,float,float,float) 
         {
@@ -802,25 +803,7 @@ namespace ols {
         }
         virtual cv::Mat get_raw_stacked_image() 
         {
-            float scale = 1.0 / std::max(1,stacked_);
-            cv::Mat res = sum_ * scale;
-            #if 1
-            if(fully_stacked_.x > 0) {
-                res(cv::Rect(fully_stacked_.x-1,0,1,height_)) = cv::Scalar::all(1.0f);
-            }
-            else if(fully_stacked_.width + fully_stacked_.x + 1 < width_) {
-                int x0 = fully_stacked_.width + fully_stacked_.x + 1;
-                res(cv::Rect(x0,0,1,height_)) = cv::Scalar::all(1.0f);
-            }
-            if(fully_stacked_.y > 0) {
-                res(cv::Rect(0,fully_stacked_.y-1,width_,1)) = cv::Scalar::all(1.0f);
-            }
-            else if(fully_stacked_.height + fully_stacked_.y + 1 < height_) {
-                int y0 = fully_stacked_.height + fully_stacked_.y + 1;
-                res(cv::Rect(0,y0,width_,1)) = cv::Scalar::all(1.0f);
-            }
-            #endif
-            return res;
+            return sum_.clone();
         }
 
 
@@ -832,19 +815,20 @@ namespace ols {
             }
             else {
                 fft_roi_ = *fft;
-                cv::mulSpectrums(fft_roi_,fft_kern_,fft_roi_,0);
+                mask_fft(fft_roi_);
             }
-            fully_stacked_ = cv::Rect(0,0,width_,height_);
             stacked_ = 1;
             if(frames_to_ignore > 0)
                 frames_to_ignore--;
             offset_ = cv::Point2f(0,0);
+            avg_dx_ = avg_dy_ = 0;
         }
         virtual bool stack_image(cv::Mat frame,bool restart_position = false)
         {
             total_ ++;
             if(restart_position)
                 frames_to_ignore = filter_frames_;
+            
             if(stacked_ == 0 || restart_position || frames_to_ignore > 0) {
                 stack_first(frame);
             }
@@ -853,10 +837,18 @@ namespace ols {
                 double reg_score = 0;
                 cv::Point2f shift = get_dx_dy(fft_frame,reg_score);
                 if(!check_step(shift)) {
-                    frames_to_ignore = filter_frames_;
-                    stack_first(frame,&fft_frame);
+                    failed_count_ ++;
+                    constexpr int max_fails = 2;
+                    if(failed_count_ >= max_fails) {
+                        failed_count_ = 0;
+                        frames_to_ignore = filter_frames_;
+                        stack_first(frame,&fft_frame);
+                        return true;
+                    }
+                    return false;
                 }
                 else {
+                    failed_count_ = 0;
                     add_frame(frame,shift,fft_frame);
                 }
             }
@@ -865,36 +857,32 @@ namespace ols {
     private:
         bool check_step(cv::Point2f shift)
         {
-            BOOSTER_INFO("stacker") << "Current " << offset_.x<<"," << offset_.y << " -> " << shift.x <<"," << shift.y;
-            if(std::abs(shift.x) > window_size_ / 4 || std::abs(shift.y) > window_size_ / 4) {
+            if(std::abs(shift.x) > window_size_ / 8 || std::abs(shift.y) > window_size_ / 8) {
                 return false;
             }
             float dx = offset_.x - shift.x;
             float dy = offset_.y - shift.y;
-            float step = sqrt(dx*dx + dy*dy);
-            float offset_l = sqrt(offset_.x*offset_.x + offset_.y * offset_.y);
-            if(step > 10) {
-                BOOSTER_INFO("stacker") << "Step " << step << " too big";
+            
+            char log_txt[256];
+            snprintf(log_txt,sizeof(log_txt),
+                    "Step size %.1f/%.1f from %.1f/%.1f -> %.1f/%.1f avg %.1f/%.1f",
+                        dx,dy,
+                        offset_.x,offset_.y,shift.x,shift.y,
+                        avg_dx_,avg_dy_);
+
+            if(std::abs(avg_dx_ - dx) > 3 || std::abs(avg_dy_ - dy) > 3) {
+                BOOSTER_INFO("stacker") << "Step is too big " << log_txt;
                 return false;
             }
-            if(step < 3)
-                return true;
-            float cosine = (offset_.x * -dx + offset_.y*-dy) / step / (offset_l + 0.0001);
-            if(offset_l > 10 && cosine < 0.8) {
-                BOOSTER_INFO("stacker") << "cosine too small " << cosine << " delta idirection" << -dx << "," << -dy;
-                return false;
-            }
-            float pred_x = offset_.x * (stacked_ + 1) / stacked_;
-            float pred_y = offset_.y * (stacked_ + 1) / stacked_;
-            float pred_dx = pred_x - shift.x;
-            float pred_dy = pred_y - shift.y;
-            if(sqrt(pred_dx*pred_dx + pred_dy*pred_dy) > 5) {
-                BOOSTER_INFO("stacker") << "Predicted too far " << cosine << " predicted " << pred_x << ","<<pred_y << " actual " << shift.x <<"," << shift.y;
-                return false;
-            }
+            BOOSTER_INFO("stacker") << "Step Ok " << log_txt;
+            float w0 = 1.0f/(stacked_ + 1);
+            float w1 = 1 - w0;
+            avg_dx_ = dx * w0 + avg_dx_ * w1;
+            avg_dy_ = dy * w0 + avg_dy_ * w1;
+            
             return true;
         }
-        void add_frame(cv::Mat frame,cv::Point2f shift,cv::Mat /*fft*/)
+        void add_frame(cv::Mat frame,cv::Point2f shift,cv::Mat fft)
         {
             int dx = round(shift.x - offset_.x);
             int dy = round(shift.y - offset_.y);
@@ -902,24 +890,35 @@ namespace ols {
             int height = (height_ - std::abs(dy));
             cv::Rect src_rect = cv::Rect(std::max(dx,0),std::max(dy,0),width,height);
             cv::Rect img_rect = cv::Rect(std::max(-dx,0),std::max(-dy,0),width,height);
-            cv::Mat(frame,img_rect) += cv::Mat(sum_,src_rect);
-            
-            cv::Rect orig_rect = fully_stacked_;
-            orig_rect.x -= dx;
-            orig_rect.y -= dy;
-            fully_stacked_ = orig_rect & img_rect;
 
+            int stacked_limit = move_limit_ / std::max(0.25f,std::max(avg_dx_,avg_dy_));
+            float W0 = stacked_ >= stacked_limit ? 0.2f : (1.0f / stacked_);
+            float W1 = 1 - W0;
+            BOOSTER_INFO("stacker") << "Dynamic stacking frames limit=" << stacked_limit;
+            frame = frame.mul(cv::Scalar::all(W0));
+            cv::Mat(frame,img_rect) += cv::Mat(sum_,src_rect).mul(cv::Scalar::all(W1));
 
             stacked_ ++;
             sum_ = frame;
             offset_ = shift;
+            int shift_limit = move_limit_ / 2;
+            if(std::abs(offset_.x) > shift_limit || std::abs(offset_.y) > shift_limit) {
+                BOOSTER_INFO("stacker") << "Resetting ancor frame  shift " << offset_ << " larger than " << shift_limit;
+                offset_ = cv::Point2f(0,0);
+                fft_roi_ = fft;
+                mask_fft(fft_roi_);
+            }
         }
 
+        cv::Point2f velocity_ = cv::Point2f(0,0);
         cv::Point2f offset_ = cv::Point2f(0,0);
         int filter_frames_ = 0;
         int frames_to_ignore = 0;
         int stacked_ = 0;
         int total_ = 0;
+        int failed_count_ = 0;
+        int move_limit_;
+        float avg_dy_,avg_dx_;
         cv::Rect fully_stacked_;
     };
 

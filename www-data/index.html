@@ -46,7 +46,7 @@
         <button class="incdec_but" onclick="showStack(false);">X</button>
     </span>
     <table>
-    <tr class="stack_opt dso_config calib_config plan_config" >
+    <tr class="stack_opt dso_config calib_config plan_config dynamic_config" >
         <td><button onclick='startStack();'>Start</button></td>
         <td>&nbsp;</td>
         <td>&nbsp;</td>
@@ -59,6 +59,7 @@
             <select id="stack_type" class="saved_input" onchange='updateStackSelect()'>
                <option value="dso" selected>Deep Space Object</option>
                <option value="planetary">Planetary</option>
+               <option value="dynamic">Non-Tracking Dynamic</option>
                <option value="calibration">Calibration Frame</option> 
             </select>
         </td>
@@ -66,20 +67,20 @@
     <tr class="dso_config stack_opt" ><td>Exposure Mpl.</td><td><input class="saved_input" id="stack_synthetic_exposure_mpl" type="number" min="1" max="50" value="1"></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Derotate</td><td><input class="saved_input" id="stack_field_derotation" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Derotate Mirror</td><td><input class="saved_input" id="stack_image_flip" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr class="dso_config calib_config stack_opt" ><td>Remove Hot Pixels</td><td><input class="saved_input" id="stack_remove_hot_pixels" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr class="dso_config stack_opt" ><td>Remove Gradient</td><td><input class="saved_input" id="stack_remove_gradient" type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr class="dso_config dynamic_config calib_config stack_opt" ><td>Remove Hot Pixels</td><td><input class="saved_input" id="stack_remove_hot_pixels" type="checkbox" ></td><td>&nbsp;</td></tr>
+    <tr class="dso_config dynamic_config stack_opt" ><td>Remove Gradient</td><td><input class="saved_input" id="stack_remove_gradient" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Remove Satellites</td><td><input class="saved_input" id="stack_remove_satellites" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Target</td><td>RA:<input class="val_input" id="stack_ra" type="text" ></td><td>DE:<input class="val_input" id="stack_de" type="text" ></td></tr>
 
     <tr class="dso_config stack_opt plan_config" ><td colspan="3" style="text-align:center;"><b>Calibration</b></td></tr>
-    <tr class="dso_config stack_opt plan_config" ><td>Darks</td><td colspan="2"><select id="stack_darks" onchange="saveCalibValue(this);" ></select></td></tr>
-    <tr class="dso_config stack_opt plan_config" ><td>Flats</td><td colspan="2"><select id="stack_flats" onchange="saveCalibValue(this);"></select></td></tr>
-    <tr class="dso_config stack_opt plan_config" ><td>Dark Flats</td><td colspan="2"><select id="stack_dark_flats" onchange="saveCalibValue(this); "></select></td></tr>
+    <tr class="dso_config stack_opt dynamic_config plan_config" ><td>Darks</td><td colspan="2"><select id="stack_darks" onchange="saveCalibValue(this);" ></select></td></tr>
+    <tr class="dso_config stack_opt dynamic_config plan_config" ><td>Flats</td><td colspan="2"><select id="stack_flats" onchange="saveCalibValue(this);"></select></td></tr>
+    <tr class="dso_config stack_opt dynamic_config plan_config" ><td>Dark Flats</td><td colspan="2"><select id="stack_dark_flats" onchange="saveCalibValue(this); "></select></td></tr>
     
-    <tr class="dso_config stack_opt plan_config" ><td colspan="3" style="text-align:center;"><b>Filters</b></td></tr>
+    <tr class="dso_config stack_opt dynamic_config plan_config" ><td colspan="3" style="text-align:center;"><b>Filters</b></td></tr>
     <tr class="stack_opt plan_config" ><td>Drop First Frames</td><td><input class="saved_input" id="stack_filters_remove_first" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr class="dso_config stack_opt plan_config" >
-        <td>Min Stat Size</td>
+    <tr class="dso_config stack_opt plan_config dynamic_config" >
+        <td><span class="stack_opt plan_config dso_config">Min Stat Size</span><span class="dynamic_config">Skip Frames</span> </td>
         <td><input class="saved_input" type="range" id="stack_filters_min_stat_size" min="3" max="30" step="1" value="10" oninput="updateFltSlider('filters_min_stat_size');" ></td>
         <td><output id="out_filters_min_stat_size">10</output></td>
     </tr>

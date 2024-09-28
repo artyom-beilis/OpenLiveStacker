@@ -131,6 +131,8 @@ namespace ols {
                 cmd->method = stack_calibration;
             else if(method == "planetary")
                 cmd->method = stack_planetary;
+            else if(method == "dynamic")
+                cmd->method = stack_dynamic;
             else
                 throw std::runtime_error("Unsupported stacking method:" + method);
             cmd->name = content_.get<std::string>("name");

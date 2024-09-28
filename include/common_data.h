@@ -3,7 +3,8 @@ namespace ols {
     enum StackMethod {
         stack_calibration,
         stack_dso,
-        stack_planetary
+        stack_planetary,
+        stack_dynamic
     };
     struct StretchInfo {
         double cut = 0;

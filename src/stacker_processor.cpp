@@ -151,8 +151,10 @@ namespace ols {
                     cframe_count_ = 0;
                 }
                 else {
-                    //stacker_.reset(new Stacker(width_,height_,channels_));
-                    stacker_.reset(new DynamicStacker(width_,height_,channels_));
+                    if(ctl->method == stack_dynamic)
+                        stacker_.reset(new DynamicStacker(width_,height_,channels_));
+                    else
+                        stacker_.reset(new Stacker(width_,height_,channels_));
                     stacker_->set_remove_satellites(ctl->remove_satellites);
                     stacker_->set_rollback_on_pause(ctl->rollback_on_pause);
                     stacker_->set_filters(ctl->filters.remove_first,

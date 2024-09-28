@@ -143,6 +143,8 @@ namespace ols {
                 cfg.method = stack_dso;
             else if(method == "planetary")
                 cfg.method = stack_planetary;
+            else if(method == "dynamic")
+                cfg.method = stack_dynamic;
             else
                 throw std::runtime_error("Invalid stack method " + method);
             cfg.derotate = v.get<bool>("derotate");

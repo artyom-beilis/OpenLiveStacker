@@ -125,7 +125,7 @@ namespace ols {
                     v["darks"] = ctl->darks_path;
                     v["flats"] = ctl->flats_path;
                     v["dark_flats"] = ctl->dark_flats_path;
-                    v["method"] = std::vector<std::string>({"calibration","dso","planetary"}).at(ctl->method);
+                    v["method"] = std::vector<std::string>({"calibration","dso","planetary","dynamic"}).at(ctl->method);
                     v["derotate"] = ctl->derotate;
                     v["derotate_mirror"] = ctl->derotate_mirror;
                     v["remove_gradient"] = ctl->remove_gradient;

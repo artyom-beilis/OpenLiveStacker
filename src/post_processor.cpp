@@ -305,10 +305,16 @@ namespace ols {
                 dropped_count_ = 0;
                 stack_info_ = *ctl;
                 last_frame_ = nullptr;
-                if(ctl->method == stack_planetary)
+                switch(ctl->method) {
+                case stack_planetary:
                     pp_.reset(new PlanetaryPostProcessor());
-                else if(ctl->method == stack_calibration || ctl->method == stack_dso)
+                    break;
+                case stack_calibration:
+                case stack_dso:
+                case stack_dynamic:
                     pp_.reset(new PostProcessor());
+                    break;
+                }
                 pp_->set_stretch(ctl->auto_stretch,ctl->stretch_low,ctl->stretch_high,ctl->stretch_gamma);
                 pp_->set_deconv(ctl->deconv_sig,ctl->deconv_iters);
                 pp_->set_unsharp_mask(ctl->unsharp_sig,ctl->unsharp_strength);

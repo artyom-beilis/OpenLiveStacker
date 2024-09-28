@@ -331,6 +331,8 @@ function updateStackSelect()
         elements = document.getElementsByClassName('calib_config');
     else if(type == 'planetary')
         elements = document.getElementsByClassName('plan_config');
+    else if(type == 'dynamic')
+        elements = document.getElementsByClassName('dynamic_config');
     new_style = '';
     for(var i=0;i<elements.length;i++) {
         elements[i].style.display = new_style;
