@@ -420,7 +420,7 @@ function changeStackerStatus(new_status)
         ui_ctl.pause = true;
         ui_ctl.resume = false;
         ui_ctl.save = true;
-        ui_ctl.pp = type == 'dso';
+        ui_ctl.pp = type == 'dso' || type == 'dynamic';
         ui_ctl.sharp = type == 'planetary';
         ui_ctl.live = true;
         ui_ctl.stats = true;
@@ -435,7 +435,7 @@ function changeStackerStatus(new_status)
         ui_ctl.cancel = true;
         ui_ctl.resume = true;
         ui_ctl.save = true;
-        ui_ctl.pp = type == 'dso';
+        ui_ctl.pp = type == 'dso' || type == 'dynamic';
         ui_ctl.sharp = type == 'planetary';
         ui_ctl.live = true;
         ui_ctl.stats = true;
