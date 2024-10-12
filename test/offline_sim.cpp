@@ -10,6 +10,7 @@
 #include <opencv2/imgproc.hpp>
 #include "hot_removal.h"
 
+#include <unistd.h>
 
 namespace ols {
     class Simulator {
@@ -23,10 +24,19 @@ namespace ols {
 
         void run(bool run_pp)
         {
+            static int counter = 0;
             queue_pointer_type out;
             if(run_pp) {
                 out = std::shared_ptr<queue_type>(new queue_type());
-                out->call_on_push([](std::shared_ptr<QueueData> ){});
+                out->call_on_push([&](std::shared_ptr<QueueData> p){
+                    std::shared_ptr<CameraFrame> frame = std::dynamic_pointer_cast<CameraFrame>(p);
+                    if(!frame || !frame->jpeg_frame)
+                        return;
+                    std::ofstream tmp("/tmp/frame_" + std::to_string(counter) + ".jpeg");
+                    tmp.write((char*)frame->jpeg_frame->data(),frame->jpeg_frame->size());
+                    tmp.close();
+                    counter++;
+                });
             }
             std::thread t1 = start_preprocessor(input_queue_,stacker_queue_,nullptr);
             std::thread t2 = start_stacker(stacker_queue_,pp_queue_);
@@ -115,6 +125,7 @@ namespace ols {
                     frame->timestamp = timestamp;
                     BOOSTER_INFO("stacker") << "Loaded image " << (path) << " " << img.rows<<"x"<<img.cols << std::endl;
                     input_queue_->push(frame);
+                    usleep(100000);
                 }
             }
             

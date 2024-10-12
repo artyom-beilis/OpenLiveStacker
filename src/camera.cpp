@@ -1,6 +1,7 @@
 #include "camera.h"
 #include <dlfcn.h>
 #include <algorithm>
+#include <iomanip>
 
 extern "C" typedef ols::CameraDriver *(*cam_generator_ptr_type)(int,ols::CamErrorCode *);
 extern "C" typedef int (*cam_config_ptr_type)(char const *);
@@ -67,22 +68,27 @@ std::unique_ptr<CameraDriver> CameraDriver::get(int id,int external_option)
         throw CamError("Failed to load camera " + std::to_string(id) + ":" + e.message());
     return r;
 }
+
 std::ostream &operator<<(std::ostream &out,CamStreamFormat const &fmt)
 {
-    switch(fmt.format) {
-    case stream_yuv2: out << "YUV2"; break;
-    case stream_mjpeg: out << "MJPEG"; break;
-    case stream_rgb24: out << "RGB24"; break;
-    case stream_rgb48: out << "RGB48"; break;
-    case stream_raw8:  out << "RAW8"; break;
-    case stream_raw16:  out << "RAW16"; break;
-    case stream_mono8:  out << "MONO8"; break;
-    case stream_mono16:  out << "MONO16"; break;
-    default: out << "Unknown";
+    std::string fmt_name = stream_type_to_str(fmt.format);
+    out << fmt_name << ":" << fmt.width << "x"  << fmt.height;
+    if(fmt.bin>1) {
+        out << ":bin" << fmt.bin;
     }
-    out << ":" << fmt.width << "x" << fmt.height <<"@" << fmt.framerate;
+    if(fmt.roi_num > 1 || fmt.roi_den > 1) {
+        if(fmt.bin == 1)
+            out << ":";
+        else
+            out << ",";
+        out << "roi=" << fmt.roi_num <<  "/" << fmt.roi_den;
+    }
+    if(fmt.framerate > 0) {
+        out << "@" <<  std::fixed << std::setprecision(1) << fmt.framerate;
+    }
     return out;
 }
+
 
 static char const *option_string_ids[] = {
     "auto_exp", "auto_wb", "auto_focus", "exp", "wb", "wb_r", "wb_b", "focus", "gain", "gamma", "brightness","contrast", "temperature", "cooler_target","cooler_on", "fan_on", "cooler_power","average_bin","black_level","conv_gain_hcg","conv_gain_hdr","low_noise","high_fullwell", 

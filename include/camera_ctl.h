@@ -248,22 +248,9 @@ namespace ols {
                 v[i]["bin"] = fmt.bin;
                 v[i]["format"] = fmt_name;
                 v[i]["framerate"] = fmt.framerate;
-                std::string name = fmt_name + ":" + std::to_string(fmt.width) + "x" + std::to_string(fmt.height);
-                if(fmt.bin>1) {
-                    name += ":bin" + std::to_string(fmt.bin);
-                }
-                if(fmt.roi_num > 1 || fmt.roi_den > 1) {
-                    if(fmt.bin == 1)
-                        name += ":";
-                    else
-                        name += ",";
-                    name += "roi=" + std::to_string(fmt.roi_num) + "/" + std::to_string(fmt.roi_den);
-                }
-                if(fmt.framerate > 0) {
-                    std::ostringstream ss;
-                    ss << "@" <<  std::fixed << std::setprecision(1) << fmt.framerate;
-                    name += ss.str();
-                }
+                std::ostringstream ss;
+                ss << fmt;
+                std::string name = ss.str();
                 v[i]["format_id"] = name;
                 formats_[name] = fmt;
             }

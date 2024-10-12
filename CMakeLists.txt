@@ -10,6 +10,9 @@ option(NO_SSE4 "Disable SSE 4.1/4.3 on x86/x86_64 builds" OFF)
 find_library(ASI_CAMERA_LIB ASICamera2)
 find_path(ASI_CAMERA_HDR ASICamera2.h)
 
+find_library(INDIGO_LIB indigo)
+find_path(INDIGO_HEADER indigo/indigo_bus.h)
+
 find_library(TOUPCAM_CAMERA_LIB toupcam)
 find_path(TOUPCAM_CAMERA_HDR toupcam.h)
 
@@ -41,6 +44,7 @@ find_library(LIBGPHOTO2_PORT_LIB gphoto2_port)
 
 set(WITH_SSE OFF)
 set(OLS_EXTRA )
+set(OLS_LIB_EXTRA )
 
 
 include_directories(${LIBCPPCMS_HRD})
@@ -147,6 +151,18 @@ else()
     message("- No Toupcam SDK header/lib found")
 endif()
 
+if(LIBCFITSIO AND LIBCFITSIO_HDR)
+    set(OLS_EXTRA ${OLS_EXTRA} src/fitsmat.cpp)
+    set(OLS_LIB_EXTRA ${LIBCFITSIO})
+endif()
+
+if(LIBCFITSIO AND LIBCFITSIO_HDR)
+    include_directories(${LIBCFITSIO_HDR})
+    add_definitions(-DWITH_CFITSIO)
+    message("- Building OLS with fits support")
+else()
+    message("- Building OLS without fits support")
+endif()
 
 
 add_library(ols SHARED 
@@ -167,7 +183,9 @@ add_library(ols SHARED
     ${OLS_EXTRA}
     )
 
-target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBZ} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
+target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBZ} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS} ${OLS_LIB_EXTRA})
+
+
 if(ANDROID_BUILD)
     target_link_libraries(ols log)
 endif()
@@ -194,23 +212,12 @@ endif()
 add_library(ols_driver_sim SHARED src/sim_camera.cpp)
 target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
 
+
+
+
 if(NOT ANDROID_BUILD)  
-    set(WDIREXTRA)
-    if(LIBCFITSIO AND LIBCFITSIO_HDR)
-        set(WDIREXTRA src/fitsmat.cpp)
-    endif()
-
-    add_library(ols_driver_wdir SHARED src/wdir_camera.cpp ${WDIREXTRA})
+    add_library(ols_driver_wdir SHARED src/wdir_camera.cpp)
     target_link_libraries(ols_driver_wdir ols ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS} ${LIBBOOSTER})
-    if(LIBCFITSIO AND LIBCFITSIO_HDR)
-        include_directories(${LIBCFITSIO_HDR})
-        target_compile_definitions(ols_driver_wdir PRIVATE WITH_CFITSIO)
-        target_link_libraries(ols_driver_wdir ${LIBCFITSIO})
-        message("- Building WDir driver with fits support")
-    else()
-        message("- Building WDir driver without fits support")
-    endif()
-
     if(LIBRAW_LIB AND LIBRAW_HDR)
         include_directories(${LIBRAW_HDR})
         target_compile_definitions(ols_driver_wdir PRIVATE WITH_LIBRAW)
@@ -222,6 +229,16 @@ if(NOT ANDROID_BUILD)
     else()
         message("- Building WDir driver without libraw")
     endif()
+endif()
+
+
+if(INDIGO_HEADER AND INDIGO_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR)
+    include_directories(${INDIGO_HEADER})
+    add_library(ols_driver_indigo SHARED src/indigo_camera.cpp)
+    target_link_libraries(ols_driver_indigo ${INDIGO_LIB})
+    message(" -- Building indigo camera driver")
+else()
+    message(" -- Indigo camera driver disabled")
 endif()
 
 if(LIBGPHOTO2_HDR AND LIBGPHOTO2_LIB AND LIBGPHOTO2_PORT_LIB)
@@ -267,7 +284,8 @@ install(TARGETS ols ols_driver_sim
 )
 
 if(NOT ANDROID_BUILD)
-
+    include_directories(src)
+    add_executable(test_indigo_format_parsing test/test_indigo_format_parsing.cpp)
     add_executable(test_camera test/test_camera.cpp)
     add_executable(ols_cmd src/ols_cmd.cpp)
     add_executable(offline_ols test/offline_sim.cpp)
@@ -276,6 +294,7 @@ if(NOT ANDROID_BUILD)
     target_link_libraries(ols_cmd ols)
     target_link_libraries(offline_ols ols)
     target_link_libraries(ols_plate_solver_test ols ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS})
+    target_link_libraries(test_indigo_format_parsing ols)
     install(TARGETS ols_driver_sim ols_cmd offline_ols
             RUNTIME DESTINATION bin
             LIBRARY DESTINATION lib

@@ -83,14 +83,17 @@ int main(int argc,char **argv)
             if(oem)
                 driver_opt = "oem";
         }
-
+        else if(driver == "indigo") {
+            driver_opt = cfg.get("indigo.connection","");
+        }
+        
         char const *driver_opt_ptr = nullptr;
         if(!driver_opt.empty()) {
             driver_opt_ptr = driver_opt.c_str();
         }
        
         ols::AllocatorGuard alloc_guard(mem_limit_mb > 0);
-        { 
+        {
             ols::CameraDriver::load_driver(driver,path,driver_opt_ptr,cfg.get("camera.log","/tmp/ols_camera.log"),cfg.get("camera.debug",false));
             ols::PlateSolver::init(astap_db,astap_exe);
             ols::OpenLiveStacker stacker;
