@@ -13,6 +13,7 @@
 #include <fstream>
 #include <cmath>
 #include "indigo_camera.h"
+#include "sync_queue.h"
 #include "fitsmat.h"
 #include "shift_bit.h"
 #define INDIGO_LINUX
@@ -71,17 +72,52 @@ namespace ols {
     {
     public:
 
-        IndigoCamera(std::string const &name) : name_(name)
+        IndigoCamera(std::string const &name,bool local_driver) : name_(name), local_driver_(local_driver)
         {
             LOG("Camera %s created\n",name.c_str());
             config_client();
             indigo_attach_client(&client_);
             LOG("Client %s attached\n",name.c_str());
+            if(local_driver_) {
+                auto worker = std::thread([this]() {
+                   this->thread_func();
+                });
+                async_calls_ = std::move(worker);
+            }
+        }
+        void async_exec(void (IndigoCamera::*f)())
+        {
+            if(!local_driver_) {
+                (this->*f)();
+            }
+            else {
+                async_queue_.push([=]() {
+                    (this->*f)(); 
+                });
+            }
         }
         ~IndigoCamera()
         {
+            if(local_driver_) {
+                async_queue_.push(std::function<void()>());
+                async_calls_.join();
+            }
             indigo_detach_client(&client_);
         }
+
+        void thread_func()
+        {
+            while(true) {
+                auto f = async_queue_.pop();
+                if(!f)
+                    break;
+                {
+                    guard_type g(lock_);
+                    f(); 
+                }
+            }
+        }
+
         bool wait_ready(CamErrorCode &e)
         {
             for(int i=0;i<100;i++) {
@@ -297,6 +333,11 @@ namespace ols {
             IndigoCamera *self = static_cast<IndigoCamera*>(client->client_context);
             return self->client_new_property_impl(true,client,device,property,message);
         }
+
+        void set_fits()
+        {
+            indigo_change_switch_property_1(&client_,name_.c_str(), CCD_IMAGE_FORMAT_PROPERTY_NAME, CCD_IMAGE_FORMAT_FITS_ITEM_NAME,true);
+        }
         
         indigo_result client_new_property_impl(bool is_new,indigo_client *client, indigo_device *device, indigo_property *property, const char *msg)
         {
@@ -331,17 +372,23 @@ namespace ols {
             {
                 return INDIGO_OK;
             }
+            if(is_new && !strcmp(property->name,CCD_STREAMING_PROPERTY_NAME)) {
+                CamParam r = CamParam();
+                if(config_num_opt(r,property,opt_exp,type_msec,CCD_STREAMING_PROPERTY_NAME,CCD_EXPOSURE_ITEM_NAME,1e3)) {
+                    streaming_max_exp_ = r.max_val;
+                }
+            }
             if(!strcmp(property->name, CCD_EXPOSURE_PROPERTY_NAME)) {
                 if(!connected_) {
                     config_num_opt(property,opt_exp,type_msec,CCD_EXPOSURE_PROPERTY_NAME,CCD_EXPOSURE_ITEM_NAME,1e3);
                 }
                 if(property->state == INDIGO_OK_STATE && streaming_) {
-                    expose();
+                    async_exec(&IndigoCamera::expose);
                 }
                 return INDIGO_OK;
             }
             if(is_new && !strcmp(property->name, CCD_IMAGE_FORMAT_PROPERTY_NAME)) {
-                indigo_change_switch_property_1(&client_,name_.c_str(), CCD_IMAGE_FORMAT_PROPERTY_NAME, CCD_IMAGE_FORMAT_FITS_ITEM_NAME,true);
+                async_exec(&IndigoCamera::set_fits);
                 return INDIGO_OK;
             }
 
@@ -386,7 +433,6 @@ namespace ols {
             double value = parameters_[opt_exp].cur_val * 1e-3;
             LOG("Setting exposure to %f\n",value);
             indigo_change_number_property(&client_, name_.c_str(), CCD_EXPOSURE_PROPERTY_NAME, 1, &item, &value);
-            //indigo_change_number_property(&client_, name_.c_str(), CCD_STREAMING_PROPERTY_NAME, 1, &item, &value);
         }
 
         void add_format(indigo_item *item)
@@ -456,12 +502,13 @@ namespace ols {
         CamStreamFormat stream_;
         int frame_counter_ = 0;
         std::string name_; 
+        bool local_driver_;
         indigo_client client_;
         bool streaming_ = false;
         frame_callback_type callback_;
         std::map<CamOptionId,CamParam> parameters_;
         std::set<CamOptionId> deferred_;
-        double stream_max_ = 0;
+        double streaming_max_exp_ = -1;
         std::vector<CamStreamFormat> formats_;
         std::vector<std::string> format_names_;
         std::vector<int> scale_factors_;
@@ -470,6 +517,9 @@ namespace ols {
         bool busy_detected_ = false;
         bool connected_ = false;
         indigo_server_entry *server_ = nullptr;
+
+        sync_queue<std::function<void()>> async_queue_;
+        std::thread async_calls_;
     };
 
 
@@ -524,6 +574,14 @@ namespace ols {
 
         virtual std::vector<std::string> list_cameras(CamErrorCode &)
         {
+            for(int i=0;i<50;i++) {
+                {
+                    guard_type g(lock_);
+                    if(!device_names_.empty())
+                        return device_names_;
+                }
+                indigo_usleep(100000);
+            }
             guard_type g(lock_);
             return device_names_;
         }
@@ -537,7 +595,8 @@ namespace ols {
                 e = "No such camera " + std::to_string(id);
                 return std::unique_ptr<Camera>();
             }
-            std::unique_ptr<Camera> c(new IndigoCamera(device_names_[size_t(id)]));
+            bool local_driver = driver_ != nullptr;
+            std::unique_ptr<Camera> c(new IndigoCamera(device_names_[size_t(id)],local_driver));
             return c;
         }
     private:
