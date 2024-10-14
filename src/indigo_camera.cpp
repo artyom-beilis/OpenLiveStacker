@@ -503,6 +503,7 @@ namespace ols {
         int frame_counter_ = 0;
         std::string name_; 
         bool local_driver_;
+        bool is_indi_;
         indigo_client client_;
         bool streaming_ = false;
         frame_callback_type callback_;
@@ -556,6 +557,7 @@ namespace ols {
                 }
             }
             else {
+                indigo_service_ = true;
                 if(indigo_load_driver(driver.c_str(), true, &driver_) != INDIGO_OK) {
                     e="Failed to load driver: " + driver;
                 }
@@ -600,18 +602,37 @@ namespace ols {
             return c;
         }
     private:
-        static indigo_result client_new_property(indigo_client *client, indigo_device *, indigo_property *property, const char *)
+
+        static indigo_result client_new_property(indigo_client *client, indigo_device *device, indigo_property *property, const char *message)
+        {
+            log_property(property,message);
+            return client_update_property(client,device,property,message);
+        }
+        static indigo_result client_update_property(indigo_client *client, indigo_device *, indigo_property *property, const char *message)
         {
             IndigoCameraDriver *self = static_cast<IndigoCameraDriver*>(client->client_context);
             if(strcmp(property->name,"INFO") == 0 && property->type == INDIGO_TEXT_VECTOR) {
-                for(int i=0;i<property->count;i++) {
-                    if(strcmp(property->items[i].name,"DEVICE_INTERFACE")==0 && (atoi(property->items[i].text.value) & INDIGO_INTERFACE_CCD)) {
-                        self->add_device(property->device);
-                        break;
-                    }
-                }
+                log_property(property,message);
+                self->check_info_property(property);
             }
             return INDIGO_OK;
+        }
+        void check_info_property(indigo_property *property)
+        {
+            guard_type g(lock_);
+            for(int i=0;i<property->count;i++) {
+                if(strcmp(property->items[i].name,"VERSION") == 0 && strcmp(property->items[i].label,"INDIGO") == 0) {
+                    set_indigo();
+                }
+                if(strcmp(property->items[i].name,"DEVICE_INTERFACE")==0 && (atoi(property->items[i].text.value) & INDIGO_INTERFACE_CCD)) {
+                    add_device(property->device);
+                }
+            }
+        }
+        void set_indigo()
+        {
+            guard_type g(lock_);
+            indigo_service_ = true;
         }
         
         static indigo_result client_attach(indigo_client *client) 
@@ -622,7 +643,6 @@ namespace ols {
 
         void add_device(char const *name)
         {
-            guard_type g(lock_);
             for(size_t i=0;i<device_names_.size();i++) {
                 if(device_names_[i] == name)
                     return;
@@ -641,7 +661,7 @@ namespace ols {
                 NULL, // enable blob model
                 &IndigoCameraDriver::client_attach,
                 &IndigoCameraDriver::client_new_property,
-                &IndigoCameraDriver::client_new_property,
+                &IndigoCameraDriver::client_update_property,
                 NULL,
                 NULL,
                 nullptr, // detach IndigoCameraDriver::client_detach
@@ -653,6 +673,7 @@ namespace ols {
         indigo_server_entry *server_ = nullptr;
         indigo_driver_entry *driver_ = nullptr;
         bool connected_ = false;
+        bool indigo_service_ = false;
         std::recursive_mutex lock_;
     };
 
