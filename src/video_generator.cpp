@@ -154,6 +154,7 @@ namespace ols {
                     case bayer_gr:  cv::cvtColor(desp,rgb,cv::COLOR_BayerGB2BGR); break; // COLOR_BayerGRBG2BGR = COLOR_BayerGB2BGR
                     case bayer_bg:  cv::cvtColor(desp,rgb,cv::COLOR_BayerRG2BGR); break; // COLOR_BayerBGGR2BGR = COLOR_BayerRG2BGR
                     case bayer_gb:  cv::cvtColor(desp,rgb,cv::COLOR_BayerGR2BGR); break; // COLOR_BayerGBRG2BGR = COLOR_BayerGR2BGR
+                    case bayer_na:  cv::cvtColor(desp,rgb,cv::COLOR_GRAY2BGR);    break; // handle case when indigo reports raw but it actually mono
                     default:
                         BOOSTER_ERROR("stacker") << "Invalid bayer patter";
                     }
