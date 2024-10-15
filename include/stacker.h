@@ -835,10 +835,12 @@ namespace ols {
                 cv::Mat fft_frame = calc_fft(frame,false);
                 double reg_score = 0;
                 cv::Point2f shift = get_dx_dy(fft_frame,reg_score);
-                if(!check_step(shift)) {
+                float step_size = check_step(shift);
+                if(step_size > 0) {
                     failed_count_ ++;
-                    constexpr int max_fails = 2;
-                    if(failed_count_ >= max_fails) {
+                    constexpr int max_fails = 5;
+                    constexpr int max_fails_large = 2;
+                    if(failed_count_ >= max_fails || (step_size > 3 && failed_count_ >= max_fails_large)) {
                         failed_count_ = 0;
                         ignore_till_ts_ = frame_timestamp + filter_frames_;
                         stack_first(frame,&fft_frame);
@@ -854,10 +856,10 @@ namespace ols {
             return true;
         }
     private:
-        bool check_step(cv::Point2f shift)
+        float check_step(cv::Point2f shift)
         {
             if(std::abs(shift.x) > window_size_ / 8 || std::abs(shift.y) > window_size_ / 8) {
-                return false;
+                return 1000;
             }
             float dx = offset_.x - shift.x;
             float dy = offset_.y - shift.y;
@@ -869,17 +871,22 @@ namespace ols {
                         offset_.x,offset_.y,shift.x,shift.y,
                         avg_dx_,avg_dy_);
 
-            if(std::abs(avg_dx_ - dx) > 3 || std::abs(avg_dy_ - dy) > 3) {
+            float avg_diff_x = std::abs(avg_dx_ - dx);
+            float avg_diff_y = std::abs(avg_dy_ - dy);
+            float result = std::max(avg_diff_x,avg_diff_y) / 3.0f;
+            if(result > 1.0f) {
                 BOOSTER_INFO("stacker") << "Step is too big " << log_txt;
-                return false;
+            }
+            else {
+                result = 0.0f;
             }
             BOOSTER_INFO("stacker") << "Step Ok " << log_txt;
-            float w0 = 1.0f/(stacked_ + 1);
+            float w0 = 1.0f/(std::min(20,stacked_) + 1);
             float w1 = 1 - w0;
             avg_dx_ = dx * w0 + avg_dx_ * w1;
             avg_dy_ = dy * w0 + avg_dy_ * w1;
             
-            return true;
+            return result;
         }
         void add_frame(cv::Mat frame,cv::Point2f shift,cv::Mat fft)
         {
