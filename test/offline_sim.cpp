@@ -45,7 +45,7 @@ namespace ols {
             std::cerr << cfg_.width << " " << cfg_.height << std::endl;
             input_queue_->push(ctl);
             try {
-                load_frames();
+                load_frames(run_pp);
                 ctl.reset(new StackerControl());
                 ctl->op = StackerControl::ctl_save;
                 input_queue_->push(ctl);
@@ -67,7 +67,7 @@ namespace ols {
             return dir_ + name;
         }
 
-        void load_frames()
+        void load_frames(bool run_pp)
         {
             std::ifstream data(dir_  + "/log.txt");
             if(!data)
@@ -126,7 +126,11 @@ namespace ols {
                     frame->timestamp = timestamp;
                     BOOSTER_INFO("stacker") << "Loaded image " << (path) << " " << img.rows<<"x"<<img.cols << std::endl;
                     input_queue_->push(frame);
-                    usleep(100000);
+                    if(run_pp && cfg_.method == stack_dynamic) {
+                        std::shared_ptr<StackerControl> ctl(new StackerControl());
+                        ctl->op = StackerControl::ctl_save;
+                        input_queue_->push(ctl);
+                    }
                 }
             }
             
