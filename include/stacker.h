@@ -52,7 +52,7 @@ namespace ols {
 
         virtual ~StackerBase() {}
 
-        virtual void set_filters(bool throw_frames,int frames_to_judge,
+        virtual void set_filters(bool throw_frames,int frames_to_judge,int dynamic_delay,
                          float sharp_percetile,float reg_percentile,float brightness_sigma) = 0;
         virtual void set_rollback_on_pause(bool v) = 0;
         virtual void set_remove_satellites(bool v) = 0;
@@ -61,7 +61,7 @@ namespace ols {
         virtual int stacked_count() = 0;
         virtual cv::Rect fully_stacked_area() = 0;
         virtual cv::Mat get_raw_stacked_image() = 0;
-        virtual bool stack_image(cv::Mat frame,bool restart_position = false) = 0;
+        virtual bool stack_image(cv::Mat frame,double timestamp,bool restart_position = false) = 0;
 
     protected:
         float max3p(float v0,float v1,float v2)
@@ -255,7 +255,7 @@ namespace ols {
             fully_stacked_count_ = 0;
         }
 
-        void set_filters(bool throw_frames,int frames_to_judge,
+        void set_filters(bool throw_frames,int frames_to_judge,int /*dynamic_delay*/,
                          float sharp_percetile,float reg_percentile,float brightness_sigma)
         {
             throw_first_frames_ = throw_frames;
@@ -545,7 +545,7 @@ namespace ols {
             quality_roi_.y -= int(best_shift_.y);
         }
         
-        bool stack_image(cv::Mat frame,bool restart_position = false)
+        bool stack_image(cv::Mat frame,double /*timestamp*/,bool restart_position = false) override
         {
             total_count_ ++;
             if(exp_multiplier_ != 1) {
@@ -778,12 +778,10 @@ namespace ols {
             fully_stacked_ = cv::Rect(border_w,border_h,width_-2*border_w,height_ - 2*border_h);
         }
 
-        virtual void set_filters(bool throw_frames,int frames_to_judge,float,float,float) 
+        virtual void set_filters(bool, int ,int dynamic_delay,float,float,float) 
         {
-            throw_frames = true;
-            if(!throw_frames)
-                frames_to_judge = 0;
-            filter_frames_ = frames_to_judge;
+            filter_frames_ = dynamic_delay;
+            BOOSTER_INFO("stacker") << "Delay after reset " << dynamic_delay;
         }
         virtual void set_rollback_on_pause(bool) {}
         virtual void set_remove_satellites(bool) {}
@@ -818,18 +816,19 @@ namespace ols {
                 mask_fft(fft_roi_);
             }
             stacked_ = 1;
-            if(frames_to_ignore > 0)
-                frames_to_ignore--;
             offset_ = cv::Point2f(0,0);
             avg_dx_ = avg_dy_ = 0;
         }
-        virtual bool stack_image(cv::Mat frame,bool restart_position = false)
+        virtual bool stack_image(cv::Mat frame,double frame_timestamp,bool restart_position = false) override
         {
             total_ ++;
-            if(restart_position)
-                frames_to_ignore = filter_frames_;
+            if(restart_position || stacked_ == 0) {
+                ignore_till_ts_ = frame_timestamp + filter_frames_;
+            }
+
             
-            if(stacked_ == 0 || restart_position || frames_to_ignore > 0) {
+            if(stacked_ == 0 || restart_position || ignore_till_ts_ > frame_timestamp) {
+                BOOSTER_INFO("stacker") << "Deley till next frame: " << (ignore_till_ts_ - frame_timestamp) << std::endl;
                 stack_first(frame);
             }
             else {
@@ -841,7 +840,7 @@ namespace ols {
                     constexpr int max_fails = 2;
                     if(failed_count_ >= max_fails) {
                         failed_count_ = 0;
-                        frames_to_ignore = filter_frames_;
+                        ignore_till_ts_ = frame_timestamp + filter_frames_;
                         stack_first(frame,&fft_frame);
                         return true;
                     }
@@ -913,7 +912,7 @@ namespace ols {
         cv::Point2f velocity_ = cv::Point2f(0,0);
         cv::Point2f offset_ = cv::Point2f(0,0);
         int filter_frames_ = 0;
-        int frames_to_ignore = 0;
+        double ignore_till_ts_ = 0;
         int stacked_ = 0;
         int total_ = 0;
         int failed_count_ = 0;

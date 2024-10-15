@@ -108,7 +108,7 @@ namespace ols {
                     BOOSTER_INFO("stacker") << "Stacking took " << (1e3*time) << " ms, calibration frame #" << cframe_count_;
                 }
                 else {
-                    if(stacker_->stack_image(video->processed_frame,restart_)) {
+                    if(stacker_->stack_image(video->processed_frame,video->timestamp,restart_)) {
                         restart_ = false;
 		                auto p1 = std::chrono::high_resolution_clock::now();
                         double time = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1> > >(p1-start).count();
@@ -159,6 +159,7 @@ namespace ols {
                     stacker_->set_rollback_on_pause(ctl->rollback_on_pause);
                     stacker_->set_filters(ctl->filters.remove_first,
                                           ctl->filters.min_stat_size,
+                                          ctl->filters.dynamic_delay,
                                           ctl->filters.sharpness_percentile,
                                           ctl->filters.reg_score_percentile,
                                           ctl->filters.avg_brightness_sigma);

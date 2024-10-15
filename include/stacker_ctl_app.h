@@ -186,6 +186,7 @@ namespace ols {
 
             cmd->filters.remove_first=content_.get("filters.remove_first",cmd->filters.remove_first);
             cmd->filters.min_stat_size=content_.get("filters.min_stat_size",cmd->filters.min_stat_size);
+            cmd->filters.dynamic_delay=content_.get("filters.dynamic_delay",cmd->filters.dynamic_delay);
             cmd->filters.sharpness_percentile=content_.get("filters.sharpness_percentile",cmd->filters.sharpness_percentile);
             cmd->filters.reg_score_percentile=content_.get("filters.reg_score_percentile",cmd->filters.reg_score_percentile);
             cmd->filters.avg_brightness_sigma=content_.get("filters.avg_brightness_sigma",cmd->filters.avg_brightness_sigma);

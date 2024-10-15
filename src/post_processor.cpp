@@ -157,6 +157,7 @@ namespace ols {
             m << "Filters:" << std::endl;
             m << " - Drop first        " << stack_info_.filters.remove_first << std::endl;
             m << " - Stat Size         " << stack_info_.filters.min_stat_size << std::endl;
+            m << " - Dynamic Delay     " << stack_info_.filters.dynamic_delay << std::endl;
             m << " - Sharp %           " << stack_info_.filters.sharpness_percentile << std::endl;
             m << " - Reg Score %       " << stack_info_.filters.reg_score_percentile << std::endl;
             m << " - Brightness Sigma  " << stack_info_.filters.avg_brightness_sigma << std::endl;

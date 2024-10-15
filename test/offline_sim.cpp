@@ -183,6 +183,7 @@ namespace ols {
             
             cfg.filters.remove_first=v.get("filters.remove_first",cfg.filters.remove_first);
             cfg.filters.min_stat_size=v.get("filters.min_stat_size",cfg.filters.min_stat_size);
+            cfg.filters.dynamic_delay=v.get("filters.dynamic_delay",cfg.filters.min_stat_size);
             cfg.filters.sharpness_percentile=v.get("filters.sharpness_percentile",cfg.filters.sharpness_percentile);
             cfg.filters.reg_score_percentile=v.get("filters.reg_score_percentile",cfg.filters.reg_score_percentile);
             cfg.filters.avg_brightness_sigma=v.get("filters.avg_brightness_sigma",cfg.filters.avg_brightness_sigma);

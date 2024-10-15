@@ -79,8 +79,13 @@
     
     <tr class="dso_config stack_opt dynamic_config plan_config" ><td colspan="3" style="text-align:center;"><b>Filters</b></td></tr>
     <tr class="stack_opt plan_config" ><td>Drop First Frames</td><td><input class="saved_input" id="stack_filters_remove_first" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr class="dso_config stack_opt plan_config dynamic_config" >
-        <td><span class="stack_opt plan_config dso_config">Min Stat Size</span><span class="dynamic_config">Skip Frames</span> </td>
+    <tr class="dynamic_config" >
+        <td>Delay After Move (s)</td>
+        <td><input class="saved_input" type="range" id="stack_filters_dynamic_delay" min="1" max="10" step="1" value="2" oninput="updateFltSlider('filters_dynamic_delay');" ></td>
+        <td><output id="out_filters_dynamic_delay">2</output></td>
+    </tr>
+    <tr class="dso_config stack_opt plan_config" >
+        <td>Min Stat Size</td>
         <td><input class="saved_input" type="range" id="stack_filters_min_stat_size" min="3" max="30" step="1" value="10" oninput="updateFltSlider('filters_min_stat_size');" ></td>
         <td><output id="out_filters_min_stat_size">10</output></td>
     </tr>

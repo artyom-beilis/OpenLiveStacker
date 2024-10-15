@@ -149,6 +149,7 @@ namespace ols {
                     
                     v["filters"]["remove_first"] = ctl->filters.remove_first;
                     v["filters"]["min_stat_size"] = ctl->filters.min_stat_size;
+                    v["filters"]["dynamic_delay"] = ctl->filters.dynamic_delay;
                     v["filters"]["sharpness_percentile"] = ctl->filters.sharpness_percentile;
                     v["filters"]["reg_score_percentile"] = ctl->filters.reg_score_percentile;
                     v["filters"]["avg_brightness_sigma"] = ctl->filters.avg_brightness_sigma;

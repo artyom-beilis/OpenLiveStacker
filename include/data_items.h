@@ -74,6 +74,7 @@ namespace ols {
 
     struct Filters {
         bool remove_first = false;
+        int dynamic_delay = 1;
         int  min_stat_size = 10;
         double sharpness_percentile = 100.0;
         double reg_score_percentile = 100.0;

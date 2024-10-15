@@ -1459,6 +1459,7 @@ function startStack()
     var filters = {
         remove_first:false,
         min_stat_size:10,
+        dynamic_delay: 2,
         sharpness_percentile:100,
         reg_score_percentile:100,
         avg_brightness_sigma:-1,
@@ -1468,6 +1469,7 @@ function startStack()
             remove_hot_pixels=false;
             filters.remove_first = getBVal('filters_remove_first');
         }
+        filters.dynamic_delay = parseInt(getVal('filters_dynamic_delay'));
         filters.min_stat_size = parseInt(getVal('filters_min_stat_size'));
         filters.sharpness_percentile = parseFloat(getVal('filters_sharpness_percentile'));
         filters.reg_score_percentile = parseFloat(getVal('filters_reg_score_percentile'));
@@ -1476,6 +1478,8 @@ function startStack()
             filters.avg_brightness_sigma = -1;
     }
     var delay = getStartDelay();
+    if(type == 'dynamic')
+        delay = 0;
     if(isNaN(synthetic_exposure_mpl))
         synthetic_exposure_mpl = 1
     var rollback_on_pause = delay > 0;
