@@ -7,6 +7,11 @@
 #include <unistd.h>
 #include "allocator.h"
 
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <unistd.h>
+
 bool parse_key_value(std::string arg,cppcms::json::value &cfg)
 {
 	booster::regex r("([^=]+)=(.*)$");
@@ -32,6 +37,69 @@ bool parse_key_value(std::string arg,cppcms::json::value &cfg)
 
 }
 
+class ServerGuard {
+public:
+    ServerGuard(ServerGuard const &) = delete;
+    void operator=(ServerGuard const &) = delete;
+    ServerGuard(std::string const &s) : cmd_(s)
+    {
+        if(cmd_.empty())
+            return;
+        std::cout << "Running " << cmd_ << std::endl;
+        std::vector<char *> parts;
+        for(char *part = strtok(&cmd_[0]," ");part;part = strtok(nullptr," ")) {
+            parts.push_back(part);
+        }
+        parts.push_back(nullptr);
+        if(parts.size() < 2) {
+            throw std::runtime_error("Invalid command " + s);
+        }
+        int child_pid = fork();
+        if(child_pid < 0) {
+            throw std::runtime_error("Failed to fork");
+        }
+        else if(child_pid > 0) {
+            child_pid_ = child_pid;
+        }
+        else {
+            execvp(parts[0],&parts[0]);
+            perror("execv");
+            std::cerr << "Server failed to start" << std::endl;
+            exit(1);
+        }
+
+    }
+    ~ServerGuard()
+    {
+        if(child_pid_ != -1) {
+            kill(child_pid_,SIGTERM);
+            int count = 0;
+            while(true) {
+                if(count > 50) {
+                    kill(child_pid_,SIGKILL);
+                }
+                int status;
+                int res = 0;
+                if((res = waitpid(child_pid_,&status,WNOHANG)) > 0)
+                    break;
+                if(res < 0) {
+                    if(errno == ECHILD)
+                        break;
+                    if(errno == EINTR)
+                        continue;
+                    break;
+                } 
+                usleep(100000);
+                count++;
+            }
+        }
+    }
+private:
+    std::string cmd_;
+    int child_pid_ = -1;
+};
+
+
 int main(int argc,char **argv)
 {   
     try {
@@ -39,6 +107,7 @@ int main(int argc,char **argv)
         std::string path;
         std::string driver;
         std::string driver_opt;
+        std::string server_cmd;
         std::string astap_exe,astap_db;
         int mem_limit_mb = 0;
 
@@ -86,11 +155,19 @@ int main(int argc,char **argv)
         else if(driver == "indigo") {
             driver_opt = cfg.get("indigo.connection","");
         }
+        else if(driver == "indi") {
+            driver_opt = cfg.get("indi.connection","");
+            server_cmd = cfg.get("indi.start_cmd",server_cmd);
+        }
+
+        
         
         char const *driver_opt_ptr = nullptr;
         if(!driver_opt.empty()) {
             driver_opt_ptr = driver_opt.c_str();
         }
+
+        ServerGuard sg(server_cmd);
        
         ols::AllocatorGuard alloc_guard(mem_limit_mb > 0);
         {

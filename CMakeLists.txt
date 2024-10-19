@@ -10,6 +10,8 @@ option(NO_SSE4 "Disable SSE 4.1/4.3 on x86/x86_64 builds" OFF)
 find_library(ASI_CAMERA_LIB ASICamera2)
 find_path(ASI_CAMERA_HDR ASICamera2.h)
 
+find_library(INDI_LIB indiclient)
+find_path(INDI_HEADER libindi/baseclient.h)
 find_library(INDIGO_LIB indigo)
 find_path(INDIGO_HEADER indigo/indigo_bus.h)
 
@@ -240,6 +242,18 @@ if(INDIGO_HEADER AND INDIGO_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR)
 else()
     message(" -- Indigo camera driver disabled")
 endif()
+
+if(INDI_HEADER AND INDI_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR)
+    include_directories(${INDI_HEADER})
+    add_library(ols_driver_indi SHARED src/indi_camera.cpp)
+    target_link_libraries(ols_driver_indi ${INDI_LIB})
+    message(" -- Building indi camera driver")
+else()
+    message(" -- Indi camera driver disabled")
+endif()
+
+
+
 
 if(LIBGPHOTO2_HDR AND LIBGPHOTO2_LIB AND LIBGPHOTO2_PORT_LIB)
     include_directories(${LIBGPHOTO2_HDR})
