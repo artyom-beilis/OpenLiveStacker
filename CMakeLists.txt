@@ -217,7 +217,7 @@ target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
 
 
 
-if(NOT ANDROID_BUILD)  
+if(NOT ANDROID_BUILD AND NOT APPLE)  
     add_library(ols_driver_wdir SHARED src/wdir_camera.cpp)
     target_link_libraries(ols_driver_wdir ols ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS} ${LIBBOOSTER})
     if(LIBRAW_LIB AND LIBRAW_HDR)

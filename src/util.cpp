@@ -36,6 +36,7 @@ namespace ols {
         return buf;
     }
 
+#ifdef __linux__
     struct DirWatch::data {
         int data_size = 0;
         union INotifyUnion {
@@ -114,4 +115,5 @@ namespace ols {
         }
         return name;
     }
+#endif    
 }

@@ -5,7 +5,7 @@ namespace ols {
     std::string ftime(std::string const &pattern,time_t ts);
     void make_dir(std::string const &path);
     bool exists(std::string const &path);
-
+#ifdef __linux__ 
     class DirWatch {
     public:
         DirWatch(std::string const &path); 
@@ -22,4 +22,5 @@ namespace ols {
         std::unique_ptr<data> d;
 
     };
+#endif    
 }
