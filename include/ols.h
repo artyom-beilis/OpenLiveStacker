@@ -29,6 +29,7 @@ namespace ols {
         int http_port = 8080;
         std::string http_ip = "0.0.0.0";
         std::string document_root = "www-data";
+        std::string indi_libdir;
 
         void init(std::string driver,int external_option = -1);
         void run();

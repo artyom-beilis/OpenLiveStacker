@@ -5,6 +5,7 @@
 #include <sstream>
 #include <booster/log.h>
 #include <android/log.h>
+#include <unistd.h>
 #define LOG(format, ...) __android_log_print(ANDROID_LOG_ERROR, "UVC", "[%s:%d/%s] " format "\n", basename(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__)
 
 namespace ols {
@@ -55,6 +56,12 @@ extern "C" {
 
             std::string dp = data_path;
             ols::make_dir(dp);
+            fflush(stderr);
+            FILE *fe=fopen(std::string(dp + "/stderr.txt").c_str(),"w");
+            if(fe) {
+                dup2(fileno(fe),2); // redirect stder
+            }
+            fprintf(stderr,"Testing stderr\n");
             dp += "/debug";
             ols::make_dir(dp);
             std::string camera_log = dp + "/" + driver + "_camera.log"; 
@@ -70,7 +77,12 @@ extern "C" {
             std::string astap_tmp = data_path + std::string("/debug");
             ols::PlateSolver::init(astap_db,astap_exe,astap_tmp);
 
+            /// configure locations
+            setenv("HOME",data_path,1);
+            setenv("INDI_MATH_PLUGINS_DIRECTORY",driver_dir,1);
+
             g_stacker.reset(new ols::OpenLiveStacker(data_path));
+            g_stacker->indi_libdir = driver_dir;
             g_stacker->http_port = http_port;
             g_stacker->mem_limit_mb = mem_limit_mb;
             g_stacker->http_ip = http_ip;

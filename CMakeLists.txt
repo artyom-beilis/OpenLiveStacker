@@ -10,8 +10,14 @@ option(NO_SSE4 "Disable SSE 4.1/4.3 on x86/x86_64 builds" OFF)
 find_library(ASI_CAMERA_LIB ASICamera2)
 find_path(ASI_CAMERA_HDR ASICamera2.h)
 
-find_library(INDI_LIB indiclient)
-find_path(INDI_HEADER libindi/baseclient.h)
+find_library(INDI_LIB1 indi_unified_client_server HINT /opt/indi_as_library/lib)
+find_library(INDI_LIB2 indi_unified HINT /opt/indi_as_library/lib)
+set(INDI_LIB ${INDI_LIB1} ${INDI_LIB2})
+find_path(INDI_HEADER libindi/baseclient.h 
+            HINT ${CMAKE_FIND_ROOT_PATH}/include
+            HINT /opt/indi_as_library/include)
+include_directories(${INDI_HEADER}/libindi)
+
 find_library(INDIGO_LIB indigo)
 find_path(INDIGO_HEADER indigo/indigo_bus.h)
 
@@ -24,8 +30,6 @@ find_library(LIBBOOSTER booster)
 find_library(LIBUVC uvc)
 find_library(LIBRAW_LIB raw_r)
 find_path(LIBRAW_HDR libraw/libraw.h)
-find_path(LIBCFITSIO_HDR fitsio.h)
-find_library(LIBCFITSIO cfitsio)
 
 
 find_path(LIBCURL_HDR curl/curl.h)
@@ -87,6 +91,13 @@ else()
     endif()        
     set(ANDROID_BUILD OFF)
 endif()
+
+
+if(NOT ANDROID_BUILD)
+    find_path(LIBCFITSIO_HDR fitsio.h)
+    find_library(LIBCFITSIO cfitsio)
+endif()    
+
 
 if(WITH_SSE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse2")
@@ -170,6 +181,7 @@ endif()
 add_library(ols SHARED 
     src/camera.cpp 
     src/ols.cpp
+    src/mount_ctl.cpp
     src/video_generator.cpp
     src/tiffmat.cpp
     src/debug_save_processor.cpp
@@ -185,7 +197,7 @@ add_library(ols SHARED
     ${OLS_EXTRA}
     )
 
-target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBZ} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS} ${OLS_LIB_EXTRA})
+target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBZ} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS} ${OLS_LIB_EXTRA} ${INDI_LIB})
 
 
 if(ANDROID_BUILD)
@@ -243,7 +255,7 @@ else()
     message(" -- Indigo camera driver disabled")
 endif()
 
-if(INDI_HEADER AND INDI_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR)
+if(INDI_HEADER AND INDI_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROID_BUILD)
     include_directories(${INDI_HEADER})
     add_library(ols_driver_indi SHARED src/indi_camera.cpp)
     target_link_libraries(ols_driver_indi ${INDI_LIB})

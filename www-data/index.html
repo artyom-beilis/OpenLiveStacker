@@ -175,6 +175,7 @@
         <button onclick="selectConfig('profiles');">Profiles</button>
         <button onclick="selectConfig('calib');">Calib.</button>
         <button onclick="selectConfig('astap');">ASTAP</button>
+        <button onclick="selectConfig('mount');">Mount</button>
     <p>
     <div id="config_tab_camera" class="config_tab" >
         <p>Format: <select id="stream_format"></select> <span class="nowr">FPS lim.<input id="stream_max_framerate" class="val_input saved_input" type="number" step="1" value="10" /></span> <button onclick="startStream()" >Stream</button></p>
@@ -249,6 +250,22 @@
             <span id='download_status'></span>
         </p>
     </div>
+    <div id="config_tab_mount" class="config_tab" style="display:none">
+        <p>Driver <span id="mount_driver"></span></p>
+        <p>Client <span id="mount_client"></span></p>
+        <p>RA/DE  <span id="mount_ra"></span>/<span id="mount_dec"></span></p>
+        <p>Start: 
+            <button onclick="mountStart('telescope_simulator')">Simulator</button> 
+            <button onclick="mountStart('telescope_skywatcherAltAz')">SkywatcherAltAz</button> 
+        </p>
+        <p><button onclick="mountStartClient()">Connect</button></p>
+        <p><button onclick="mountGoTo('2:31:48','89:15:51')">GOTO Polaris</button></p>
+        <p>
+            <code id="mount_log"></code>
+        </p>
+    </div>
+
+
     <div id="config_tab_calib" class="config_tab" style="display:none">
         <table>
         <thead>

@@ -17,8 +17,8 @@
 #include "fitsmat.h"
 #include "shift_bit.h"
 
-#include <libindi/baseclient.h>
-#include <libindi/basedevice.h>
+#include "baseclient.h"
+#include "basedevice.h"
 
 namespace ols {
 

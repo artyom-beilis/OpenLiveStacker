@@ -22,6 +22,7 @@ var g_hist_zoom = 'vis';
 var g_hist_move_line_id = -1;
 var g_hist_move_line_pos = -1;
 var g_hist_move_start_x = -1;
+var g_mount_update_on = false;
 var g_stretch = {
     gain:1,
     cut:0,
@@ -1960,9 +1961,47 @@ function setDownloadURL(db_id)
     document.getElementById('astap_download_url').value = url;
 }
 
+function formatLog(lines)
+{
+    var txt = ''
+    for(var i=0;i<lines.length;i++) {
+        var line = lines[i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        txt += line + '<br/>'
+    }
+    document.getElementById('mount_log').innerHTML = txt;
+}
+
+function mountStart(name)
+{
+    restCall('post','/api/mount/start',{'driver':name},(e)=>{}) 
+}
+
+function mountStartClient()
+{
+    restCall('post','/api/mount/connect',{},(e)=>{}) 
+}
+
+function mountGoTo(ra,dec)
+{
+    restCall('post','/api/mount/goto',{'target':{'ra':ra,'dec':dec}},(e)=>{}) 
+}
+
+function update_mnt() {
+    restCall('get','/api/mount/status',null,(data)=>{
+        document.getElementById('mount_driver').innerHTML = data.server ? 'Started' : 'Offline';
+        document.getElementById('mount_client').innerHTML = data.client ? 'Started' : 'Idle';
+        document.getElementById('mount_ra').innerHTML = data.ra;
+        document.getElementById('mount_dec').innerHTML = data.dec;
+        formatLog(data.log);
+    });
+    if(g_mount_update_on) {
+        setTimeout(update_mnt,500);
+    }
+}
+
 function selectConfig(cfg)
 {
-    var cfgs = ['astap','general','camera','profiles','calib'];
+    var cfgs = ['astap','general','camera','profiles','calib','mount'];
     for(var i=0;i<cfgs.length;i++) {
         var obj = document.getElementById('config_tab_' + cfgs[i]);
         if(cfgs[i] == cfg) {
@@ -1980,6 +2019,13 @@ function selectConfig(cfg)
     }
     else if(cfg == 'calib') {
         loadCalibFrames();
+    }
+    if(cfg == 'mount') {
+        g_mount_update_on = true;
+        update_mnt();
+    }
+    else {
+        g_mount_update_on = false;
     }
 }
 

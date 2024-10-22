@@ -6,6 +6,7 @@
 #include <cppcms/mount_point.h>
 #include <fstream>
 #include "camera_ctl.h"
+#include "mount_ctl.h"
 #include "stacker_ctl_app.h"
 #include "processors.h"
 #include "common_utils.h"
@@ -184,6 +185,7 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
     web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this,video_generator_queue_),cppcms::mount_point("/camera((/.*)?)",1));
+    web_service_->applications_pool().mount(cppcms::create_pool<MountControlApp>(indi_libdir),cppcms::mount_point("/mount((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(this,data_dir_,video_generator_queue_),
                                             cppcms::mount_point("/stacker((/.*)?)",1),
                                             cppcms::app::asynchronous);
