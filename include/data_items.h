@@ -46,6 +46,11 @@ namespace ols {
         virtual ~ErrorNotificationData() {}
     };
 
+    struct MountPositionNotification : public QueueData {
+        std::string RA,DEC;
+        virtual ~MountPositionNotification() {}
+    };
+
     struct CameraFrame : public QueueData {
         CamStreamFormat format;
         CamBayerType bayer = bayer_na;

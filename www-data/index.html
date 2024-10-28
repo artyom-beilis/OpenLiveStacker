@@ -17,8 +17,12 @@
 <div id='thumb' style="display:none; position:absolute; right:0; top:0; z-index:-1;">
     <span id="thumb_video"><span>
 </div>
-<div id='stacking_ui_stats' style="position:absolute; right:0; bottom:0; display:none;">
-    </span><span id="stats_info"></span>
+<div style="position:absolute; right:0; bottom:0; text-align:right;">
+    <span class="mount_connected_display_inline" style="display:none;" >
+        Ra <span id="mount_ra"></span><br>
+        Dec <span id="mount_dec"></span><br>
+    </span>
+    <span  id='stacking_ui_stats'></span>
 </div>
 <p id="open_camera"   style="display:inline" >Camera: <select id="camera_select"></select><button onclick="openCamera()">Open</button></p>
 <p id='std_controls' style="display:none;" >
@@ -32,9 +36,39 @@
     <button style="display:none" id="stacking_ui_pp" class="comp_but stretch_background" onclick="openConfigTab('pp');" >&nbsp;</button>
     <button style="display:none" id="stacking_ui_sharp" class="comp_but sharp_background" onclick="openConfigTab('sharp');" >&nbsp;</button>
     <button style="display:none" id="stacking_ui_stop" class="comp_but stop_background" onclick="stopStream();" >&nbsp;</button>
+    <button style="display:none" id="mount_ctl_icon" class="comp_but mount_background mount_connected_display_inline" onclick="openConfigTab('mount');" >&nbsp;</button>
     <button style="display:none" id="error_notification" class="comp_but error_background" onclick='showErrorNotification();'>&nbsp;</button>
 </p>
 <button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
+<div id="mount_controls" style="display:none">
+<p>
+    <table>
+    <tr>
+        <td><button id="mount_manual_sync" style='display:none' class="mount_sync mount_sq_but solve_background" >&nbsp;</button><button class="mount_no_sync mount_sq_but no_sync_background" >&nbsp;</button</td>
+        <td><button class="mount_sq_but N_background" id="slew_N" >&nbsp;</button></td>
+        <td><button class="mount_sq_but" onclick='showMount(false);' >X</button></td>
+    <tr>
+        <td><button class="mount_sq_but W_background" id="slew_W" >&nbsp;</button></td>
+        <td><button class="mount_sq_but" id="mount_slew_speed" onclick='slew("",null)' >5</button></td>
+        <td><button class="mount_sq_but E_background" id="slew_E" >&nbsp;</button></td>
+    </tr>
+    <tr>
+        <td><button class="mount_sq_but slow_background" onclick='mountUpdateSlewSpeedUI(-1)'>&nbsp;</button></td>
+        <td><button class="mount_sq_but S_background" id="slew_S" >&nbsp;</button></td>
+        <td><button class="mount_sq_but fast_background" onclick='mountUpdateSlewSpeedUI(+1)' >&nbsp;</button></td>
+    </tr>
+    <tr>
+        <td>
+            <!-- <button style='display:none' class="mount_sq_but mount_sync" onclick='mountGoToSelected()' >≫</button>
+            <button class="mount_sq_but mount_no_sync" ><strike>≫</strike></button>-->
+            <button style='display:none' class="mount_sq_but mount_sync" onclick='mountGoToSelected()' >Go</button>
+            <button class="mount_sq_but mount_no_sync" ><strike>Go</strike></button>
+        </td>
+        <td colspan="2"><input oninput="updateMountRADE(this.value)" class="mount_input" id="mount_object" type="text"></input></td>
+    </tr>
+    </table>
+</p>
+</div>
 <p id="short_message"></p>
 <div id='zoom_controls' style="display:none; position: absolute; bottom: 1mm; left: 1mm">
     <button class="comp_but" onclick="zoom(+1);">+</button>
@@ -251,17 +285,25 @@
         </p>
     </div>
     <div id="config_tab_mount" class="config_tab" style="display:none">
-        <p>Driver <span id="mount_driver"></span></p>
-        <p>Client <span id="mount_client"></span></p>
-        <p>RA/DE  <span id="mount_ra"></span>/<span id="mount_dec"></span></p>
-        <p>Start: 
-            <button onclick="mountStart('telescope_simulator')">Simulator</button> 
-            <button onclick="mountStart('telescope_skywatcherAltAz')">SkywatcherAltAz</button> 
-        </p>
-        <p><button onclick="mountStartClient()">Connect</button></p>
-        <p><button onclick="mountGoTo('2:31:48','89:15:51')">GOTO Polaris</button></p>
-        <p>
-            <code id="mount_log"></code>
+        <div id="mount_driver_selection" style='display:none'>
+            <p>Select Driver</p>
+            <p><select id="mount_driver_name" onchange="mountDriverSelect()"></select></p>
+            <p><input id="mount_driver_option" value="" type="text" ></p>
+            <p><button onclick="mountStart();">Load</button></p>
+        </div>
+        <div id="mount_connection_options" style='display:none'>
+            <p>Connection: <select id="mount_connection_type" onchange="mountConnTypeMod()"></select></p>
+            <p>Address/Port: <input id="mount_connection_address" type="text" oninput='document.getElementById("mount_connection_address_set").disabled=false;'></input>
+                <button onclick="mountConnStrSet()" disabled="disabled" id="mount_connection_address_set">Set</button>
+            <p><button id="mount_connect_button" onclick="mountConnect()">Connect</button></p>
+        </div>
+        <p class="mount_connected_display_inline" style="display:none">
+            Tracking: 
+            <select id="mount_tracking_mode" onchange="mountSetTrackingMode()">
+                <option value="sidereal">Sidereal</option>
+                <option value="solar">Solar</option>
+                <option value="lunar">Lunar</option>
+            </select>
         </p>
     </div>
 
@@ -281,17 +323,23 @@
         </table>
     </div>
 </div>
+
 <div class="config_div" id="plate_solve_div" style="display:none; background-color:transparent;">
     <span style="position:absolute; right:1mm; top:1mm">
         <button class="incdec_but" onclick="showSolve(false);">X</button>
     </span>
     <div id="solver_config">
-        <p><button onclick="plateSolve();" >Solve</button></p>
+        <p>
+            <button onclick="plateSolve();" >Solve</button>
+            <button class="mount_connected_display_inline" style="display:none" onclick="solveAndSync();" >Solve &amp; Sync</button>
+            <button class="mount_connected_display_inline" style="display:none" onclick="solveSyncAndGoTo();" >Solve, Sync &amp; GoTo </button>
+        </p>
         <p>Object <input class="val_input saved_input" id="solver_object" type="text" oninput='updateSolverRADE(this.value)'  value="" /> (M31, NGC457)</p>
         <p>
             <span class="nowr" >RA <input class="val_input" id="solver_ra" type="text" value="" />,</span>
             <span class="nowr" >DEC <input class="val_input" id="solver_de" type="text" value=""/></span>
         </p>
+        <p style="display:none" class="mount_connected_display_inline"><input type="checkbox" checked id="use_mount_coordinates" ><label for="use_mount_coordinates">Use Mount Position</label></p>
         <p>
             <span class="nowr">Pixel Size (μm) <input class="val_input saved_input" id="solver_pixel_size" type="number" step="0.01" value="" oninput='recalcFOV();' />,</span>
             <span class="nowr">Focal Length (mm) <input class="val_input saved_input" id="solver_focal_length" type="number" value="" oninput='recalcFOV();' /></span>

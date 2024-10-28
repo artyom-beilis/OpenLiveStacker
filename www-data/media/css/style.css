@@ -35,6 +35,11 @@
     .val_input { width: 15mm; }
     .slider_elem { background-color: transparent; }
     .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
+
+    .mount_input { width: 30mm; height:15mm; font-size:8mm; padding: 0;}
+    .mount_sq_but { width: 15mm ; height:15mm; font-size:8mm ; padding: 0; }
+    .mount_but { width: 45mm ; height:15mm; font-size:8mm ; padding: 0; }
+
     .stretch_background {
         background: url(/media/img/stretch.png) no-repeat center center;
         background-size: 10mm 10mm;
@@ -43,8 +48,16 @@
         background: url(/media/img/sharp.png) no-repeat center center;
         background-size: 10mm 10mm;
     }
+    .mount_background {
+        background: url(/media/img/mount.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
     .solve_background {
         background: url(/media/img/solve.png) no-repeat center center;
+        background-size: 10mm 10mm;
+    }
+    .no_sync_background {
+        background: url(/media/img/no_sync.png) no-repeat center center;
         background-size: 10mm 10mm;
     }
     .pause_background {
@@ -74,6 +87,30 @@
     .settings_background {
         background: url(/media/img/settings.png) no-repeat center center;
         background-size: 10mm 10mm;
+    }
+    .N_background {
+        background: url(/media/img/N.png) no-repeat center center;
+        background-size: 15mm 15mm;
+    }
+    .S_background {
+        background: url(/media/img/S.png) no-repeat center center;
+        background-size: 15mm 15mm;
+    }
+    .W_background {
+        background: url(/media/img/W.png) no-repeat center center;
+        background-size: 15mm 15mm;
+    }
+    .E_background {
+        background: url(/media/img/E.png) no-repeat center center;
+        background-size: 15mm 15mm;
+    }
+    .fast_background {
+        background: url(/media/img/fast.png) no-repeat center center;
+        background-size: 15mm 15mm;
+    }
+    .slow_background {
+        background: url(/media/img/slow.png) no-repeat center center;
+        background-size: 15mm 15mm;
     }
     #thumb_stream_video {
         padding:0;

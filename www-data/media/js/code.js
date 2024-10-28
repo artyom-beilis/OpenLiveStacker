@@ -1,4 +1,6 @@
 
+var g_slew_max = -1;
+var g_slew_speed = 5;
 var global_width = 0;
 var global_height = 0;
 var global_bin = 0;
@@ -22,7 +24,10 @@ var g_hist_zoom = 'vis';
 var g_hist_move_line_id = -1;
 var g_hist_move_line_pos = -1;
 var g_hist_move_start_x = -1;
-var g_mount_update_on = false;
+var g_mount_lat_lon_set = false;
+var g_mount_connected = false;
+var g_mount_driver_populated = null;
+var g_sync_counter = 0;
 var g_stretch = {
     gain:1,
     cut:0,
@@ -276,7 +281,40 @@ function checkAndSetLocation(params)
     return false;
 }
 
+function setPressUnpressEvents(id,on_event,off_event)
+{
+    var but = document.getElementById(id);
+    but.addEventListener('mousedown',(e)=>{on_event();});
+    but.addEventListener('touchstart',(e)=>{on_event();});
+
+    but.addEventListener('mouseup',(e)=>{off_event();});
+    but.addEventListener('mouseout',(e)=>{off_event();});
+    but.addEventListener('touchend',(e)=>{off_event();});
+    but.addEventListener('touchcancel',(e)=>{off_event();});
+}
+
+function setSlewEventListeners()
+{
+    var dirs = ['N','S','W','E'];
+    for(var i=0;i<dirs.length;i++) {
+        let d = dirs[i];
+        setPressUnpressEvents(`slew_${d}`,
+            ()=>{
+                console.log('Slew  to ' + d);
+                slew(d);
+            },
+            noslew);
+    }
+    setPressUnpressEvents('mount_manual_sync',manualSyncPressStart,manualSyncPressEnd);
+}
+
 function setEventListeners()
+{
+    setCanvasEventListeners();
+    setSlewEventListeners();
+}
+
+function setCanvasEventListeners()
 {
     var canvas = document.getElementById('hist_canvas');
     canvas.addEventListener('mousedown',(e)=>histEvent(e,'down'))
@@ -299,6 +337,8 @@ function run()
     restCall("get","/api/camera",null,listCameras);
     setEventListeners();
     updateSavedInputs();
+    update_mnt();
+    startUIUpdates();
     if(!checkAndSetLocation(params) && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((pos)=>{
             setGPS(pos.coords.latitude,pos.coords.longitude);
@@ -448,25 +488,17 @@ function changeStackerStatus(new_status)
         var st = ui_ctl[name] ? 'inline' : 'none';
         document.getElementById('stacking_ui_' + name).style.display = st;
     }
-    if(ui_ctl.stats) {
-        if(!g_stats) {
-            g_stats = new EventSource("/api/updates");
-            g_stats.onmessage = (e) => {
-                updateStackerStats(e.data);
-            };
-        }
-    }
-    else {
-        if(g_stats) {
-            // make sure errors received on save
-            setTimeout(()=>{
-                g_stats.close();
-                g_stats = null;
-                g_since_saved_s = 0;
-            },500);
-        }
-    }
     g_stacker_status = new_status;
+}
+
+function startUIUpdates()
+{
+    if(!g_stats) {
+        g_stats = new EventSource("/api/updates");
+        g_stats.onmessage = (e) => {
+            updatePushEvents(e.data);
+        };
+    }
 }
 
 function hZoom(value)
@@ -710,10 +742,10 @@ function updateHistogram()
     }
 }
 
-function updateStackerStats(e) {
+function updatePushEvents(e) {
     var stats = JSON.parse(e);
     if(stats.type == 'stats') { 
-        document.getElementById('stats_info').innerHTML = stats.stacked + '/' + stats.missed + '/' + stats.dropped;
+        document.getElementById('stacking_ui_stats').innerHTML = stats.stacked + '/' + stats.missed + '/' + stats.dropped;
         g_since_saved_s = stats.since_saved_s;
         if(stats.histogramm.length == 0)
             g_histogram = null;
@@ -725,6 +757,10 @@ function updateStackerStats(e) {
     else if(stats.type == 'error') {
         document.getElementById('error_notification').style.display='inline';
         g_error_messages[stats.source] = stats.message;
+    }
+    else if(stats.type == 'mount') {
+        document.getElementById('mount_ra').innerHTML = stats.ra;
+        document.getElementById('mount_dec').innerHTML = stats.dec;
     }
 }
 
@@ -1200,6 +1236,20 @@ function startStream()
     showConfig(false);
 }
 
+function showMount(disp)
+{
+    document.getElementById('mount_controls').style.display = disp ? 'block' : 'none';
+}
+
+function noslew() { 
+    slew('',null);
+}
+
+function slew(direction)
+{
+    restCall('post','/api/mount/slew',{"direction":direction,"speed" : g_slew_speed },(e) => {});
+}
+
 function openConfigTab(name)
 {
     var tabCtl = {
@@ -1207,7 +1257,8 @@ function openConfigTab(name)
         stack : showStack,
         pp:     showPP,
         sharp:  showSharp,
-        solve:  showSolve
+        solve:  showSolve,
+        mount:  showMount,
     };
     for(var n in tabCtl) {
         if(n != name)
@@ -1583,6 +1634,7 @@ function updateRADE(name)
     updateRADEFor(name,'stack');
     updateRADEFor(name,'solver');
     document.getElementById('solver_object').value = name;
+    document.getElementById('mount_object').value = name;
     saveInputValue('solver_object');
 }
 function updateSolverRADE(name)
@@ -1590,18 +1642,76 @@ function updateSolverRADE(name)
     updateRADEFor(name,'solver');
     updateRADEFor(name,'stack');
     document.getElementById('stack_object').value = name;
+    document.getElementById('mount_object').value = name;
     saveInputValue('stack_object')
+}
+
+function updateMountRADE(name)
+{
+    updateRADEFor(name,'solver');
+    updateRADEFor(name,'stack');
+    document.getElementById('stack_object').value = name;
+    document.getElementById('solver_object').value = name;
+    saveInputValue('stack_object')
+}
+
+
+function setDisplayStyle(arr,val)
+{
+    for(var i=0;i<arr.length;i++)
+        arr[i].style.display=val;
 }
 
 function updateRADEFor(name,target_id)
 {
     var coord=['','']
     name = name.toUpperCase();
+    var sync = document.getElementsByClassName('mount_sync');
+    var no_sync = document.getElementsByClassName('mount_no_sync');
     if(name in jsdb) {
         coord = jsdb[name]
+        setDisplayStyle(sync,'inline');
+        setDisplayStyle(no_sync,'none');
+    }
+    else {
+        setDisplayStyle(no_sync,'inline');
+        setDisplayStyle(sync,'none');
     }
     document.getElementById(target_id + '_ra').value = coord[0];
     document.getElementById(target_id + '_de').value = coord[1];
+}
+
+function mountGoToSelected()
+{
+    var ra = document.getElementById('solver_ra').value;
+    var de = document.getElementById('solver_de').value;
+    mountGoTo(ra,de);
+}
+
+function mountSyncSelected()
+{
+    var ra = document.getElementById('solver_ra').value;
+    var de = document.getElementById('solver_de').value;
+    restCall('post','/api/mount/sync',{'ra':ra,'dec':de},(e)=>{}) 
+}
+
+function manualSyncPressStart()
+{
+    g_sync_counter ++;
+    let cur_counter = g_sync_counter + 0;
+    setTimeout(()=> {
+        if(cur_counter == g_sync_counter) {
+            mountSyncSelected();
+            showNotification('Sync Command Sent');
+        }
+        else {
+            showNotification('Press on sync button for 2 second to sync');
+        }
+    },2000);
+}
+function manualSyncPressEnd()
+{
+    g_sync_counter++;
 }
 
 function recalcFOV()
@@ -1644,13 +1754,26 @@ function toggleFS(fs)
 }
 
 
-function plateSolveWithOpt(background)
+function plateSolveWithOpt(background,result_callback,sync_op)
 {
     var req;
     try {
-        var ra,de,fov,rad,lat,non,timeout;
+        var ra,de,mount_ra,mount_de,fov,rad,lat,non,timeout;
+        var use_mount_pos = g_mount_connected && document.getElementById('use_mount_coordinates').checked;
         ra = parseRA(document.getElementById('solver_ra').value);
         de = parseDEC(document.getElementById('solver_de').value);
+        if(use_mount_pos) {
+            mount_ra = parseRA(document.getElementById("mount_ra").innerHTML);
+            mount_de = parseDEC(document.getElementById("mount_dec").innerHTML);
+            if(sync_op) {
+                ra = mount_ra;
+                de = mount_de;
+            }
+        }
+        else {
+            mount_ra = ra;
+            mount_de = de;
+        }
         fov = parseFloat(document.getElementById('solver_fov').value);
         rad = parseFloat(document.getElementById('solver_radius').value);
         timeout = parseFloat(document.getElementById('solver_timeout').value);
@@ -1667,6 +1790,8 @@ function plateSolveWithOpt(background)
             "fov" : fov,
             "ra"  : ra,
             "de"  : de,
+            "mount_ra" : mount_ra,
+            "mount_de" : mount_de,
             "rad" : rad,
             "lat" : lat,
             "lon" : lon,
@@ -1690,17 +1815,17 @@ function plateSolveWithOpt(background)
         document.getElementById('solver_result').style.display = 'none';
     }
     g_solving = true;
-    restCall('post','/api/plate_solver',req,solveResult)
+    restCall('post','/api/plate_solver',req,(r) => { solveResult(r,result_callback); })
 }
 
 function plateSolve()
 {
-    plateSolveWithOpt(false);
+    plateSolveWithOpt(false,null,false);
 }
 
 function resolveOnTimer()
 {
-    plateSolveWithOpt(true);
+    plateSolveWithOpt(true,null,false);
 }
 
 function startSolvingIfNeeded()
@@ -1822,8 +1947,54 @@ function updateSolverTable()
     }
     document.getElementById('solver_status').innerHTML = status;
 }
+function formatRA(RA)
+{
+    let rh = Math.floor(RA);
+    let rs = Math.floor(RA*3600) % 3600;
+    let rm = Math.floor(rs / 60);
+    rs = rs % 60;
+    return `${rh}:${rm}:${rs}`;
+}
 
-function solveResult(v)
+function formatDEC(DEC)
+{
+    let s = 1;
+    if(DEC < 0) {
+        s=-1;
+        DEC=-DEC;
+    }
+    let dd = Math.floor(DEC);
+    let ds = Math.floor(DEC*3600) % 3600;
+    let dm = Math.floor(ds / 60);
+    ds = ds % 60;
+    dd = dd * s;
+    return `${dd}:${dm}:${ds}`
+}
+
+function syncSolve(r,call_goto)
+{
+    var ra_h = r.center_ra / 15;
+    var de_d = r.center_de;
+    restCall('post','/api/mount/sync',{'ra':formatRA(ra_h),'dec':formatDEC(de_d)},(r)=>{
+        if(call_goto) {
+            mountGoToSelected();
+        }
+    });
+}
+
+function solveAndSync()
+{
+    plateSolveWithOpt(false,(v)=>{syncSolve(v,false);},true);
+}
+
+function solveSyncAndGoTo()
+{
+    plateSolveWithOpt(false,(v)=>{syncSolve(v,true);},true);
+}
+
+
+
+function solveResult(v,callback)
 {
     g_solving = false;
     g_solver_result = null;
@@ -1836,6 +2007,9 @@ function solveResult(v)
         document.getElementById('solver_result_image').src = jpeg;
     }
     document.getElementById('solver_result').style.display = jpeg ? 'inline' : 'none';
+    if(v.solved && callback) {
+        callback(v);
+    }
     startSolvingIfNeeded();
 }
 
@@ -1961,42 +2135,206 @@ function setDownloadURL(db_id)
     document.getElementById('astap_download_url').value = url;
 }
 
-function formatLog(lines)
-{
-    var txt = ''
-    for(var i=0;i<lines.length;i++) {
-        var line = lines[i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-        txt += line + '<br/>'
-    }
-    document.getElementById('mount_log').innerHTML = txt;
-}
 
 function mountStart(name)
 {
-    restCall('post','/api/mount/start',{'driver':name},(e)=>{}) 
+    var name = document.getElementById('mount_driver_name').value;
+    var opt = document.getElementById('mount_driver_option').value;
+    restCall('post','/api/mount/start',{'driver':name,'option':opt},(e)=>{
+        update_mnt();
+    });
 }
 
-function mountStartClient()
+function waitMountConnUpdate(data) {
+    var button = document.getElementById('mount_connect_button');
+    if(data.connected) {
+        onMountConnected();
+        updateMountFunc(data);
+        button.disabled = false;
+    }
+    else if(g_wait_connected > 0) {
+        g_wait_connected --;
+        setTimeout(()=>{
+            restCall('get','/api/mount/config',null,
+            (data)=>{
+                waitMountConnUpdate(data);
+            },
+            (e) => {
+                button.disabled = false;
+                showError(e);
+            })
+        },500);
+    }
+    else {
+        button.disabled = false;
+        showError("Connection Failed"); 
+    }
+}
+
+function mountConnect()
 {
-    restCall('post','/api/mount/connect',{},(e)=>{}) 
+    g_wait_connected = 10;
+    document.getElementById('mount_connect_button').disabled = true;
+    restCall('post','/api/mount/connect',{},(e) => {
+        waitMountConnUpdate({"connected":false})
+    });
 }
 
 function mountGoTo(ra,dec)
 {
-    restCall('post','/api/mount/goto',{'target':{'ra':ra,'dec':dec}},(e)=>{}) 
+    restCall('post','/api/mount/goto',{'ra':ra,'dec':dec},(e)=>{}) 
+}
+
+function loadMountProtocols(data)
+{
+    var current = data.proto.current;
+    var types = document.getElementById('mount_connection_type');
+    for(var i=types.options.length - 1; i>= 0 ;i--) {
+        types.options.remove(i);
+    }
+    var addr = '';
+    if(data.proto.inet.supported) {
+        var op = document.createElement('option');
+        op.text = 'Network';
+        op.value = 'inet';
+        op.selected = current == 'inet';
+        if(op.selected)
+            addr = data.proto.inet.connection;
+        types.add(op)
+    }
+    if(data.proto.serial.supported) {
+        var op = document.createElement('option');
+        op.text = 'Serial';
+        op.value = 'serial';
+        op.selected = current == 'serial';
+        if(op.selected)
+            addr = data.proto.serial.connection;
+        types.add(op)
+    }
+    document.getElementById('mount_connection_address').value = addr;
+    document.getElementById('mount_connection_address_set').disabled = true;
+}
+
+function mountConnTypeMod()
+{
+    var name = document.getElementById('mount_connection_type').value;
+    restCall('post','/api/mount/connection_proto',{'proto':name},(v) => {
+        setTimeout(update_mnt,500);
+    });
+}
+
+function mountConnStrSet()
+{
+    var addr = document.getElementById('mount_connection_address').value;
+    var proto = document.getElementById('mount_connection_type').value;
+    restCall('post','/api/mount/connection_addr',{'proto': proto, 'addr':addr},(v) => {
+        setTimeout(update_mnt,500);
+    });
+}
+
+function mountDriverSelect()
+{
+    var name = document.getElementById('mount_driver_name').value;
+    st = getStoageValue();
+    st['mount_driver'] = name;
+    setSlewEventListeners(st);
+    var opt = g_mount_driver_populated[name];
+    var dopt = document.getElementById('mount_driver_option');
+    if(opt == null) {
+        opt = ''
+        dopt.disabled = true;
+    }
+    else {
+        dopt.disabled = false;
+    }
+    dopt.value = opt;
+}
+
+function updateMountFunc(data)
+{
+    if(!data.server) {
+        document.getElementById('mount_driver_selection').style.display='block';
+        if(!g_mount_driver_populated) {
+            var driver_options = {}
+            var selected_driver = getStoageValue()['mount_driver']
+            var drivers = document.getElementById('mount_driver_name');
+            for(var i=0;i<data.server_drivers.length;i++) {
+                var option = document.createElement("option");
+                var name = data.server_drivers[i].name;
+                var has_opt = data.server_drivers[i].has_option;
+                var driver_opt = data.server_drivers[i].option;
+                if(!selected_driver)
+                    selected_driver = name;
+                driver_options[name] = has_opt ? driver_opt : null;
+                option.text  = name;
+                option.value = name;
+                option.selected = selected_driver == name;
+                drivers.add(option);
+            }
+            g_mount_driver_populated = driver_options;
+            mountDriverSelect();
+        }
+    }
+    else {
+        document.getElementById('mount_driver_selection').style.display='none';
+        if(!data.connected) {
+            document.getElementById('mount_connection_options').style.display='';
+            loadMountProtocols(data);
+        }
+        else {
+            g_mount_connected = true;
+            document.getElementById('mount_connection_options').style.display='none';
+            var items_to_enable = document.getElementsByClassName('mount_connected_display_inline');
+            for(var i=0;i<items_to_enable.length;i++) {
+                items_to_enable[i].style.display='inline';
+            }
+            loadMountStatus();
+        }
+    }
+}
+
+function mountUpdateSlewSpeedUI(delta)
+{
+    g_slew_speed += delta;
+    if(g_slew_speed < 0)
+        g_slew_speed = 0;
+    if(g_slew_speed >= g_slew_max)
+        g_slew_speed = g_slew_max - 1;
+    document.getElementById('mount_slew_speed').innerHTML = `${g_slew_speed + 1}`;
+}
+
+function loadMountStatus()
+{
+    restCall('get','/api/mount/status',null,(data) => {
+        g_slew_max = data.slew.max;
+        g_slew_speed = data.slew.current;
+        console.log(`max=${g_slew_max} cur=${g_slew_speed}`)
+        mountUpdateSlewSpeedUI(0);
+        document.getElementById("mount_tracking_mode").value = data.tracking_mode;
+    });
+}
+
+function mountSetTrackingMode()
+{
+    var mode = document.getElementById("mount_tracking_mode").value;
+    restCall("post","/api/mount/tracking",{"tracking_mode":mode},(e)=>{});
+}
+
+function onMountConnected()
+{
+    lat = parseFloat(getVal("lat"));
+    lon = parseFloat(getVal("lon"));
+    if(isNaN(lat) || isNaN(lon)) {
+        showError("Lattitude/Longitude is not defined, moust geolocation is not updated");
+    }
+    restCall('post','/api/mount/geolocation',{"lat":lat,"lon":lon},(r)=>{
+        showNotification(`Mount geolocation updated lat=${lat},lon=${lon}`);
+    });
+        
 }
 
 function update_mnt() {
-    restCall('get','/api/mount/status',null,(data)=>{
-        document.getElementById('mount_driver').innerHTML = data.server ? 'Started' : 'Offline';
-        document.getElementById('mount_client').innerHTML = data.client ? 'Started' : 'Idle';
-        document.getElementById('mount_ra').innerHTML = data.ra;
-        document.getElementById('mount_dec').innerHTML = data.dec;
-        formatLog(data.log);
-    });
-    if(g_mount_update_on) {
-        setTimeout(update_mnt,500);
-    }
+    restCall('get','/api/mount/config',null,updateMountFunc);
 }
 
 function selectConfig(cfg)
@@ -2021,11 +2359,7 @@ function selectConfig(cfg)
         loadCalibFrames();
     }
     if(cfg == 'mount') {
-        g_mount_update_on = true;
         update_mnt();
-    }
-    else {
-        g_mount_update_on = false;
     }
 }
 

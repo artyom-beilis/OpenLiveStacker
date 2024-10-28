@@ -6,17 +6,25 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2 -g")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
 option(OPENCV_ROOT "Path to OpenCV Library" "")
 option(NO_SSE4 "Disable SSE 4.1/4.3 on x86/x86_64 builds" OFF)
+option(USE_INDI_AS_LIBRARY "Use special variand of indi - embedded server/client/deriver" OFF)
 
 find_library(ASI_CAMERA_LIB ASICamera2)
 find_path(ASI_CAMERA_HDR ASICamera2.h)
 
-find_library(INDI_LIB1 indi_unified_client_server HINT /opt/indi_as_library/lib)
-find_library(INDI_LIB2 indi_unified HINT /opt/indi_as_library/lib)
-set(INDI_LIB ${INDI_LIB1} ${INDI_LIB2})
-find_path(INDI_HEADER libindi/baseclient.h 
-            HINT ${CMAKE_FIND_ROOT_PATH}/include
-            HINT /opt/indi_as_library/include)
-include_directories(${INDI_HEADER}/libindi)
+if(USE_INDI_AS_LIBRARY)
+    find_library(INDI_LIB1 indi_unified_client_server HINT /opt/indi_as_library/lib)
+    find_library(INDI_LIB2 indi_unified HINT /opt/indi_as_library/lib)
+    set(INDI_LIB ${INDI_LIB1} ${INDI_LIB2})
+    find_path(INDI_HEADER libindi/baseclient.h 
+                HINT ${CMAKE_FIND_ROOT_PATH}/include
+                HINT /opt/indi_as_library/include)
+    include_directories(${INDI_HEADER}/libindi)
+    add_definitions(-DINDI_AS_LIBRARY)
+else()
+    find_library(INDI_LIB indiclient)
+    find_path(INDI_HEADER libindi/baseclient.h)
+    include_directories(${INDI_HEADER})
+endif()
 
 find_library(INDIGO_LIB indigo)
 find_path(INDIGO_HEADER indigo/indigo_bus.h)
@@ -178,10 +186,19 @@ else()
 endif()
 
 
+if(INDI_LIB AND INDIGO_HEADER)
+    set(OLS_EXTRA ${OLS_EXTRA} src/indi_mount.cpp)
+    add_definitions(-DWITH_INDI)
+endif()
+
+
+
+
 add_library(ols SHARED 
     src/camera.cpp 
     src/ols.cpp
     src/mount_ctl.cpp
+    src/mount.cpp
     src/video_generator.cpp
     src/tiffmat.cpp
     src/debug_save_processor.cpp

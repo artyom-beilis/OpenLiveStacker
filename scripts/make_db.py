@@ -22,7 +22,7 @@ def normalize_name(name):
     if m:
        new_name = m.group(1) + m.group(3) + m.group(4)
        return normalize_name(new_name)
-    return name
+    return name.strip().upper()
 
 
 def get_OpenNGC_DSO():
@@ -53,8 +53,50 @@ def get_OpenNGC_DSO():
                 result[normalize_name('IC%s' % ic)] = [ra,de]
     return result
 
+def split_RA(RA):
+    rh = int(RA);
+    rs = int(RA*3600) % 3600;
+    rm = rs / 60;
+    rs = rs % 60;
+    return (rh,rm,rs)
+
+def split_DEC(DEC):
+    s = 1;
+    if DEC < 0:
+        s=-1;
+        DEC=-DEC;
+    dd = int(DEC);
+    ds = int(DEC*3600) % 3600;
+    dm = ds / 60;
+    ds = ds % 60;
+    dd = dd * s;
+    return (dd,dm,ds)
+
+def format_RA(RA):
+    return "%02d:%02d:%02d" % split_RA(RA)
+
+def format_DEC(DEC):
+    return "%02d:%02d:%02d" % split_DEC(DEC)
+
+def get_stars(allstars):
+    with open('external/western_constellations_atlas_of_space/data/hygdata_v3/hygdata_v3.csv','r') as f:
+        for i,row in enumerate(csv.reader(f)):
+            if i <= 1:
+                continue
+            sid = row[1]
+            name=row[6]
+            if name == '':
+                continue
+            ra=format_RA(float(row[7]))
+            de=format_DEC(float(row[8]))
+            mag=float(row[13])
+            if mag <= 5:
+                allstars[normalize_name(name)] = [ra,de]
+
+
 if __name__ == "__main__":
     db = get_OpenNGC_DSO()
+    get_stars(db)
     with open(sys.argv[1],'w') as f:
         f.write('// Attribution-ShareAlike 4.0 International\n')
         f.write('// generated from https://github.com/mattiaverga/OpenNGC\n')

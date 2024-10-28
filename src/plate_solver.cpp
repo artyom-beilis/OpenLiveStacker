@@ -35,14 +35,14 @@ namespace ols {
     {
         temp_dir_ = p;
     }
-    PlateSolver::Result PlateSolver::solve(std::string const &img_path,double fov,double ra,double de,double rad,double timeout)
+    PlateSolver::Result PlateSolver::solve(std::string const &img_path,double fov,double ra,double de,double mra,double mde,double rad,double timeout)
     {
         std::vector<std::string> cmd = {
             exe_,
            "-f",img_path,
            "-fov",std::to_string(fov),
-            "-ra",std::to_string(ra/15.0),
-            "-spd",std::to_string(de+90),
+            "-ra",std::to_string(mra/15.0),
+            "-spd",std::to_string(mde+90),
             "-r",std::to_string(rad),
             "-o",temp_dir_ + "/ols_astap_output"
         };
@@ -155,12 +155,14 @@ namespace ols {
             double fov_deg,
             double target_ra_deg,
             double target_de_deg,
+            double mount_ra_deg,
+            double mount_de_deg,
             double search_radius_deg,
             double timeout)
     {
         std::string tiff = temp_dir_ + "/ols_astap_input.tiff";
         save_tiff(img,tiff);
-        auto r = solve(tiff,fov_deg,target_ra_deg,target_de_deg,search_radius_deg,timeout);
+        auto r = solve(tiff,fov_deg,target_ra_deg,target_de_deg,mount_ra_deg,mount_de_deg,search_radius_deg,timeout);
         if(img.channels() != 3) {
             cv::Mat tmp;
             cv::cvtColor(img,tmp,cv::COLOR_GRAY2BGR);
@@ -293,6 +295,8 @@ namespace ols {
                                         double fov,
                                         double ra,
                                         double de,
+                                        double mount_ra,
+                                        double mount_de,
                                         double rad,
                                         double timeout)
     {
@@ -309,7 +313,7 @@ namespace ols {
             std::unique_lock<std::mutex> g(lock_);
             if(!instance_)
                 throw std::runtime_error("plate solver is not ready");
-            return instance_->solve_and_mark(img,do_stretch,jpeg_with_marks,fov,ra,de,rad,timeout);
+            return instance_->solve_and_mark(img,do_stretch,jpeg_with_marks,fov,ra,de,mount_ra,mount_de,rad,timeout);
         }
     }
 

@@ -57,6 +57,8 @@ namespace ols {
             double fov = content_.get<double>("fov");
             double ra  = content_.get<double>("ra");
             double de  = content_.get<double>("de");
+            double mount_ra  = content_.get<double>("mount_ra");
+            double mount_de  = content_.get<double>("mount_de");
             double rad = content_.get<double>("rad");
             double timeout = content_.get<double>("timeout");
             timeout = std::max(std::min(timeout,180.0),5.0);
@@ -66,10 +68,16 @@ namespace ols {
             std::string img = "/plate_solving_solution.jpeg";
             std::string jpeg = data_dir_ + img;
             try {
-                auto res = PlateSolver::solve_last_image(jpeg,fov,ra,de,rad,timeout);
+                auto res = PlateSolver::solve_last_image(
+                            jpeg,fov,
+                            ra,de,
+                            mount_ra,mount_de,
+                            rad,timeout);
                 response_["solved"]=true;
                 response_["distance_to_target"] = res.angle_to_target_deg;
                 response_["result_image"] = "/data" + img;
+                response_["center_ra"] = res.center_ra_deg;
+                response_["center_de"] = res.center_de_deg;
                 response_["delta_ra"] = ra - res.center_ra_deg;
                 response_["delta_de"] = de - res.center_de_deg;
                 if(lat != invalid_geolocation && lon != invalid_geolocation) {

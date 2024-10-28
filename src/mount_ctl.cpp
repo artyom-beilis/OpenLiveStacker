@@ -1,4 +1,4 @@
-#define INDI_AS_LIBRARY 
+//#define INDI_AS_LIBRARY 
 #ifdef INDI_AS_LIBRARY
 #include "baseclient.h"
 #include "basedevice.h"
@@ -17,390 +17,287 @@
 
 #include "camera.h"
 #include "mount_ctl.h"
+#include "mount.h"
 
-#ifdef INDI_AS_LIBRARY
-int indiserver_main(std::vector<std::string> drivers);
-#endif
+#include <booster/aio/deadline_timer.h>
 
 
 namespace ols {
 
-static std::mutex last_messages_lock;
-static std::list<std::string> last_messages;
-
-#define LOG(...) do {  \
-    char buf[256]; \
-    int n = snprintf( buf, sizeof(buf) ,__VA_ARGS__);  \
-    if(n < 255 && n > 0 && buf[n-1] == '\n')  {\
-        buf[n-1] = 0; \
-    } \
-    { \
-         std::unique_lock<std::mutex> g(last_messages_lock); \
-         if(last_messages.size() > 20) \
-             last_messages.pop_front(); \
-        last_messages.push_back(buf); \
-    } \
-    BOOSTER_INFO("stacker") << buf; \
-} while(0)
-
-
-typedef std::unique_lock<std::recursive_mutex> guard_type;
-static void log_property(char const *src,INDI::Property const &p) 
-{
-    char const *perms[]={"ro","wo","rw"};
-    LOG("%3s %s:%s (%s) %s type %s\n",src,p.getDeviceName(), p.getName(), p.getStateAsString(), perms[p.getPermission()], p.getTypeAsString());
-    switch(p.getType()) {
-        case INDI_NUMBER:
-            {
-                INDI::PropertyNumber v(p);
-                for(size_t i=0;i<v.size();i++) {
-                    LOG("  %2d %s/%s val=%f min=%f max=%f step=%f\n",int(i),v[i].getName(),v[i].getLabel(),v[i].getValue(),v[i].getMin(),v[i].getMax(),v[i].getStep());
-                }
-            }
-            break;
-        case INDI_TEXT:
-            {
-                INDI::PropertyText v(p);
-                for(size_t i=0;i<v.size();i++) {
-                    LOG("  %2d %s/%s val=%s\n",int(i),v[i].getName(),v[i].getLabel(),v[i].getText());
-                }
-            }
-            break;
-        case INDI_SWITCH:
-            {
-                INDI::PropertySwitch v(p);
-                for(size_t i=0;i<v.size();i++) {
-                    LOG("  %2d %s/%s %s\n",int(i),v[i].getName(),v[i].getLabel(),(v[i].getState() == ISS_ON ? "ON " : "OFF"));
-                }
-            }
-            break;
-        case INDI_LIGHT:
-            {
-                INDI::PropertyLight v(p);
-                for(size_t i=0;i<v.size();i++) {
-                    LOG("  %2d %s/%s %s\n",int(i),v[i].getName(),v[i].getLabel(),v[i].getStateAsString());
-                }
-            }
-            break;
-        case INDI_BLOB:
-            {
-                INDI::PropertyBlob v(p);
-                for(size_t i=0;i<v.size();i++) {
-                    LOG("  %2d %s/%s ptr=%p size=%d\n",int(i),v[i].getName(),v[i].getLabel(),v[i].getBlob(),v[i].getSize());
-                }
-            }
-            break;
-        default:
-            ;
-    }
-}
-
-
-class MountClient : public INDI::BaseClient {
-public:
-    std::string latest_ra;
-    std::string latest_dec;
-
-    MountClient(char *port = nullptr)
-    {
-        if(port)
-            port_ = port;
-        setServer("localhost",7624);
-        if(!connectServer()) {
-            throw std::runtime_error("Faild to connect");
-        }
-    }
-
-    void sendNewProperty(INDI::Property prop)
-    {
-        log_property("SND",prop);
-        INDI::BaseClient::sendNewProperty(prop);
-    }
-
-    virtual void updateProperty(INDI::Property prop) override
-    {
-        guard_type g(lock_);
-        handle(true,prop);
-    }
-    virtual void newProperty(INDI::Property prop) override
-    {
-        guard_type g(lock_);
-        handle(false,prop);
-    }
-    void handle(bool is_new,INDI::Property prop)
-    {
-        log_property(is_new?"new":"upd",prop);
-        if(prop.isNameMatch("DRIVER_INFO") && name_.empty()) {
-            INDI::PropertyText p(prop);
-            auto interface = p.findWidgetByName("DRIVER_INTERFACE");
-            if(interface && atoi(interface->getText()) & INDI::BaseDevice::TELESCOPE_INTERFACE) {
-                LOG("!!!!!!!!!!!!!!!!!!!!!!!!!!!! DERECTED %s\n",prop.getDeviceName());
-                name_ = prop.getDeviceName();
-                on_detected(prop.getBaseDevice());
-            }
-        }
-        /*if(prop.isNameMatch("CONNECTION") && prop.isDeviceNameMatch(name_)) {
-            handle_connection(prop);
-        }*/
-        else if(prop.isNameMatch("CONNECTION_MODE")) {
-            handle_mode(prop);
-        }
-        else if(prop.isNameMatch("EQUATORIAL_EOD_COORD")) {
-            log_ra_de(prop);
-        }
-        else if(prop.isNameMatch("GEOGRAPHIC_COORD")) {
-            set_geolocation(prop);
-        }
-    }
-
-    bool coord_def_ = false;
-    void set_geolocation(INDI::PropertyNumber p)
-    {
-        if(coord_def_)
-            return;
-        auto lat = p.findWidgetByName("LAT");
-        auto lon = p.findWidgetByName("LONG");
-        if(!lat || !lon) {
-            LOG("NO WID\n");
-            return;
-        }
-        lat->setValue(31.0);
-        lon->setValue(34.0);
-        sendNewProperty(p);
-        coord_def_ = true;
-    }
-    
-    void go_to(double RA,double DEC)
-    {
-        guard_type g(lock_);
-        /*for(auto p : device_.getProperties()) {
-            log_property("GTO",p);
-        }*/
-        INDI::PropertySwitch on_set = device_.getProperty("ON_COORD_SET");
-        if(!on_set.isValid()) {
-            throw std::runtime_error("No ON_COORD_SET");
-        }
-        INDI::PropertyNumber coord = device_.getProperty("EQUATORIAL_EOD_COORD");
-        if(!coord.isValid()) {
-            throw std::runtime_error("No EQUATORIAL_EOD_COORD");
-        }
-        auto on_set_w = on_set.findWidgetByName("TRACK");
-        auto ra_w = coord.findWidgetByName("RA");
-        auto dec_w = coord.findWidgetByName("DEC");
-        
-        if(!on_set_w || !ra_w || !dec_w) {
-            throw  std::runtime_error("No goto widgets");
-        }
-        if(on_set_w->getState() != ISS_ON) {
-            on_set_w->setState(ISS_ON);
-            sendNewProperty(on_set);
-        }
-        ra_w->setValue(RA);
-        dec_w->setValue(DEC);
-        sendNewProperty(coord);
-    }
-    void log_ra_de(INDI::PropertyNumber prop) 
-    {
-        if(!prop.isValid())
-            return;
-        auto ra = prop.findWidgetByName("RA");
-        auto de = prop.findWidgetByName("DEC");
-        if(!ra || !de)
-            return;
-        double RA=ra->getValue();
-        double DEC=de->getValue();
-
-        int rh = int(RA);
-        int rs = int(RA*3600) % 3600;
-        int rm = rs / 60;
-        rs = rs % 60;
-        
-        char s='+';
-        if(DEC < 0) {
-            s='-';
-            DEC=-DEC;
-        }
-        int dd = int(DEC);
-        int ds = int(DEC*3600) % 3600;
-        int dm = ds / 60;
-        ds = ds % 60;
-        char ra_str[256];
-        char dec_str[256];
-        snprintf(ra_str,sizeof(ra_str),"%02d:%02d:%02d",rh,rm,rs);
-        snprintf(dec_str,sizeof(dec_str),"%c%02d:%02d:%02d",s,dd,dm,ds);
-        LOG("Coordinates RA=%s DE=%s\n",ra_str,dec_str);
-        latest_ra = ra_str;
-        latest_dec = dec_str;
-    }
-    void handle_mode(INDI::PropertySwitch p)
-    {
-        if(!p.isValid()) {
-            LOG("Property is not valid\n");
-            return;
-        }
-        char const *wname = port_.empty() ? "CONNECTION_TCP" : "CONNECTION_SERIAL";
-        printf("Connecting to %s\n",wname);
-        bool update = false;
-        for(unsigned i=0;i<p.count();i++) {
-            if(p[i].isNameMatch(wname)) {
-                if(p[i].getState() != ISS_ON) {
-                    p[i].setState(ISS_ON);
-                    update = true;
-                }
-            }
-            else {
-                if(p[i].getState() != ISS_OFF) {
-                    p[i].setState(ISS_OFF);
-                    update = true;
-                }
-            }
-        }
-        if(update) {
-            sendNewProperty(p);
-        }
-    }
-    bool is_connected()
-    {
-        return connected_;
-    }
-    void on_detected(INDI::BaseDevice d)
-    {
-        device_ = d;
-        watchDevice(name_.c_str());
-        connectDevice(name_.c_str());
-    }
-    void handle_connection(INDI::PropertySwitch p)
-    {
-        auto ptr = p.findWidgetByName("CONNECT");
-        if(!ptr) {
-            LOG("No CONNECT in connection\n");
-            return;
-        }
-        if(ptr->getState() != ISS_ON) {
-            LOG("Connecting to %s\n",name_.c_str());
-            connectDevice(name_.c_str());
-        }
-        else {
-            LOG("Connected to camera %s\n",name_.c_str());
-            connected_ = true;
-        }
-    }
-    void connect() {
-        /*
-        INDI::PropertySwitch p = device_.getProperty("CONNECTION_TYPE");
-        auto atcp = p.findWidgetByName("TCP");
-        auto audp = p.findWidgetByName("UDP");
-        if(!audp || !atcp)
-            throw std::runtime_error("Can't swithc to udp");
-        atcp->setState(ISS_ON);
-        audp->setState(ISS_OFF);
-        sendNewProperty(p);
-        */
-        handle_connection(device_.getProperty("CONNECTION"));
-    }
-
-
-private:
-    std::string port_;
-    std::recursive_mutex lock_;
-    bool connected_ = false;
-    std::string name_;
-    INDI::BaseDevice device_;
-};
-
-
-double parseRA(int h,int m,int s)
-{
-    double hours = (h + (60 * m + s) / 3600.0 );
-    return hours;
-}
-
-double parseDEC(int d,int m,int s)
-{
-    int sig=1;
-    if(d < 0) {
-        sig = -1;
-        d = -d;
-    }
-    return sig*(d + (60 * m + s) / 3600.0);
-}
-
-
-
-
-
-
 std::mutex MountControlApp::lock;
-std::unique_ptr<MountClient> MountControlApp::client;   
-bool MountControlApp::server_started;
+std::unique_ptr<Mount> MountControlApp::client;   
+
+
 
 MountControlApp::~MountControlApp()
 {
+
 }
 
 void MountControlApp::start_driver()
 {
     guard_type g(lock);
-    if(server_started) {
-        throw std::runtime_error("Service is alreay running");
+    if(mount_driver_is_running()) {
+        throw std::runtime_error("driver is alreay loaded");
     }
     std::string driver = content_.get<std::string>("driver");
-    if(driver != "telescope_skywatcherAltAz"  && driver != "telescope_simulator")
-        throw std::runtime_error("Unsupported device");
-    std::string path = libdir_ + "/libindidriver_" + driver + ".so";
-    std::thread main([=]() {
-        indiserver_main({path});
-    });
-    main.detach();
-    usleep(500000);
-    server_started = true;
-    if(!client)
-        client.reset(new MountClient());
+    std::string option = content_.get<std::string>("option");
+    MountErrorCode e;
+    mount_driver_load(driver,option,e);
+    e.check();
+    if(!client) {
+        setup_client();
+    }
+}
+
+void MountControlApp::set_proto()
+{
+    guard_type g(lock);
+    if(!mount_driver_is_running() && !client)
+        throw std::runtime_error("No connection to driver"); 
+    std::string proto = content_.get<std::string>("proto");
+    MountErrorCode e;
+    if(proto == "inet")
+        client->set_proto(proto_inet,e);
+    else if(proto == "serial")
+        client->set_proto(proto_serial,e);
+    else
+        throw std::runtime_error("Unsupported protocol " + proto);
+    e.check();
+}
+
+void MountControlApp::set_addr()
+{
+    guard_type g(lock);
+    if(!mount_driver_is_running() && !client)
+        throw std::runtime_error("No connection to driver"); 
+    std::string proto = content_.get<std::string>("proto");
+    std::string addr = content_.get<std::string>("addr");
+    MountErrorCode e;
+    if(proto == "inet")
+        client->set_conn_string(proto_inet,addr,e);
+    else if(proto == "serial")
+        client->set_conn_string(proto_serial,addr,e);
+    else
+        throw std::runtime_error("Unsupported protocol " + proto);
+    e.check();
+}
+
+void MountControlApp::set_geolocation()
+{
+    guard_type g(lock);
+    check_connected();
+    double lat = content_.get<double>("lat");
+    double lon = content_.get<double>("lon");
+    MountErrorCode e;
+    client->set_lat_lon(lat,lon,e);
+    e.check();
+}
+
+
+void MountControlApp::get_config_status()
+{
+    guard_type g(lock);
+    if(!mount_driver_is_running()) {
+        mount_config_libdir(libdir_);
+        response_["server"] = false;
+        auto drivers = mount_drivers_list();
+        for(unsigned i=0;i<drivers.size();i++) {
+            auto const &drv = drivers[i];
+            response_["server_drivers"][i]["name"]=drv.name;
+            response_["server_drivers"][i]["option"]=drv.option;
+            response_["server_drivers"][i]["has_option"]=drv.has_option;
+        }
+    }
+    else {
+        response_["server"] = true;
+        MountErrorCode e;
+        if(!client) {
+            setup_client();
+        }
+        bool connected = client->connected();
+        response_["connected"] = connected;
+        if(!connected) {
+            int proto_list = client->supported_proto(e);
+            e.check();
+            if(proto_list & proto_inet) {
+                response_["proto"]["inet"]["supported"]=true;
+                response_["proto"]["inet"]["connection"] = client->get_conn_string(proto_inet,e);
+                e.check();
+            }
+            else{
+                response_["proto"]["inet"]["supported"]=false;
+            }
+            if(proto_list & proto_serial) {
+                response_["proto"]["serial"]["supported"]=true;
+                response_["proto"]["serial"]["connection"] = client->get_conn_string(proto_serial,e);
+                e.check();
+            }
+            else {
+                response_["proto"]["serial"]["supported"]=false;
+            }
+            MountProto proto = client->get_proto(e);
+            e.check();
+            if(proto == proto_inet) 
+                response_["proto"]["current"] = "inet";
+            else if(proto == proto_serial)
+                response_["proto"]["current"] = "serial";
+            else
+                response_["proto"]["current"] = "none";
+        }
+    }
 }
 
 void MountControlApp::get_status()
 {
     guard_type g(lock);
-    response_["server"] = server_started;
-    if(client.get()) {
-        response_["client"] = client->is_connected();
-        response_["ra"] = client->latest_ra;
-        response_["dec"] = client->latest_dec;
+    check_connected();
+    MountErrorCode e;
+    auto pos = client->get_current(e);
+    e.check();
+    response_["ra"] = Mount::formatRA(pos.RA);
+    response_["dec"] = Mount::formatDEC(pos.DEC);
+    auto slew = client->get_slew_rate(e);
+    e.check();
+    response_["slew"]["max"] = slew.second;
+    response_["slew"]["current"] = slew.first;
+    MountTrac tr = client->get_tracking(e);
+    e.check();
+    std::vector<std::string> trmode{"sidereal","solar","lunar"};
+    response_["tracking_mode"] = trmode[tr];
+}
+
+void MountControlApp::set_tracking_mode()
+{
+    check_connected();
+    std::string m = content_.get<std::string>("tracking_mode");
+    MountTrac t;
+    if(m=="sidereal")
+        t=trac_sidereal;
+    else if(m=="solar")
+        t=trac_solar;
+    else if(m=="lunar")
+        t=trac_lunar;
+    else
+        throw std::runtime_error("Unsuppoted mode " + m);
+    MountErrorCode e;
+    client->set_tracking(t,e);
+    e.check();
+}
+
+void MountControlApp::setup_client()
+{
+    if(!client) {
+        MountErrorCode e;
+        client = std::move(get_mount(e));
+        e.check();
+        if(!client)
+            throw std::runtime_error("Internal erroo no client");
+        std::weak_ptr<queue_type> wq = notification_queue_;
+        client->set_update_callback([=](EqCoord coord,std::string const &msg) {
+            queue_pointer_type q = wq.lock();
+            if(!q)
+                return;
+            if(!msg.empty()) {
+                MountControlApp::send_error_message(q,msg);
+            }
+            else {
+                MountControlApp::send_pointing_update(q,coord);
+            }
+        });
+        usleep(500000);
     }
-    else {
-        response_["client"] = false;
-        response_["ra"] = "N/A";
-        response_["dec"] = "N/A";
-    }
-    {
-        std::unique_lock<std::mutex> g2(last_messages_lock);
-        std::vector<std::string> r(last_messages.begin(),last_messages.end());
-        response_["log"] = r;
-    }
+}
+
+void MountControlApp::send_error_message(queue_pointer_type q,std::string const &msg)
+{
+    std::shared_ptr<ErrorNotificationData> obj(new ErrorNotificationData());
+    obj->source = "mount";
+    obj->message = msg;
+    q->push(obj);
+}
+
+void MountControlApp::send_pointing_update(queue_pointer_type q,EqCoord const &pos)
+{
+    std::shared_ptr<MountPositionNotification> obj(new MountPositionNotification());
+    obj->RA = Mount::formatRA(pos.RA);
+    obj->DEC = Mount::formatDEC(pos.DEC);
+    q->push(obj);
 }
 
 void MountControlApp::connect()
 {
     guard_type g(lock);
-    if(!client)
-        throw std::runtime_error("Start server first");
-    client->connect();
+    if(!mount_driver_is_running())
+        throw std::runtime_error("Mount driver hadn't been started");
+    if(!client) {
+        setup_client();
+    }
+    MountErrorCode e;
+    client->connect(e);
+    e.check();
 }
 
 void MountControlApp::go_to()
 {
     guard_type g(lock);
-    if(!client)
-        throw std::runtime_error("Not connected");
-    std::istringstream ss(content_.get<std::string>("target.ra") + "  " + content_.get<std::string>("target.dec"));
-    int rh,rm,rs,dh,dm,ds;
-    char c;
-    ss >> rh >>c >> rm >> c >> rs >> dh>>c>>dm>>c>>ds;
-    if(!ss) {
-        throw std::runtime_error("Bad format:" + ss.str());
-    }
-    client->go_to(parseRA(rh,rm,rs),parseDEC(dh,dm,ds));
+    check_connected();
+    MountErrorCode e;
+    double RA=Mount::parseRA(content_.get<std::string>("ra"),e);
+    e.check();
+    double DEC=Mount::parseRA(content_.get<std::string>("dec"),e);
+    e.check();
+    client->go_to(EqCoord{RA,DEC},e);
+    e.check();
 }
+
+void MountControlApp::check_connected()
+{
+    if(!client || !client->connected())
+        throw std::runtime_error("Connect to mount first");
+}
+
+void MountControlApp::sync()
+{
+    guard_type g(lock);
+    check_connected();
+    MountErrorCode e;
+    double RA=Mount::parseRA(content_.get<std::string>("ra"),e);
+    e.check();
+    double DEC=Mount::parseRA(content_.get<std::string>("dec"),e);
+    e.check();
+    client->sync(EqCoord{RA,DEC},e);
+    e.check();
+}
+
+void MountControlApp::slew()
+{
+    guard_type g(lock);
+    check_connected();
+    int speed = content_.get<int>("speed");
+    std::string direction = content_.get<std::string>("direction");
+    if(!direction.empty()) {
+        MountErrorCode e;
+        if(direction=="N") 
+            client->slew(slew_N,speed,e);
+        else if(direction == "S")
+            client->slew(slew_S,speed,e);
+        else if(direction == "W")
+            client->slew(slew_W,speed,e);
+        else if(direction == "E")
+            client->slew(slew_E,speed,e);
+        else
+            throw std::runtime_error("Unsupoted slew direction: " + direction);
+        e.check();
+    }
+    else {
+        MountErrorCode e;
+        client->slew(slew_stop,0,e);
+        e.check();
+    }
+}
+
+
 
 } // namespace
 

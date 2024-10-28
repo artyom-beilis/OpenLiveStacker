@@ -26,6 +26,8 @@ namespace ols {
                                         double fov_deg,
                                         double target_ra_deg,
                                         double target_de_deg,
+                                        double mount_ra_deg,
+                                        double mount_de_deg,
                                         double search_radius_deg,
                                         double timeout);
 
@@ -39,6 +41,8 @@ namespace ols {
                                 double fov_deg,
                                 double target_ra_deg,
                                 double target_de_deg,
+                                double mount_ra_deg,
+                                double mount_de_deg,
                                 double search_radius_deg,
                                 double timeout);
             
@@ -47,6 +51,8 @@ namespace ols {
                         double fov_deg,
                         double target_ra_deg,
                         double target_de_deg,
+                        double mount_ra_deg,
+                        double mount_de_deg,
                         double search_radius_deg,
                         double timeout);
     private:
