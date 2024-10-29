@@ -37,20 +37,34 @@ namespace ols {
 
 namespace {
     struct LogFile {
-        FILE *log_file;
+        static FILE *log_file;
         LogFile() {
-            char name[1024];
-            snprintf(name,sizeof(name),"%s/prop_log.txt",getenv("HOME"));
-            log_file = fopen(name,"a");
+            if(!log_file) {
+                char name[512];
+                char prev_name[512];
+                #ifdef ANDROID_BUILD         
+                char const *fname = "debug/indi_mount_prop_log.txt";
+                char const *prev_fname = "debug/indi_mount_prop_log.1.txt";
+                char const *home_dir = getenv("HOME");
+                #else
+                char const *fname = "indi_mount_prop_log.txt";
+                char const *prev_fname = "indi_mount_prop_log.1.txt";
+                char const *home_dir = "/tmp";
+                #endif    
+                snprintf(name,sizeof(name),"%s/%s",home_dir,fname);
+                snprintf(prev_name,sizeof(prev_name),"%s/%s",home_dir,prev_fname);
+                rename(name,prev_name);
+                log_file = fopen(name,"w");
+            }
         }
         ~LogFile()
         { 
             if(log_file) { 
                 fflush(log_file);
-                fclose(log_file);
             }
         }
     };
+    FILE *LogFile::log_file;
 }
 
     #define LOGP(...) do { LOG(__VA_ARGS__); LogFile l; fprintf(l.log_file,__VA_ARGS__); } while(0)
@@ -325,6 +339,9 @@ namespace {
                 { "RA",  coord.RA  },
                 { "DEC", coord.DEC }
             },e,true);
+            if(e)
+                return;
+            save_alignment(e);
         }
         virtual void slew(MountSlew direction,int speed,MountErrorCode &e) override
         {
@@ -453,8 +470,45 @@ namespace {
             else if(prop.isNameMatch("CONNECTION")) {
                 handle_connection(prop);
             }
+            else if(prop.isNameMatch("ALIGNMENT_POINTSET_ACTION")) {
+                align_pointset_action_ = true;
+            }
+            else if(prop.isNameMatch("ALIGNMENT_POINTSET_COMMIT")) {
+                align_pointset_commit_ = true;
+            }
+            if(align_pointset_commit_ && align_pointset_action_ && !align_pointset_loaded_) {
+                align_pointset_loaded_ = true;
+                load_alignment();
+            }
        }
     private:
+        void load_alignment()
+        {
+            MountErrorCode e;
+            setPropSwitch("ALIGNMENT_POINTSET_ACTION","LOAD DATABASE",e,true);
+            if(e) {
+                LOGP("No load database for mount: %s\n",e.message().c_str());
+                return;
+            }
+            setPropSwitch("ALIGNMENT_POINTSET_COMMIT","ALIGNMENT_POINTSET_COMMIT",e,true);
+            if(e) {
+                LOGP("Can't commit for load database mount: %s\n",e.message().c_str());
+                return;
+            }
+        }
+        
+        void save_alignment(MountErrorCode &e)
+        {
+            if(!(align_pointset_action_ && align_pointset_commit_)) {
+                return; // No alignment supported
+            }
+            setPropSwitch("ALIGNMENT_POINTSET_ACTION","SAVE DATABASE",e,true);
+            if(e) {
+                return;
+            }
+            setPropSwitch("ALIGNMENT_POINTSET_COMMIT","ALIGNMENT_POINTSET_COMMIT",e,true);
+        }
+
         void handle_connection(INDI::PropertySwitch p)
         {
             auto ptr = p.findWidgetByName("CONNECT");
@@ -483,10 +537,13 @@ namespace {
         virtual void reset_alignment(MountErrorCode &e)
         {
             guard_type g(lock_);
-            setPropSwitch("ALIGNMENT_POINTSET_ACTION","CLEAR",e);
+            setPropSwitch("ALIGNMENT_POINTSET_ACTION","CLEAR",e,true);
             if(e)
                 return;
-            setPropSwitch("ALIGNMENT_POINTSET_COMMIT","ALIGNMENT_POINTSET_COMMIT",e);
+            setPropSwitch("ALIGNMENT_POINTSET_COMMIT","ALIGNMENT_POINTSET_COMMIT",e,true);
+            if(e)
+                return;
+            save_alignment(e);
         }
 
         void log_ra_de(INDI::PropertyNumber prop) 
@@ -519,7 +576,6 @@ namespace {
             lon->setValue(lon_);
             LOGP("Setting new lat/long according to local setup\n");
             sendNewProperty(p);
-            pending_lat_long_ = false;
         }
         
         std::string getPropText(std::string const &prop_name,std::string const &name,MountErrorCode &e)
@@ -640,6 +696,10 @@ namespace {
     
         std::string device_name_;
         bool device_loaded_ = false;
+        bool align_pointset_action_ = false;
+        bool align_pointset_commit_ = false;
+        bool align_pointset_loaded_ = false;
+        bool pending_save_ = false;
         bool disable_serial_;
         INDI::BaseDevice device_;
     };

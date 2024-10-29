@@ -1666,7 +1666,7 @@ function setDisplayStyle(arr,val)
 function updateRADEFor(name,target_id)
 {
     var coord=['','']
-    name = name.toUpperCase();
+    name = name.toUpperCase().trim();
     var sync = document.getElementsByClassName('mount_sync');
     var no_sync = document.getElementsByClassName('mount_no_sync');
     if(name in jsdb) {
