@@ -164,7 +164,8 @@ namespace ols {
             return parseDEC(dd,dm,ds);
         }
 
-
+        virtual int get_alignment_points(MountErrorCode &e) = 0;
+        virtual void reset_alignment(MountErrorCode &e) = 0;
         virtual MountTrac get_tracking(MountErrorCode &e) = 0;
         virtual void set_tracking(MountTrac t,MountErrorCode &e) = 0;
         virtual void connect(MountErrorCode &e) = 0;
@@ -174,6 +175,7 @@ namespace ols {
         virtual std::string get_conn_string(MountProto p,MountErrorCode &e) = 0;
         virtual void set_conn_string(MountProto p,std::string const &s,MountErrorCode &e) = 0;
         virtual void set_lat_lon(double lat,double lon,MountErrorCode &e) = 0;
+        virtual std::pair<double,double> get_lat_lon(MountErrorCode &e) = 0;
         virtual EqCoord get_current(MountErrorCode &e) = 0; 
         virtual std::pair<int,int> get_slew_rate(MountErrorCode &e) = 0;
         virtual void go_to(EqCoord coord,MountErrorCode &e) = 0;

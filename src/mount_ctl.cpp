@@ -165,8 +165,22 @@ void MountControlApp::get_status()
     e.check();
     std::vector<std::string> trmode{"sidereal","solar","lunar"};
     response_["tracking_mode"] = trmode[tr];
+    auto lat_lon = client->get_lat_lon(e);
+    e.check();
+    response_["lat"] = lat_lon.first;
+    response_["lon"] = lat_lon.second;
+    response_["alignment"] = client->get_alignment_points(e);
+    e.check();
 }
 
+void MountControlApp::reset_alignment()
+{
+    guard_type g(lock);
+    check_connected();
+    MountErrorCode e;
+    client->reset_alignment(e);
+    e.check();
+}
 void MountControlApp::set_tracking_mode()
 {
     check_connected();

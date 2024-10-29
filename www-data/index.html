@@ -19,8 +19,10 @@
 </div>
 <div style="position:absolute; right:0; bottom:0; text-align:right;">
     <span class="mount_connected_display_inline" style="display:none;" >
-        Ra <span id="mount_ra"></span><br>
-        Dec <span id="mount_dec"></span><br>
+        <span id="mount_ra_de_coord" >
+            Ra <span id="mount_ra"></span><br>
+            Dec <span id="mount_dec"></span><br>
+        </span>
     </span>
     <span  id='stacking_ui_stats'></span>
 </div>
@@ -285,10 +287,10 @@
         </p>
     </div>
     <div id="config_tab_mount" class="config_tab" style="display:none">
-        <div id="mount_driver_selection" style='display:none'>
+        <div id="mount_driver_selection" style='display:none' >
             <p>Select Driver</p>
             <p><select id="mount_driver_name" onchange="mountDriverSelect()"></select></p>
-            <p><input id="mount_driver_option" value="" type="text" ></p>
+            <p id="mount_driver_option_p"><input id="mount_driver_option" value="" type="text" ></p>
             <p><button onclick="mountStart();">Load</button></p>
         </div>
         <div id="mount_connection_options" style='display:none'>
@@ -297,7 +299,7 @@
                 <button onclick="mountConnStrSet()" disabled="disabled" id="mount_connection_address_set">Set</button>
             <p><button id="mount_connect_button" onclick="mountConnect()">Connect</button></p>
         </div>
-        <p class="mount_connected_display_inline" style="display:none">
+        <p class="mount_connected_display_block" style="display:none">
             Tracking: 
             <select id="mount_tracking_mode" onchange="mountSetTrackingMode()">
                 <option value="sidereal">Sidereal</option>
@@ -305,6 +307,12 @@
                 <option value="lunar">Lunar</option>
             </select>
         </p>
+        <p class="mount_connected_display_block" style="display:none" >Lat <span id="mount_lat"></span>, Lon <span id="mount_lon"></span></p>
+        <p class="mount_connected_display_block" style="display:none" >
+            Ra <span id="mount_cfg_ra"></span> Dec <span id="mount_cfg_dec"></span>
+        </p>
+        <p class="mount_connected_display_block" style="display:none"><input type="checkbox" class='saved_input' id="show_ra_de" checked onchange="toggleRADE(this.checked);" /><label for="show_ra_de">Display on screen RA/DEC</label></p>
+        <p class="mount_connected_display_block" style="display:none">Alignment: <span id="mount_alignment"></span> <button id="mount_alignment_reset" onclick="mountResetAlignment()">Reset</button></p>
     </div>
 
 
@@ -339,7 +347,7 @@
             <span class="nowr" >RA <input class="val_input" id="solver_ra" type="text" value="" />,</span>
             <span class="nowr" >DEC <input class="val_input" id="solver_de" type="text" value=""/></span>
         </p>
-        <p style="display:none" class="mount_connected_display_inline"><input type="checkbox" checked id="use_mount_coordinates" ><label for="use_mount_coordinates">Use Mount Position</label></p>
+        <p style="display:none" class="mount_connected_display_block"><input type="checkbox" checked id="use_mount_coordinates" ><label for="use_mount_coordinates">Use Mount Position</label></p>
         <p>
             <span class="nowr">Pixel Size (μm) <input class="val_input saved_input" id="solver_pixel_size" type="number" step="0.01" value="" oninput='recalcFOV();' />,</span>
             <span class="nowr">Focal Length (mm) <input class="val_input saved_input" id="solver_focal_length" type="number" value="" oninput='recalcFOV();' /></span>

@@ -1,4 +1,3 @@
-
 var g_slew_max = -1;
 var g_slew_speed = 5;
 var global_width = 0;
@@ -24,10 +23,10 @@ var g_hist_zoom = 'vis';
 var g_hist_move_line_id = -1;
 var g_hist_move_line_pos = -1;
 var g_hist_move_start_x = -1;
-var g_mount_lat_lon_set = false;
 var g_mount_connected = false;
 var g_mount_driver_populated = null;
 var g_sync_counter = 0;
+var g_mount_geolocation_updated = false;
 var g_stretch = {
     gain:1,
     cut:0,
@@ -761,6 +760,8 @@ function updatePushEvents(e) {
     else if(stats.type == 'mount') {
         document.getElementById('mount_ra').innerHTML = stats.ra;
         document.getElementById('mount_dec').innerHTML = stats.dec;
+        document.getElementById('mount_cfg_ra').innerHTML = stats.ra;
+        document.getElementById('mount_cfg_dec').innerHTML = stats.dec;
     }
 }
 
@@ -1692,7 +1693,9 @@ function mountSyncSelected()
 {
     var ra = document.getElementById('solver_ra').value;
     var de = document.getElementById('solver_de').value;
-    restCall('post','/api/mount/sync',{'ra':ra,'dec':de},(e)=>{}) 
+    restCall('post','/api/mount/sync',{'ra':ra,'dec':de},(e)=>{
+        setTimeout(update_mnt,300);
+    }) 
 }
 
 function manualSyncPressStart()
@@ -1976,6 +1979,7 @@ function syncSolve(r,call_goto)
     var ra_h = r.center_ra / 15;
     var de_d = r.center_de;
     restCall('post','/api/mount/sync',{'ra':formatRA(ra_h),'dec':formatDEC(de_d)},(r)=>{
+        setTimeout(update_mnt,300);
         if(call_goto) {
             mountGoToSelected();
         }
@@ -2148,7 +2152,6 @@ function mountStart(name)
 function waitMountConnUpdate(data) {
     var button = document.getElementById('mount_connect_button');
     if(data.connected) {
-        onMountConnected();
         updateMountFunc(data);
         button.disabled = false;
     }
@@ -2237,15 +2240,19 @@ function mountDriverSelect()
     var name = document.getElementById('mount_driver_name').value;
     st = getStoageValue();
     st['mount_driver'] = name;
-    setSlewEventListeners(st);
+    setStorageValue(st);
+    setSlewEventListeners();
     var opt = g_mount_driver_populated[name];
     var dopt = document.getElementById('mount_driver_option');
+    var popt = document.getElementById('mount_driver_option_p');
     if(opt == null) {
         opt = ''
         dopt.disabled = true;
+        popt.style.display = 'none';
     }
     else {
         dopt.disabled = false;
+        popt.style.display = 'block';
     }
     dopt.value = opt;
 }
@@ -2288,9 +2295,18 @@ function updateMountFunc(data)
             for(var i=0;i<items_to_enable.length;i++) {
                 items_to_enable[i].style.display='inline';
             }
+            var items_to_enable = document.getElementsByClassName('mount_connected_display_block');
+            for(var i=0;i<items_to_enable.length;i++) {
+                items_to_enable[i].style.display='block';
+            }
             loadMountStatus();
         }
     }
+}
+
+function toggleRADE(disp)
+{
+    document.getElementById('mount_ra_de_coord').style.display = disp ? 'inline' : 'none';
 }
 
 function mountUpdateSlewSpeedUI(delta)
@@ -2303,6 +2319,13 @@ function mountUpdateSlewSpeedUI(delta)
     document.getElementById('mount_slew_speed').innerHTML = `${g_slew_speed + 1}`;
 }
 
+function mountResetAlignment()
+{
+    restCall('post','/api/mount/reset_alignment',{},(e)=>{
+        setTimeout(update_mnt,300);
+    });
+}
+
 function loadMountStatus()
 {
     restCall('get','/api/mount/status',null,(data) => {
@@ -2311,6 +2334,33 @@ function loadMountStatus()
         console.log(`max=${g_slew_max} cur=${g_slew_speed}`)
         mountUpdateSlewSpeedUI(0);
         document.getElementById("mount_tracking_mode").value = data.tracking_mode;
+        document.getElementById("mount_lat").innerHTML = data.lat.toFixed(2);
+        document.getElementById("mount_lon").innerHTML = data.lon.toFixed(2);
+        document.getElementById('mount_alignment_reset').disabled = data.alignment < 0;
+        var alignment_status;
+        if(data.alignment < 0)
+            alignment_status = "not supported";
+        else if(data.alignment == 0)
+            alignment_status = "not aligned";
+        else if(data.alignment > 10)
+            alignment_status = "on multiple points";
+        else
+            alignment_status = `on ${data.alignment} points`;
+        document.getElementById('mount_alignment').innerHTML = alignment_status;
+        if(!g_mount_geolocation_updated) {
+            var lat = parseFloat(getVal("lat"));
+            var lon = parseFloat(getVal("lon"));
+            if(isNaN(lat) || isNaN(lon)) {
+                showError("Lattitude/Longitude is not defined, moust geolocation is not updated");
+                return;
+            }
+            if(Math.abs(lat - data.lat) > 0.0001 || Math.abs(lon-data.lon) > data.lon) {
+                restCall('post','/api/mount/geolocation',{"lat":lat,"lon":lon},(r)=>{
+                    g_mount_geolocation_updated = true;
+                    update_mnt();
+                });
+            }
+        }
     });
 }
 
@@ -2318,19 +2368,6 @@ function mountSetTrackingMode()
 {
     var mode = document.getElementById("mount_tracking_mode").value;
     restCall("post","/api/mount/tracking",{"tracking_mode":mode},(e)=>{});
-}
-
-function onMountConnected()
-{
-    lat = parseFloat(getVal("lat"));
-    lon = parseFloat(getVal("lon"));
-    if(isNaN(lat) || isNaN(lon)) {
-        showError("Lattitude/Longitude is not defined, moust geolocation is not updated");
-    }
-    restCall('post','/api/mount/geolocation',{"lat":lat,"lon":lon},(r)=>{
-        showNotification(`Mount geolocation updated lat=${lat},lon=${lon}`);
-    });
-        
 }
 
 function update_mnt() {

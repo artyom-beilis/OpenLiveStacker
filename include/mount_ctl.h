@@ -36,6 +36,7 @@ namespace ols {
             dispatcher().map("POST","/goto/?",&MountControlApp::go_to,this);
             dispatcher().map("POST","/slew/?",&MountControlApp::slew,this);
             dispatcher().map("POST","/sync/?",&MountControlApp::sync,this);
+            dispatcher().map("POST","/reset_alignment/?",&MountControlApp::reset_alignment,this);
             dispatcher().map("POST","/tracking/?",&MountControlApp::set_tracking_mode,this);
         }
 
@@ -52,6 +53,7 @@ namespace ols {
         void set_addr();
         void set_geolocation();
         void set_tracking_mode();
+        void reset_alignment();
     private:
         void setup_client();
         static void send_error_message(queue_pointer_type q,std::string const &msg);

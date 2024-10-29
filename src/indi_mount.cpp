@@ -4,11 +4,13 @@
 #ifdef INDI_AS_LIBRARY
 #include "baseclient.h"
 #include "basedevice.h"
+#include "libastro.h"
 #include <dirent.h>
 int indiserver_main(std::vector<std::string> drivers);
 #else
 #include <libindi/baseclient.h>
 #include <libindi/basedevice.h>
+#include <libindi/libastro.h>
 #endif
 
 #include <sys/time.h>
@@ -114,6 +116,24 @@ namespace {
             if(!connectServer()) {
                 throw MountError("Faild to connect to indi server");
             }
+        }
+        
+        static double get_jd()
+        {
+            double jd = time(nullptr) / 86400.0 + 2440587.5;
+            return jd;
+        }
+        static EqCoord eod_to_j2000(EqCoord eq)
+        {
+            INDI::IEquatorialCoordinates eod={eq.RA,eq.DEC},j2000 = {0,0};
+            INDI::ObservedToJ2000(&eod,get_jd(),&j2000);
+            return EqCoord{j2000.rightascension,j2000.declination};
+        }
+        static EqCoord j2000_to_eod(EqCoord eq)
+        {
+            INDI::IEquatorialCoordinates j2000={eq.RA,eq.DEC},eod = {0,0};
+            INDI::J2000toObserved(&j2000,get_jd(),&eod);
+            return EqCoord{eod.rightascension,eod.declination};
         }
     
         virtual int supported_proto(MountErrorCode &e) override
@@ -243,9 +263,26 @@ namespace {
             lon_ = lon;
             set_geolocation(device_.getProperty("GEOGRAPHIC_COORD"));
         }
+        virtual std::pair<double,double> get_lat_lon(MountErrorCode &) override
+        {
+            guard_type g(lock_);
+            if(pending_lat_long_) {
+                return std::make_pair(lat_,lon_);
+            }
+            INDI::PropertyNumber p = device_.getProperty("GEOGRAPHIC_COORD");
+            auto wlat = p.findWidgetByName("LAT");
+            auto wlon = p.findWidgetByName("LONG");
+            double lat=0,lon=0;
+            if(wlat && wlon) {
+                lat = wlat->getValue();
+                lon = wlon->getValue();
+            }
+            return std::make_pair(lat,lon);
+        }
         virtual EqCoord get_current(MountErrorCode &/*e*/) override
         {
-            return EqCoord{RA_,DEC_};
+            guard_type g(lock_);
+            return eod_to_j2000(EqCoord{RA_,DEC_});
         }
         virtual std::pair<int,int> get_slew_rate(MountErrorCode &/*e*/) override
         {
@@ -267,6 +304,7 @@ namespace {
         virtual void go_to(EqCoord coord,MountErrorCode &e) override
         {
             guard_type g(lock_);
+            coord = j2000_to_eod(coord);
             setPropSwitch("ON_COORD_SET","TRACK",e,true);
             if(e)
                 return;
@@ -275,8 +313,11 @@ namespace {
                 { "DEC", coord.DEC }
             },e,true);
         }
+
         virtual void sync(EqCoord coord,MountErrorCode &e) override
         {
+            guard_type g(lock_);
+            coord = j2000_to_eod(coord);
             setPropSwitch("ON_COORD_SET","SYNC",e,true);
             if(e)
                 return;
@@ -287,6 +328,7 @@ namespace {
         }
         virtual void slew(MountSlew direction,int speed,MountErrorCode &e) override
         {
+            guard_type g(lock_);
             if(direction == slew_stop) {
                 setPropSwitch("TELESCOPE_MOTION_NS","",e,true);
                 setPropSwitch("TELESCOPE_MOTION_WE","",e,true);
@@ -425,6 +467,28 @@ namespace {
             LOGP("CONNECION status = %d\n",int(connected_));
         }
 
+        virtual int get_alignment_points(MountErrorCode &) override
+        {
+            guard_type g(lock_);
+            INDI::PropertyNumber p = device_.getProperty("ALIGNMENT_POINTSET_SIZE");
+            if(!p.isValid())
+                return -1;
+            auto w = p.findWidgetByName("ALIGNMENT_POINTSET_SIZE");
+            if(!w)
+                return -1;
+            if(w->getValue() > 3)
+                return 1000;
+            return w->getValue();
+        }
+        virtual void reset_alignment(MountErrorCode &e)
+        {
+            guard_type g(lock_);
+            setPropSwitch("ALIGNMENT_POINTSET_ACTION","CLEAR",e);
+            if(e)
+                return;
+            setPropSwitch("ALIGNMENT_POINTSET_COMMIT","ALIGNMENT_POINTSET_COMMIT",e);
+        }
+
         void log_ra_de(INDI::PropertyNumber prop) 
         {
             if(!prop.isValid())
@@ -437,7 +501,7 @@ namespace {
             DEC_ = de->getValue();
             
             if(callback_) {
-                callback_(EqCoord{RA_,DEC_},"");
+                callback_(eod_to_j2000(EqCoord{RA_,DEC_}),"");
             }
             
         }
