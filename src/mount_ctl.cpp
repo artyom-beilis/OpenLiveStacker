@@ -203,7 +203,7 @@ void MountControlApp::setup_client()
 {
     if(!client) {
         MountErrorCode e;
-        client = std::move(get_mount(e));
+        client = get_mount(e);
         e.check();
         if(!client)
             throw std::runtime_error("Internal erroo no client");

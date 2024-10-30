@@ -82,7 +82,7 @@ namespace ols {
         
         Mount() {
         }
-        ~Mount() {
+        virtual ~Mount() {
         }
 
         static double parseRA(int h,int m,int s)

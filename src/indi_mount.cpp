@@ -6,6 +6,7 @@
 #include "basedevice.h"
 #include "libastro.h"
 #include <dirent.h>
+#include <signal.h>
 int indiserver_main(std::vector<std::string> drivers);
 #else
 #include <libindi/baseclient.h>
@@ -42,7 +43,7 @@ namespace {
             if(!log_file) {
                 char name[512];
                 char prev_name[512];
-                #ifdef ANDROID_BUILD         
+                #ifdef ANDROID_SUPPORT
                 char const *fname = "debug/indi_mount_prop_log.txt";
                 char const *prev_fname = "debug/indi_mount_prop_log.1.txt";
                 char const *home_dir = getenv("HOME");
@@ -55,6 +56,10 @@ namespace {
                 snprintf(prev_name,sizeof(prev_name),"%s/%s",home_dir,prev_fname);
                 rename(name,prev_name);
                 log_file = fopen(name,"w");
+                if(!log_file) {
+                    fprintf(stderr,"Failed to open file [%s]\n",name);
+                    log_file = stderr;
+                }
             }
         }
         ~LogFile()
@@ -404,7 +409,7 @@ namespace {
             switchTo(p,"TRACK_SIDEREAL",e);
             return trac_sidereal;
         }
-        virtual void set_tracking(MountTrac t,MountErrorCode &e)
+        virtual void set_tracking(MountTrac t,MountErrorCode &e) override
         {
             guard_type g(lock_);
             switch(t) {
@@ -576,6 +581,7 @@ namespace {
             lon->setValue(lon_);
             LOGP("Setting new lat/long according to local setup\n");
             sendNewProperty(p);
+            pending_lat_long_ = false;
         }
         
         std::string getPropText(std::string const &prop_name,std::string const &name,MountErrorCode &e)
@@ -724,6 +730,12 @@ namespace {
         });
         main.detach();
         usleep(500000);
+        // remove signal handler by libev
+        struct sigaction sa;
+        sa.sa_handler = SIG_DFL;
+        sigfillset(&sa.sa_mask);
+        sa.sa_flags = SA_RESTART; 
+        sigaction(SIGCHLD, &sa, 0);
         return true;
     }
 #endif    

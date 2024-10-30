@@ -186,9 +186,12 @@ else()
 endif()
 
 
-if(INDI_LIB AND INDIGO_HEADER)
+if(INDI_LIB AND INDI_HEADER)
+    message(" - Building OLS with INDI Mount Support")
     set(OLS_EXTRA ${OLS_EXTRA} src/indi_mount.cpp)
     add_definitions(-DWITH_INDI)
+else()
+    message(" - Building OLS without INDI Mount Support")
 endif()
 
 
