@@ -78,7 +78,13 @@ namespace {
     {
         
         char const *perms[]={"ro","wo","rw"};
-        LOGP("%3s %s:%s (%s) %s type %s\n",src,p.getDeviceName(), p.getName(), p.getStateAsString(), perms[p.getPermission()], p.getTypeAsString());
+        struct timeval tv;
+        struct tm t;
+        gettimeofday(&tv, nullptr);
+        localtime_r(&tv.tv_sec,&t);
+        char ts[64];
+        strftime(ts,sizeof(ts),"%H:%M:%S",&t);
+        LOGP("%3s (%s.%03d) %s:%s (%s) %s type %s\n",src,ts,(int)tv.tv_usec/1000,p.getDeviceName(), p.getName(), p.getStateAsString(), perms[p.getPermission()], p.getTypeAsString());
         switch(p.getType()) {
             case INDI_NUMBER:
                 {
@@ -151,8 +157,10 @@ namespace {
         static EqCoord j2000_to_eod(EqCoord eq)
         {
             INDI::IEquatorialCoordinates j2000={eq.RA,eq.DEC},eod = {0,0};
-            INDI::J2000toObserved(&j2000,get_jd(),&eod);
-            return EqCoord{eod.rightascension,eod.declination};
+            double jd = get_jd();
+            INDI::J2000toObserved(&j2000,jd,&eod);
+            EqCoord res{eod.rightascension,eod.declination};
+            return res;
         }
     
         virtual int supported_proto(MountErrorCode &e) override
@@ -481,12 +489,27 @@ namespace {
             else if(prop.isNameMatch("ALIGNMENT_POINTSET_COMMIT")) {
                 align_pointset_commit_ = true;
             }
+            else if(prop.isNameMatch("POLLING_PERIOD") && is_new) {
+                handle_polling(prop);
+            }
             if(align_pointset_commit_ && align_pointset_action_ && !align_pointset_loaded_) {
                 align_pointset_loaded_ = true;
                 load_alignment();
             }
        }
     private:
+        void handle_polling(INDI::PropertyNumber p)
+        {
+            if(!p.isValid() || p.count() != 1) {
+                LOGP("Invalid polling prop format\n");
+                return;
+            }
+            double val = p[0].getValue();
+            if(val < 1000.0) {
+                p[0].setValue(1000.0);
+                sendNewProperty(p);
+            }
+        }
         void load_alignment()
         {
             MountErrorCode e;
