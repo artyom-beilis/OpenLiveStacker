@@ -623,7 +623,6 @@ namespace {
             EqCoord coord = EqCoord{RA_,DEC_};
             AltAzCoord altaz = get_altitude_for_jnow(coord);
             if(callback_) {
-                auto j2000 = eod_to_j2000(coord);
                 callback_(eod_to_j2000(coord),altaz,"");
             }
             double alt = altaz.Alt;
