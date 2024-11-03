@@ -1682,19 +1682,48 @@ function toRaDecCoord(name)
     return [formatRA(ra/15),formatDEC(dec)];
 }
 
+function notifySunWarning()
+{
+    var el = document.getElementById('mount_sun_allow');
+    if(el.checked) {
+        el.checked = false;
+        requestConfirmation("Are you sure you want to allow GoTo Sun? Make sure you use correct and safe equipment!",()=> {
+            el.checked = true;
+        });
+    }
+}
+
+function sunIsAllowed()
+{
+    return document.getElementById('mount_sun_allow').checked;
+}
+
 function updateRADEFor(name,target_id)
 {
     var coord=['','']
     name = name.toUpperCase().trim();
     var sync = document.getElementsByClassName('mount_sync');
     var no_sync = document.getElementsByClassName('mount_no_sync');
+    let do_sync = true;
     if(name in jsdb) {
-        coord = jsdb[name]
-        setDisplayStyle(sync,'inline');
-        setDisplayStyle(no_sync,'none');
+        coord = jsdb[name];
+    }
+    else if(isSolarSystemObject(name) && (name != 'SUN' || sunIsAllowed())) {
+        var lat = parseFloat(getVal("lat"));
+        var lon = parseFloat(getVal("lon"));
+        if(isNaN(lat))
+            lat = 0;
+        if(isNaN(lon))
+            lon = 0;
+        coord = getSolarSystemObject(name,lat,lon);
     }
     else if(toRaDecCoord(name)) {
         coord = toRaDecCoord(name);
+    }
+    else {
+        do_sync = false
+    }
+    if(do_sync) {
         setDisplayStyle(sync,'inline');
         setDisplayStyle(no_sync,'none');
     }
@@ -1708,6 +1737,20 @@ function updateRADEFor(name,target_id)
 
 function mountGoToSelected()
 {
+    var name = document.getElementById('mount_object').value;
+    // make sure we have latest RA/DEC
+    updateMountRADE(name);
+    name = name.toUpperCase().trim();
+    var track = 'sidereal';
+    if(name == 'SUN')
+        track = 'solar';
+    else if(name == 'MOON')
+        track = 'lunar'
+    var mode_el = document.getElementById('mount_tracking_mode');
+    if(mode_el.value != track) {
+        mode_el.value = track;
+        mountSetTrackingMode();
+    }
     var ra = document.getElementById('solver_ra').value;
     var de = document.getElementById('solver_de').value;
     mountGoTo(ra,de);
@@ -2615,6 +2658,31 @@ function profileSave()
     saveProfiles(data);
     selectProfile();
 }
+
+function isSolarSystemObject(p)
+{
+    return ['MOON','MERCURY','VENUS','MARS','JUPITER','SATURN','NEPTUNE','URANUS','SUN'].indexOf(p) != -1;
+}
+
+function getSolarSystemObject(p,lat,lon)
+{
+    p = p.trim();
+    p = p.substring(0,1).toUpperCase() + p.substring(1).toLowerCase();
+    var r2d = 180 / Math.PI;
+    var d2r = Math.PI / 180;
+    var rLat = lat * d2r;
+    var rLon = lon * d2r;
+    var date = new Date();
+    var jd = JulianDate.gregorianDateToJulianDate(date.getUTCFullYear(),date.getUTCMonth()+1,date.getUTCDate(),date.getUTCHours(),date.getUTCMinutes(),date.getUTCSeconds());
+    var body = CPReduce.bodies.indexOf(p);
+    var res =  CPReduce.reduce(body,jd,[rLat,rLon,0]);
+    var RA = res[0];
+    var DEC = res[1];
+
+	return [ formatRA(RA * r2d / 15), formatDEC(DEC *r2d) ]
+}
+
+
 
 
 window.onload = (event) => {

@@ -350,7 +350,10 @@ endif()
 
 
 add_custom_command(TARGET ols POST_BUILD
-    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/make_db.py ${CMAKE_CURRENT_SOURCE_DIR}/www-data/media/js/jsdb.js
+    COMMAND python3 
+                ${CMAKE_CURRENT_SOURCE_DIR}/scripts/make_db.py 
+                ${CMAKE_CURRENT_SOURCE_DIR}/www-data/media/js/jsdb.js 
+                ${CMAKE_CURRENT_SOURCE_DIR}/www-data/media/js/vsop87_lib.js
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Building DB"
 )

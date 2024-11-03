@@ -93,8 +93,20 @@ def get_stars(allstars):
             if mag <= 5:
                 allstars[normalize_name(name)] = [ra,de]
 
+def make_vsop87(out_path):
+    with open(out_path,"wb") as f:
+        with open('external/vsop87-multilang/Languages/JavaScript/vsop87a_large.js','rb') as f1:
+            f.write(f1.read())
+        with open('external/vsop87-multilang/Languages/JavaScript/vsop87a_large_velocities.js','rb') as f2:
+            f.write(f2.read())
+        f.write(b'vsop87a_full = vsop87a_large;\n')
+        f.write(b'vsop87a_full_velocities = vsop87a_large_velocities;\n')
+        with open('external/vsop87-multilang/Languages/JavaScript/CelestialProgrammingReduce.js','rb') as f3:
+            f.write(f3.read())
+
 
 if __name__ == "__main__":
+    make_vsop87(sys.argv[2])
     db = get_OpenNGC_DSO()
     get_stars(db)
     with open(sys.argv[1],'w') as f:

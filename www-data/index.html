@@ -61,8 +61,6 @@
     </tr>
     <tr>
         <td>
-            <!-- <button style='display:none' class="mount_sq_but mount_sync" onclick='mountGoToSelected()' >≫</button>
-            <button class="mount_sq_but mount_no_sync" ><strike>≫</strike></button>-->
             <button style='display:none' class="mount_sq_but mount_sync" onclick='mountGoToSelected()' >Go</button>
             <button class="mount_sq_but mount_no_sync" ><strike>Go</strike></button>
         </td>
@@ -313,6 +311,7 @@
         </p>
         <p class="mount_connected_display_block" style="display:none"><input type="checkbox" class='saved_input' id="show_ra_de" checked onchange="toggleRADE(this.checked);" /><label for="show_ra_de">Display on screen RA/DEC</label></p>
         <p class="mount_connected_display_block" style="display:none">Alignment: <span id="mount_alignment"></span> <button id="mount_alignment_reset" onclick="mountResetAlignment()">Reset</button></p>
+        <p class="mount_connected_display_block" style="display:none"><input type="checkbox" id="mount_sun_allow" onchange="notifySunWarning();" /><label for="mount_sun_allow">Sun is searchable</label></p>
     </div>
 
 
@@ -379,6 +378,7 @@
 </div>
 <div id="white_screen" ></div>
 <script src="/media/js/jsdb.js"></script>
+<script src="/media/js/vsop87_lib.js"></script>
 <script src="/media/js/code.js"></script>
 </body>
 </html>
