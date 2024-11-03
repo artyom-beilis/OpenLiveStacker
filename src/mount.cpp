@@ -4,6 +4,8 @@
     #include "indi_mount.h"
 #endif
 
+#include <fstream>
+
 namespace ols {
 
 
@@ -90,5 +92,53 @@ namespace ols {
         e.check();
         client_ = std::move(cl);
     }
-    
+   
+    Mount::Mount() {
+        load_alt();
+    }
+    Mount::~Mount()
+    {
+    }
+    std::string Mount::ols_config_file()
+    {
+        char const *home = getenv("HOME");
+        if(home == nullptr)
+            home = ".";
+        std::string file = home;
+        file += "/.ols_mount_config.txt";
+        return file;
+    }
+    void Mount::check_alt_limits(int low,int high,MountErrorCode &e)
+    {
+        if(high - low < 45 || high > 90 || low < -90 || high < 30) {
+            e = "Invalid altitude values";
+        }
+    }
+    void Mount::load_alt()
+    {
+        std::ifstream f(ols_config_file());
+        if(!f)
+            return;
+        int low = 0, high = 0;
+        f >> low >> high;
+        if(!f)
+            return;
+        MountErrorCode e;
+        check_alt_limits(low,high,e);
+        if(e)
+            return;
+        low_alt_ = low;
+        high_alt_ = high;
+    }
+    void Mount::save_alt(MountErrorCode &e)
+    {
+        std::string name = ols_config_file();
+        std::ofstream f(name);
+        if(!f) {
+            e = "Failed to open file " + name;
+            return;
+        }
+        f<< low_alt_ << " " << high_alt_ << "\n";
+        f.close();
+    }
 } // namespace

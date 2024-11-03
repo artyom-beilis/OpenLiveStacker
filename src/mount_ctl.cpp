@@ -33,6 +33,7 @@ void MountControlApp::start_driver()
     setup_client();
 }
 
+
 void MountControlApp::set_proto()
 {
     auto g = mi_->guard();
@@ -77,6 +78,17 @@ void MountControlApp::set_geolocation()
     double lon = content_.get<double>("lon");
     MountErrorCode e;
     client->set_lat_lon(lat,lon,e);
+    e.check();
+}
+void MountControlApp::set_alt_limits()
+{
+    auto g=mi_->guard();
+    auto client = check_connected();
+
+    int alt_min = content_.get<int>("alt_min");
+    int alt_max = content_.get<int>("alt_max");
+    MountErrorCode e;
+    client->set_alt_limits(alt_min,alt_max,e);
     e.check();
 }
 
@@ -130,6 +142,7 @@ void MountControlApp::get_config_status()
                 response_["proto"]["current"] = "serial";
             else
                 response_["proto"]["current"] = "none";
+
         }
     }
 }
@@ -156,6 +169,10 @@ void MountControlApp::get_status()
     response_["lat"] = lat_lon.first;
     response_["lon"] = lat_lon.second;
     response_["alignment"] = client->get_alignment_points(e);
+    e.check();
+    auto limits = client->get_alt_limits(e);
+    response_["alt_min"] = limits.first;
+    response_["alt_max"] = limits.second;
     e.check();
 }
 
@@ -192,7 +209,7 @@ void MountControlApp::setup_client()
         mi_->load_mount();
         auto client = mi_->client();
         std::weak_ptr<queue_type> wq = notification_queue_;
-        client->set_update_callback([=](EqCoord coord,std::string const &msg) {
+        client->set_update_callback([=](EqCoord coord,AltAzCoord altaz,std::string const &msg) {
             queue_pointer_type q = wq.lock();
             if(!q)
                 return;
@@ -200,7 +217,7 @@ void MountControlApp::setup_client()
                 MountControlApp::send_error_message(q,msg);
             }
             else {
-                MountControlApp::send_pointing_update(q,coord);
+                MountControlApp::send_pointing_update(q,coord,altaz);
             }
         });
         usleep(500000);
@@ -215,11 +232,13 @@ void MountControlApp::send_error_message(queue_pointer_type q,std::string const 
     q->push(obj);
 }
 
-void MountControlApp::send_pointing_update(queue_pointer_type q,EqCoord const &pos)
+void MountControlApp::send_pointing_update(queue_pointer_type q,EqCoord const &pos,AltAzCoord const &altaz)
 {
     std::shared_ptr<MountPositionNotification> obj(new MountPositionNotification());
     obj->RA = Mount::formatRA(pos.RA);
     obj->DEC = Mount::formatDEC(pos.DEC);
+    obj->Alt = altaz.Alt;
+    obj->Az = altaz.Az;
     q->push(obj);
 }
 

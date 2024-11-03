@@ -138,6 +138,31 @@ namespace {
             double jd = time(nullptr) / 86400.0 + 2440587.5;
             return jd;
         }
+
+        AltAzCoord get_altitude_for_jnow(EqCoord eq)
+        {
+            INDI::IEquatorialCoordinates eod={eq.RA,eq.DEC};
+            INDI::IHorizontalCoordinates altaz;
+            double lon = lon_;
+            if(lon < 0) {
+                lon += 360;
+            }
+            double jd = get_jd();
+            INDI::IGeographicCoordinates geo = { lon, lat_, 0 };
+       
+            INDI::EquatorialToHorizontal(&eod,&geo,jd,&altaz);
+            return AltAzCoord{altaz.altitude,altaz.azimuth};
+        }
+
+        void abort()
+        {
+            MountErrorCode e;
+            setPropSwitch("TELESCOPE_ABORT_MOTION","ABORT",e,true);
+            if(e) {
+                LOGP("Failed to abort %s\n",e.message().c_str());
+            }
+        }
+
         static EqCoord eod_to_j2000(EqCoord eq)
         {
             INDI::IEquatorialCoordinates eod={eq.RA,eq.DEC},j2000 = {0,0};
@@ -294,6 +319,8 @@ namespace {
                 lat = wlat->getValue();
                 lon = wlon->getValue();
             }
+            lat_ = lat;
+            lon_ = lon;
             return std::make_pair(lat,lon);
         }
         virtual EqCoord get_current(MountErrorCode &/*e*/) override
@@ -318,10 +345,23 @@ namespace {
             }
             return std::make_pair(2,4); // just some default
         }
+        bool check_altitude_in_limits(double alt,MountErrorCode &e)
+        {
+            if(alt < low_alt_ || alt > high_alt_) {
+                std::ostringstream ss;
+                ss << "Altitude of the target " << alt << " is not withing limits [" <<low_alt_ << ","<<high_alt_ << "]";
+                e = ss.str();
+                return false;
+            }
+            return true;
+        }
         virtual void go_to(EqCoord coord,MountErrorCode &e) override
         {
             guard_type g(lock_);
             coord = j2000_to_eod(coord);
+            double alt = get_altitude_for_jnow(coord).Alt;
+            if(!check_altitude_in_limits(alt,e))
+                return;
             setPropSwitch("ON_COORD_SET","TRACK",e,true);
             if(e)
                 return;
@@ -382,6 +422,7 @@ namespace {
                     setPropSwitch("TELESCOPE_MOTION_WE","MOTION_EAST",e);
             }
         }
+        
         virtual MountTrac get_tracking(MountErrorCode &e) override
         {
             guard_type g(lock_);
@@ -425,7 +466,7 @@ namespace {
             std::string msg = baseDevice.messageQueue(messageID);
             LOGP("GOT MESSAGE: id=%d: %s\n",messageID,msg.c_str());
             if(msg.find("[ERROR]")!=std::string::npos && callback_) {
-                callback_(EqCoord{0,0},msg);
+                callback_(EqCoord{0,0},AltAzCoord{0,0},msg);
             }
         }
 
@@ -468,6 +509,10 @@ namespace {
             else if(prop.isNameMatch("GEOGRAPHIC_COORD")) {
                 if(pending_lat_long_) {
                     set_geolocation(prop);
+                }
+                else {
+                    MountErrorCode e;
+                    get_lat_lon(e);
                 }
             }
             else if(prop.isNameMatch("CONNECTION")) {
@@ -574,11 +619,36 @@ namespace {
                 return;
             RA_  = ra->getValue();
             DEC_ = de->getValue();
-            
+
+            EqCoord coord = EqCoord{RA_,DEC_};
+            AltAzCoord altaz = get_altitude_for_jnow(coord);
             if(callback_) {
-                callback_(eod_to_j2000(EqCoord{RA_,DEC_}),"");
+                auto j2000 = eod_to_j2000(coord);
+                callback_(eod_to_j2000(coord),altaz,"");
             }
-            
+            double alt = altaz.Alt;
+            MountErrorCode e;
+            if(!check_altitude_in_limits(alt,e)) {
+                bool call_abort = true;
+                if(alt > high_alt_) {
+                    if(prev_alt_ > -100 && prev_alt_ >= alt) {
+                        call_abort = false;
+                    }
+                }
+                else if(alt < low_alt_) {
+                    if(prev_alt_ > -100 && prev_alt_ <= alt) {
+                        call_abort = false;
+                    }
+                }
+                LOGP("Altitude is not withing limits %s, previous %f aborting = %d\n",e.message().c_str(),prev_alt_,int(call_abort));
+                if(call_abort) {
+                    abort();
+                    if(callback_) {
+                        callback_(EqCoord{0,0},AltAzCoord{0,0},"Aborting motion: " + e.message());
+                    }
+                }
+            }
+            prev_alt_ = alt;
         }
         void set_geolocation(INDI::PropertyNumber p)
         {
@@ -720,6 +790,7 @@ namespace {
         bool align_pointset_loaded_ = false;
         bool pending_save_ = false;
         bool disable_serial_;
+        double prev_alt_ = -100;
         INDI::BaseDevice device_;
     };
 

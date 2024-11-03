@@ -16,6 +16,7 @@ namespace ols {
     class Mount;
     class MountInterface;
     struct EqCoord;
+    struct AltAzCoord;
     class MountControlApp : public ControlAppBase {
     public:
         
@@ -27,6 +28,7 @@ namespace ols {
             dispatcher().map("GET", "/config/?",&MountControlApp::get_config_status,this);
             dispatcher().map("GET", "/status/?",&MountControlApp::get_status,this);
             dispatcher().map("POST","/geolocation/?",&MountControlApp::set_geolocation,this);
+            dispatcher().map("POST","/alt_limits/?",&MountControlApp::set_alt_limits,this);
             dispatcher().map("POST","/start/?",&MountControlApp::start_driver,this);
             dispatcher().map("POST","/connection_proto/?",&MountControlApp::set_proto,this);
             dispatcher().map("POST","/connection_addr/?",&MountControlApp::set_addr,this);
@@ -52,10 +54,11 @@ namespace ols {
         void set_geolocation();
         void set_tracking_mode();
         void reset_alignment();
+        void set_alt_limits();
     private:
         void setup_client();
         static void send_error_message(queue_pointer_type q,std::string const &msg);
-        static void send_pointing_update(queue_pointer_type q,EqCoord const &pos);
+        static void send_pointing_update(queue_pointer_type q,EqCoord const &pos,AltAzCoord const &altaz);
         Mount *check_connected();
         queue_pointer_type notification_queue_;
         MountInterface *mi_;

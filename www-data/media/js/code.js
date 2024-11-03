@@ -762,6 +762,8 @@ function updatePushEvents(e) {
         document.getElementById('mount_dec').innerHTML = stats.dec;
         document.getElementById('mount_cfg_ra').innerHTML = stats.ra;
         document.getElementById('mount_cfg_dec').innerHTML = stats.dec;
+        document.getElementById('mount_cfg_alt').innerHTML = stats.alt.toFixed(2);
+        document.getElementById('mount_cfg_az').innerHTML = stats.az.toFixed(2);
     }
 }
 
@@ -2404,6 +2406,8 @@ function loadMountStatus()
         document.getElementById("mount_lat").innerHTML = data.lat.toFixed(2);
         document.getElementById("mount_lon").innerHTML = data.lon.toFixed(2);
         document.getElementById('mount_alignment_reset').disabled = data.alignment < 0;
+        document.getElementById('mount_alt_low').value = `${data.alt_min}`;
+        document.getElementById('mount_alt_high').value = `${data.alt_max}`;
         var alignment_status;
         if(data.alignment < 0)
             alignment_status = "not supported";
@@ -2430,6 +2434,14 @@ function loadMountStatus()
         }
     });
 }
+
+function setMoutAltLimits()
+{
+    var low = parseInt(document.getElementById('mount_alt_low').value);
+    var high = parseInt(document.getElementById('mount_alt_high').value);
+    restCall('post','/api/mount/alt_limits',{'alt_min':low,'alt_max' : high},(e)=>{});
+}
+
 
 function mountSetTrackingMode()
 {

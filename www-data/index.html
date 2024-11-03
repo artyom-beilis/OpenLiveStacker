@@ -305,9 +305,14 @@
                 <option value="lunar">Lunar</option>
             </select>
         </p>
+        <p class="mount_connected_display_block" style="display:none">
+            Min Altitude <input type="number" id="mount_alt_low"  value="-90" min="-90" max="90" step="1" ><br>
+            Max Altitude <input type="number" id="mount_alt_high" value="90"  min="-90" max="90" step="1" ><br>
+            <button onclick="setMoutAltLimits()" >Set Limits</button>
+        </p>
         <p class="mount_connected_display_block" style="display:none" >Lat <span id="mount_lat"></span>, Lon <span id="mount_lon"></span></p>
         <p class="mount_connected_display_block" style="display:none" >
-            Ra <span id="mount_cfg_ra"></span> Dec <span id="mount_cfg_dec"></span>
+            Ra <span id="mount_cfg_ra"></span>, Dec <span id="mount_cfg_dec"></span>, Alt <span id="mount_cfg_alt"></span>, Az <span id="mount_cfg_az" ></span>
         </p>
         <p class="mount_connected_display_block" style="display:none"><input type="checkbox" class='saved_input' id="show_ra_de" checked onchange="toggleRADE(this.checked);" /><label for="show_ra_de">Display on screen RA/DEC</label></p>
         <p class="mount_connected_display_block" style="display:none">Alignment: <span id="mount_alignment"></span> <button id="mount_alignment_reset" onclick="mountResetAlignment()">Reset</button></p>

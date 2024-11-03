@@ -262,6 +262,8 @@ namespace ols {
                 info["type"] = "mount";
                 info["ra"]   = mount->RA;
                 info["dec"]  = mount->DEC;
+                info["alt"]  = mount->Alt;
+                info["az"]   = mount->Az;
             }
             else
                 return;

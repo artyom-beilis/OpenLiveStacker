@@ -12,6 +12,10 @@ namespace ols {
         double RA = 0;
         double DEC = 0;
     };
+    struct AltAzCoord {
+        double Alt = 0;
+        double Az = 0;
+    };
 
     class MountError : public std::runtime_error {
     public:
@@ -75,15 +79,13 @@ namespace ols {
         slew_E       = (3<<3),
     };
 
-    typedef std::function<void(EqCoord,std::string const &)> mount_callback_type;
+    typedef std::function<void(EqCoord,AltAzCoord,std::string const &)> mount_callback_type;
     class Mount {
     public:
         typedef std::unique_lock<std::recursive_mutex> guard_type;
         
-        Mount() {
-        }
-        virtual ~Mount() {
-        }
+        Mount();
+        virtual ~Mount();
 
         static double parseRA(int h,int m,int s)
         {
@@ -164,6 +166,17 @@ namespace ols {
             return parseDEC(dd,dm,ds);
         }
 
+        virtual std::pair<int,int> get_alt_limits(MountErrorCode &)
+        {
+            return std::make_pair(low_alt_,high_alt_);
+        }
+        virtual void set_alt_limits(int low,int high,MountErrorCode &e)
+        {
+            check_alt_limits(low,high,e);
+            low_alt_ = low;
+            high_alt_ = high;
+            save_alt(e);
+        }
         virtual int get_alignment_points(MountErrorCode &e) = 0;
         virtual void reset_alignment(MountErrorCode &e) = 0;
         virtual MountTrac get_tracking(MountErrorCode &e) = 0;
@@ -200,7 +213,14 @@ namespace ols {
         }
 
     protected:
+        
+        virtual void check_alt_limits(int low,int high,MountErrorCode &e);
+        void save_alt(MountErrorCode &e);
+        void load_alt();
+        std::string ols_config_file();
 
+        int high_alt_ = 90;
+        int low_alt_ = -90;
         std::recursive_mutex lock_;
         bool connected_ = false;
         double RA_ = 0,DEC_ = 0;

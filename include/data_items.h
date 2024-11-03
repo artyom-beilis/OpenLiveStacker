@@ -48,6 +48,7 @@ namespace ols {
 
     struct MountPositionNotification : public QueueData {
         std::string RA,DEC;
+        double Alt=0,Az=0;
         virtual ~MountPositionNotification() {}
     };
 

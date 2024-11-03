@@ -281,7 +281,7 @@ namespace ols {
     {
         std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,stacking_output,live_output,debug_save,plate_solving_out));
         std::thread t([=](){vg->run();});
-        return std::move(t);
+        return t;
     }
 
 }
