@@ -1,12 +1,3 @@
-//#define INDI_AS_LIBRARY 
-#ifdef INDI_AS_LIBRARY
-#include "baseclient.h"
-#include "basedevice.h"
-#else
-#include <libindi/baseclient.h>
-#include <libindi/basedevice.h>
-#endif
-
 #include <sys/time.h>
 #include <iostream>
 #include <sstream>
@@ -14,6 +5,7 @@
 #include <mutex>
 #include <thread>
 #include <queue>
+#include <unistd.h>
 
 #include "camera.h"
 #include "mount_ctl.h"
@@ -24,37 +16,29 @@
 
 namespace ols {
 
-std::mutex MountControlApp::lock;
-std::unique_ptr<Mount> MountControlApp::client;   
-
 
 
 MountControlApp::~MountControlApp()
 {
-
 }
 
 void MountControlApp::start_driver()
 {
-    guard_type g(lock);
-    if(mount_driver_is_running()) {
+    auto g=mi_->guard();
+    if(mi_->driver_is_loaded())
         throw std::runtime_error("driver is alreay loaded");
-    }
     std::string driver = content_.get<std::string>("driver");
     std::string option = content_.get<std::string>("option");
-    MountErrorCode e;
-    mount_driver_load(driver,option,e);
-    e.check();
-    if(!client) {
-        setup_client();
-    }
+    mi_->load_driver(driver,option);
+    setup_client();
 }
 
 void MountControlApp::set_proto()
 {
-    guard_type g(lock);
-    if(!mount_driver_is_running() && !client)
+    auto g = mi_->guard();
+    if(!mi_->mount_is_loaded())
         throw std::runtime_error("No connection to driver"); 
+    auto client = mi_->client();
     std::string proto = content_.get<std::string>("proto");
     MountErrorCode e;
     if(proto == "inet")
@@ -68,9 +52,10 @@ void MountControlApp::set_proto()
 
 void MountControlApp::set_addr()
 {
-    guard_type g(lock);
-    if(!mount_driver_is_running() && !client)
+    auto g=mi_->guard();
+    if(!mi_->mount_is_loaded())
         throw std::runtime_error("No connection to driver"); 
+    auto client = mi_->client();
     std::string proto = content_.get<std::string>("proto");
     std::string addr = content_.get<std::string>("addr");
     MountErrorCode e;
@@ -85,8 +70,9 @@ void MountControlApp::set_addr()
 
 void MountControlApp::set_geolocation()
 {
-    guard_type g(lock);
-    check_connected();
+    auto g=mi_->guard();
+    auto client = check_connected();
+
     double lat = content_.get<double>("lat");
     double lon = content_.get<double>("lon");
     MountErrorCode e;
@@ -97,11 +83,10 @@ void MountControlApp::set_geolocation()
 
 void MountControlApp::get_config_status()
 {
-    guard_type g(lock);
-    if(!mount_driver_is_running()) {
-        mount_config_libdir(libdir_);
+    auto g=mi_->guard();
+    if(!mi_->driver_is_loaded()) {
         response_["server"] = false;
-        auto drivers = mount_drivers_list();
+        auto drivers = mi_->drivers_list();
         for(unsigned i=0;i<drivers.size();i++) {
             auto const &drv = drivers[i];
             response_["server_drivers"][i]["name"]=drv.name;
@@ -112,9 +97,10 @@ void MountControlApp::get_config_status()
     else {
         response_["server"] = true;
         MountErrorCode e;
-        if(!client) {
+        if(!mi_->mount_is_loaded()) {
             setup_client();
         }
+        auto client = mi_->client();
         bool connected = client->connected();
         response_["connected"] = connected;
         if(!connected) {
@@ -150,8 +136,8 @@ void MountControlApp::get_config_status()
 
 void MountControlApp::get_status()
 {
-    guard_type g(lock);
-    check_connected();
+    auto g=mi_->guard();
+    auto client = check_connected();
     MountErrorCode e;
     auto pos = client->get_current(e);
     e.check();
@@ -175,15 +161,16 @@ void MountControlApp::get_status()
 
 void MountControlApp::reset_alignment()
 {
-    guard_type g(lock);
-    check_connected();
+    auto g=mi_->guard();
+    auto client = check_connected();
     MountErrorCode e;
     client->reset_alignment(e);
     e.check();
 }
 void MountControlApp::set_tracking_mode()
 {
-    check_connected();
+    auto g = mi_->guard();
+    auto client = check_connected();
     std::string m = content_.get<std::string>("tracking_mode");
     MountTrac t;
     if(m=="sidereal")
@@ -201,12 +188,9 @@ void MountControlApp::set_tracking_mode()
 
 void MountControlApp::setup_client()
 {
-    if(!client) {
-        MountErrorCode e;
-        client = get_mount(e);
-        e.check();
-        if(!client)
-            throw std::runtime_error("Internal erroo no client");
+    if(!mi_->mount_is_loaded()) {
+        mi_->load_mount();
+        auto client = mi_->client();
         std::weak_ptr<queue_type> wq = notification_queue_;
         client->set_update_callback([=](EqCoord coord,std::string const &msg) {
             queue_pointer_type q = wq.lock();
@@ -241,21 +225,21 @@ void MountControlApp::send_pointing_update(queue_pointer_type q,EqCoord const &p
 
 void MountControlApp::connect()
 {
-    guard_type g(lock);
-    if(!mount_driver_is_running())
+    auto g=mi_->guard();
+    if(!mi_->driver_is_loaded())
         throw std::runtime_error("Mount driver hadn't been started");
-    if(!client) {
+    if(!mi_->mount_is_loaded()) {
         setup_client();
     }
     MountErrorCode e;
-    client->connect(e);
+    mi_->client()->connect(e);
     e.check();
 }
 
 void MountControlApp::go_to()
 {
-    guard_type g(lock);
-    check_connected();
+    auto g=mi_->guard();
+    auto client = check_connected();
     MountErrorCode e;
     double RA=Mount::parseRA(content_.get<std::string>("ra"),e);
     e.check();
@@ -265,16 +249,17 @@ void MountControlApp::go_to()
     e.check();
 }
 
-void MountControlApp::check_connected()
+Mount *MountControlApp::check_connected()
 {
-    if(!client || !client->connected())
+    if(!mi_->mount_is_loaded() || !mi_->client()->connected())
         throw std::runtime_error("Connect to mount first");
+    return mi_->client();
 }
 
 void MountControlApp::sync()
 {
-    guard_type g(lock);
-    check_connected();
+    auto g=mi_->guard();
+    auto client = check_connected();
     MountErrorCode e;
     double RA=Mount::parseRA(content_.get<std::string>("ra"),e);
     e.check();
@@ -286,8 +271,8 @@ void MountControlApp::sync()
 
 void MountControlApp::slew()
 {
-    guard_type g(lock);
-    check_connected();
+    auto g=mi_->guard();
+    auto client = check_connected();
     int speed = content_.get<int>("speed");
     std::string direction = content_.get<std::string>("direction");
     if(!direction.empty()) {

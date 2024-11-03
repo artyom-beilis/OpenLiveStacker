@@ -4,10 +4,10 @@
 #ifdef INDI_AS_LIBRARY
 #include "baseclient.h"
 #include "basedevice.h"
+#include "indiserver_lib.h"
 #include "libastro.h"
 #include <dirent.h>
 #include <signal.h>
-int indiserver_main(std::vector<std::string> drivers);
 #else
 #include <libindi/baseclient.h>
 #include <libindi/basedevice.h>
@@ -25,16 +25,6 @@ int indiserver_main(std::vector<std::string> drivers);
 #include <booster/log.h>
 
 namespace ols {
-
-#define LOG(...) do {  \
-    char buf[256]; \
-    int n = snprintf( buf, sizeof(buf) ,__VA_ARGS__);  \
-    if(n < 255 && n > 0 && buf[n-1] == '\n')  {\
-        buf[n-1] = 0; \
-    } \
-    BOOSTER_INFO("stacker") << buf; \
-} while(0)
-
 
 namespace {
     struct LogFile {
@@ -72,7 +62,7 @@ namespace {
     FILE *LogFile::log_file;
 }
 
-    #define LOGP(...) do { LOG(__VA_ARGS__); LogFile l; fprintf(l.log_file,__VA_ARGS__); } while(0)
+    #define LOGP(...) do { LogFile l; fprintf(l.log_file,__VA_ARGS__); } while(0)
 
     static void log_property(char const *src,INDI::Property const &p) 
     {
@@ -733,35 +723,74 @@ namespace {
         INDI::BaseDevice device_;
     };
 
-    std::unique_ptr<Mount> indi_mount_create(std::string const &device_name,std::string const &host,int port,bool disable_serial)
-    {
-        std::unique_ptr<Mount> m;
-        m.reset(new IndiMount(device_name,host,port,disable_serial));
-        return m;
-    }
 
 #ifdef INDI_AS_LIBRARY
-    bool start_indi_driver(std::string driver,std::string const &libdir,MountErrorCode &e)
-    {
-        std::string path = libdir + "/libindidriver_telescope_" + driver + ".so";
-        if(!exists(path)) {
-            e="No such file " + path;
-            return false;
+    class LocalIndiMountDriver : public MountDriver  {
+    public:
+        LocalIndiMountDriver(std::string const &path)
+        {
+            std::thread main([=]() {
+                    indiserver_main({path});
+            });
+            usleep(500000);
+            indiserver_main_reset_sigchld();
+            worker_ =std::move(main);
         }
-        std::thread main([=]() {
-            indiserver_main({path});
-        });
-        main.detach();
-        usleep(500000);
-        // remove signal handler by libev
-        struct sigaction sa;
-        sa.sa_handler = SIG_DFL;
-        sigfillset(&sa.sa_mask);
-        sa.sa_flags = SA_RESTART; 
-        sigaction(SIGCHLD, &sa, 0);
-        return true;
-    }
+        virtual void shutdown() override
+        {
+            indiserver_main_shutdown();
+            worker_.join();
+        }
+        virtual std::unique_ptr<Mount> get_mount(MountErrorCode &e) override
+        {
+            try {
+                #ifdef ANDROID_SUPPORT
+                bool disable_serial = true;
+                #else
+                bool disable_serial = false;
+                #endif
+                std::unique_ptr<Mount> m(new IndiMount("","localhost",7624,disable_serial));
+                return m;
+            }
+            catch(std::exception const &err) {
+                e = err;
+                return std::unique_ptr<Mount>();
+            }
+        }
+
+    private:
+        std::thread worker_;
+    };
+
 #endif    
+    class RemoteIndiMountDriver : public MountDriver  {
+    public:
+        RemoteIndiMountDriver(std::string const &host,int port) :
+            host_(host),
+            port_(port)
+        {
+        }
+        virtual std::unique_ptr<Mount> get_mount(MountErrorCode &e) override
+        {
+            try {
+                std::unique_ptr<Mount> m(new IndiMount("",host_,port_,false));
+                return m;
+            }
+            catch(std::exception const &err) {
+                e = err;
+                return std::unique_ptr<Mount>();
+            }
+        }
+        virtual void shutdown() override
+        {
+        }
+
+    private:
+        std::string host_;
+        int port_;
+    };
+
+
     void indi_list_drivers(std::vector<DriverInfo> &drivers,std::string const &
             #ifdef INDI_AS_LIBRARY
             libdir
@@ -769,6 +798,7 @@ namespace {
     )
     {
         drivers.push_back(DriverInfo("indi:remote","localhost:7624",true));
+        size_t start_pos = drivers.size();
 #ifdef INDI_AS_LIBRARY
         DIR *d = opendir(libdir.c_str());
         if(!d)
@@ -785,7 +815,53 @@ namespace {
             }
         }
         closedir(d);
+        std::sort(drivers.begin() + start_pos,drivers.end(),[](DriverInfo const &l,DriverInfo const &r) -> bool {
+            return l.name < r.name;
+        }); 
 #endif        
+    }
+
+    std::unique_ptr<MountDriver> indi_start_driver(std::string const &d,std::string const &opt,
+            #ifdef INDI_AS_LIBRARY
+                std::string const &libdir,MountErrorCode &e
+            #else                
+                std::string const &,MountErrorCode &
+            #endif
+        )
+    {
+        std::unique_ptr<MountDriver> m;
+        if(d == "indi::remote") {
+            std::string indi_host = "localhost";
+            int indi_port = 7624;
+            size_t pos = opt.find(':');
+            if(pos == std::string::npos) {
+                if(!opt.empty())
+                    indi_host = opt;
+            }
+            else {
+                if(opt.size() > pos+1)
+                    indi_port = atoi(opt.c_str()+pos+1);
+                if(pos > 0)
+                    indi_host = opt.substr(0,pos);
+            }
+            m.reset(new RemoteIndiMountDriver(indi_host,indi_port));
+        }
+        #ifdef INDI_AS_LIBRARY
+        else if(d.find("indi:") == 0) {
+            std::string driver = d.substr(5);
+            std::string path = libdir + "/libindidriver_telescope_" + driver + ".so";
+            if(!exists(path)) {
+                e="No such file " + path;
+            }
+            else {
+                m.reset(new LocalIndiMountDriver(path));
+            }
+        }
+        #endif
+        else {
+            e = "Invalid indi driver " + d;
+        }
+        return m;
     }
     
 } // ols

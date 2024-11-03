@@ -82,7 +82,7 @@ extern "C" {
             setenv("INDI_MATH_PLUGINS_DIRECTORY",driver_dir,1);
 
             g_stacker.reset(new ols::OpenLiveStacker(data_path));
-            g_stacker->indi_libdir = driver_dir;
+            g_stacker->config_libdir(driver_dir);
             g_stacker->http_port = http_port;
             g_stacker->mem_limit_mb = mem_limit_mb;
             g_stacker->http_ip = http_ip;

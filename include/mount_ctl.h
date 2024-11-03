@@ -14,17 +14,15 @@ namespace booster{ namespace aio { class deadline_timer; } }
 
 namespace ols {
     class Mount;
+    class MountInterface;
     struct EqCoord;
     class MountControlApp : public ControlAppBase {
     public:
-        typedef std::unique_lock<std::mutex> guard_type;
-        static std::mutex lock;
-        static std::unique_ptr<Mount> client;
         
-        MountControlApp(cppcms::service &srv,queue_pointer_type notify,std::string libdir) : 
+        MountControlApp(cppcms::service &srv,queue_pointer_type notify,MountInterface *mi) : 
             ControlAppBase(srv),
             notification_queue_(notify),
-            libdir_(libdir)
+            mi_(mi)
         {
             dispatcher().map("GET", "/config/?",&MountControlApp::get_config_status,this);
             dispatcher().map("GET", "/status/?",&MountControlApp::get_status,this);
@@ -58,8 +56,8 @@ namespace ols {
         void setup_client();
         static void send_error_message(queue_pointer_type q,std::string const &msg);
         static void send_pointing_update(queue_pointer_type q,EqCoord const &pos);
-        void check_connected();
+        Mount *check_connected();
         queue_pointer_type notification_queue_;
-        std::string libdir_;
+        MountInterface *mi_;
     };
 }

@@ -136,7 +136,7 @@ int main(int argc,char **argv)
         }
         mem_limit_mb = cfg.get<int>("mem_limit_mb",0);
         driver = cfg.get<std::string>("driver");
-        std::string libdir = cfg.get<std::string>("indi.libdir");
+        std::string libdir = cfg.get<std::string>("indi.libdir","./");
         path = cfg.get("libdir","");
         astap_exe = cfg.get("astap.exe","astap_cli");
         astap_db = cfg.get("astap.db","");
@@ -175,7 +175,7 @@ int main(int argc,char **argv)
             ols::CameraDriver::load_driver(driver,path,driver_opt_ptr,cfg.get("camera.log","/tmp/ols_camera.log"),cfg.get("camera.debug",false));
             ols::PlateSolver::init(astap_db,astap_exe);
             ols::OpenLiveStacker stacker;
-            stacker.indi_libdir = libdir;
+            stacker.config_libdir(libdir);
             if(!libdir.empty()) {
                 setenv("INDI_MATH_PLUGINS_DIRECTORY",libdir.c_str(),1);
             }

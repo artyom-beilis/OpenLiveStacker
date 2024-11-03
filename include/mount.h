@@ -222,11 +222,47 @@ namespace ols {
         bool has_option = false;
     };
 
-    void mount_config_libdir(std::string const &libdir);
-    bool mount_driver_is_running();
-    std::vector<DriverInfo> mount_drivers_list();
-    void mount_driver_load(std::string const &d,std::string const &opt,MountErrorCode &e);
-    std::unique_ptr<Mount> get_mount(MountErrorCode &e);
+    class MountDriver {
+    public:
+        virtual std::unique_ptr<Mount> get_mount(MountErrorCode &e) = 0;
+        virtual void shutdown() = 0;
+        virtual ~MountDriver()
+        {
+        }
+    protected:
+    };
+
+    class MountInterface {
+    public:
+
+        typedef std::unique_lock<std::recursive_mutex> guard_type;
+        MountInterface();
+        virtual ~MountInterface();
+
+        guard_type guard()
+        {
+            guard_type g(lock_);
+            return g;
+        }
+        
+        void config_libdir(std::string const &libdir);
+        std::vector<DriverInfo> drivers_list();
+        void load_driver(std::string const &d,std::string const &opt);
+        void load_mount();
+
+        void shutdown_mount();
+
+        bool driver_is_loaded();
+        bool mount_is_loaded();
+        Mount *client();
+        
+    protected:
+        std::vector<DriverInfo> drivers_;
+        std::unique_ptr<MountDriver> driver_;
+        std::unique_ptr<Mount> client_;
+        std::string libdir_;
+        std::recursive_mutex lock_;
+    };
     
 
 

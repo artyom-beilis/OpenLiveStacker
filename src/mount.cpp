@@ -5,92 +5,90 @@
 #endif
 
 namespace ols {
-    typedef std::unique_lock<std::recursive_mutex> guard_type;
-    static std::recursive_mutex driver_lock;
-    static bool driver_started = false;
-    static std::string libdir;
-#ifdef WITH_INDI 
-    static std::string indi_host = "localhost";
-    static int indi_port = 7624;
-    static bool indi_is_remote=true;
-#endif
-    bool mount_driver_is_running()
+
+
+    MountInterface::MountInterface()
     {
-        guard_type g(driver_lock);
-        return driver_started;
     }
-
-
-    void mount_config_libdir(std::string const &ld)
+    MountInterface::~MountInterface()
     {
-        guard_type g(driver_lock);
-        libdir = ld;
-    }
-
-    void mount_driver_load(std::string const &name,std::string const &opt,MountErrorCode &e)
-    {
-        guard_type g(driver_lock);
-#ifdef WITH_INDI 
-        if(name.find("indi:") == 0) {
-            if(name == "indi:remote") {
-                indi_is_remote = true;
-                size_t pos = opt.find(':');
-                if(pos == std::string::npos) {
-                    if(!opt.empty())
-                        indi_host = opt;
-                }
-                else {
-                    if(opt.size() > pos+1)
-                        indi_port = atoi(opt.c_str()+pos+1);
-                    if(pos > 0)
-                        indi_host = opt.substr(0,pos);
-                }
-                driver_started = true;
-                return;
-            }
-        #ifdef INDI_AS_LIBRARY
-            else {
-                indi_is_remote = false;
-                std::string driver_name = name.substr(5);
-                driver_started = start_indi_driver(driver_name,libdir,e);
-                return;
-            }
-        #endif            
-        }
-#endif        
-        e = "Unsupported driver " + name;
+        shutdown_mount();
     }
     
-    std::unique_ptr<Mount> get_mount(MountErrorCode &e)
+    bool MountInterface::driver_is_loaded()
     {
-        guard_type g(driver_lock);
-        std::unique_ptr<Mount> m;
-        try {
+        auto g=guard();
+        return driver_.get();
+    }
+    bool MountInterface::mount_is_loaded()
+    {
+        auto g=guard();
+        return client_.get();
+    }
+    Mount *MountInterface::client()
+    {
+        if(!client_)
+            throw MountError("Client is not ready");
+        return client_.get();
+    }
+ 
+    void MountInterface::config_libdir(std::string const &ld)
+    {
+        auto g = guard();
+        libdir_ = ld;
+    }
+
+    void MountInterface::shutdown_mount()
+    {
+        auto g = guard();
+        if(client_)
+            client_.reset();
+        if(driver_) {
+            driver_->shutdown();
+            driver_.reset();
+        }
+    }
+
+    std::vector<DriverInfo> MountInterface::drivers_list()
+    {
+        auto g = guard();
+        if(drivers_.empty()) {
 #ifdef WITH_INDI
-            #ifdef ANDROID_SUPPORT
-            bool disable_serial= !indi_is_remote;
-            #else
-            bool disable_serial = false;
-            #endif
-            m = std::move(indi_mount_create("",indi_host,indi_port,disable_serial));
+            indi_list_drivers(drivers_,libdir_);
+#endif            
+        }
+        return drivers_;
+    }
+
+    void MountInterface::load_driver(std::string const &name,std::string const &opt)
+    {
+        auto g = guard();
+        if(driver_) {
+            throw MountError("The driver is already loaded");
+        }
+#ifdef WITH_INDI 
+        if(name.find("indi:") == 0) {
+            MountErrorCode e;
+            std::unique_ptr<MountDriver> m = indi_start_driver(name,opt,libdir_,e);
+            e.check();
+            driver_ = std::move(m);
+            return;
+        }
 #endif
-        }
-        catch(std::exception const &ex) {
-            e = ex;
-        } 
-        if(!m)
-            e = "Failed to connect to the driver";
-        return m;
+        throw MountError("Unsupported driver " + name);
     }
-    std::vector<DriverInfo> mount_drivers_list()
+
+    void MountInterface::load_mount()
     {
-        guard_type g(driver_lock);
-        static std::vector<DriverInfo> r;
-#ifdef WITH_INDI
-        if(r.empty()) {
-            indi_list_drivers(r,libdir);
-        }
-#endif        
-        return r;
+        auto g = guard();
+        if(!driver_)
+            throw MountError("Driver is not loaded");
+        if(client_)
+            throw MountError("Mount client is already loaded");
+        MountErrorCode e;
+        auto cl = driver_->get_mount(e);
+        e.check();
+        client_ = std::move(cl);
     }
-}
+    
+} // namespace

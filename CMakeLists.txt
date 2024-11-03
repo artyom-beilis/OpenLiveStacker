@@ -15,7 +15,7 @@ if(USE_INDI_AS_LIBRARY)
     find_library(INDI_LIB1 indi_unified_client_server HINT /opt/indi_as_library/lib)
     find_library(INDI_LIB2 indi_unified HINT /opt/indi_as_library/lib)
     set(INDI_LIB ${INDI_LIB1} ${INDI_LIB2})
-    find_path(INDI_HEADER libindi/baseclient.h 
+    find_path(INDI_HEADER libindi/indiserver_lib.h 
                 HINT ${CMAKE_FIND_ROOT_PATH}/include
                 HINT /opt/indi_as_library/include)
     include_directories(${INDI_HEADER}/libindi)
