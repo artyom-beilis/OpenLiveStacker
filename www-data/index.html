@@ -87,7 +87,7 @@
         <td>&nbsp;</td>
         <td>&nbsp;</td>
     </tr>
-    <tr class="dso_config stack_opt" ><td>Object ID</td><td><input class="saved_input val_input" oninput="updateRADE(this.value)" id="stack_object" type="text" value="" ></td><td>for example: M31, NGC457</td></tr>
+    <tr class="dso_config stack_opt" ><td>Object</td><td><input class="saved_input wide_input" oninput="updateRADE(this.value)" id="stack_object" type="text" value="" ></td><td>'M31' or Ra/Dec '14:34, -15:08'</td></tr>
     <tr><td><span class="dso_config stack_opt">Extra </span> Name</td><td><input class="val_input saved_input" id="stack_name" type="text" value="" ></td><td>&nbsp;</td></tr>
     <tr>
         <td>Stacking</td>
@@ -106,7 +106,7 @@
     <tr class="dso_config dynamic_config calib_config stack_opt" ><td>Remove Hot Pixels</td><td><input class="saved_input" id="stack_remove_hot_pixels" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr class="dso_config dynamic_config stack_opt" ><td>Remove Gradient</td><td><input class="saved_input" id="stack_remove_gradient" type="checkbox" ></td><td>&nbsp;</td></tr>
     <tr class="dso_config stack_opt" ><td>Remove Satellites</td><td><input class="saved_input" id="stack_remove_satellites" type="checkbox" ></td><td>&nbsp;</td></tr>
-    <tr class="dso_config stack_opt" ><td>Target</td><td>RA:<input class="val_input" id="stack_ra" type="text" ></td><td>DE:<input class="val_input" id="stack_de" type="text" ></td></tr>
+    <tr class="dso_config stack_opt" ><td>Target</td><td>RA:<input class="val_input" id="stack_ra" type="text" disabled ></td><td>DE:<input class="val_input" id="stack_de" type="text" disabled ></td></tr>
 
     <tr class="dso_config stack_opt plan_config" ><td colspan="3" style="text-align:center;"><b>Calibration</b></td></tr>
     <tr class="dso_config stack_opt dynamic_config plan_config" ><td>Darks</td><td colspan="2"><select id="stack_darks" onchange="saveCalibValue(this);" ></select></td></tr>
@@ -342,10 +342,10 @@
             <button class="mount_connected_display_inline" style="display:none" onclick="solveAndSync();" >Solve &amp; Sync</button>
             <button class="mount_connected_display_inline" style="display:none" onclick="solveSyncAndGoTo();" >Solve, Sync &amp; GoTo </button>
         </p>
-        <p>Object <input class="val_input saved_input" id="solver_object" type="text" oninput='updateSolverRADE(this.value)'  value="" /> (M31, NGC457)</p>
+        <p>Object <input class="wide_input saved_input" id="solver_object" type="text" oninput='updateSolverRADE(this.value)'  value="" /> (M31, RA, DEC)</p>
         <p>
-            <span class="nowr" >RA <input class="val_input" id="solver_ra" type="text" value="" />,</span>
-            <span class="nowr" >DEC <input class="val_input" id="solver_de" type="text" value=""/></span>
+            <span class="nowr" >RA <input class="val_input" id="solver_ra" type="text" value="" disabled/>,</span>
+            <span class="nowr" >DEC <input class="val_input" id="solver_de" type="text" value="" disabled/></span>
         </p>
         <p style="display:none" class="mount_connected_display_block"><input type="checkbox" checked id="use_mount_coordinates" ><label for="use_mount_coordinates">Use Mount Position</label></p>
         <p>

@@ -116,7 +116,7 @@ function parseRA(svalue)
 
 function parseDEC(svalue)
 {
-    const re_float = /^([+-−]?\d+.\d+?)$/;
+    const re_float = /^([+-−]?\d+\.\d+?)$/;
     const re_colon = /^([-+−]?)(\d+):(\d+)(?::(\d+(.\d+)?))?$/;
     const re_dms = /^([-+−]?)(\d+)[dD° \t]\s*(\d+)[mM'′]\s*(?:(\d+(.\d+)?)(?:s|S|″|′′|''))?$/;
     const re_space = /^([-+−]?)(\d+)\s+(\d+)(?:\s+(\d+(.\d+)?))?$/;
@@ -135,9 +135,9 @@ function parseDEC(svalue)
     var m = parseInt(res[3]);
     var s = 0;
     if(res[4]) {
-        s = parseFloat(res[3]);
+        s = parseFloat(res[4]);
     }
-    if(d  > 90 || m >= 60 || s >= 60)
+    if(d > 90 || m >= 60 || s >= 60)
         return null;
     return sig*(d + (60 * m + s) / 3600.0);
 }
@@ -1554,6 +1554,10 @@ function startStack()
     var name = getVal('name').trim();
     var obj = getVal('object').trim();
 
+    if(toRaDecCoord(obj) != null) {
+        obj = '';
+    }
+
     if(type == 'dso') {
         if(name == '')
             name = obj;
@@ -1663,6 +1667,21 @@ function setDisplayStyle(arr,val)
         arr[i].style.display=val;
 }
 
+
+function toRaDecCoord(name)
+{
+    let radec = name.split(',')
+    if(radec.length != 2)
+        return null;
+    let ra = radec[0].trim();
+    let dec = radec[1].trim();
+    ra  = parseRA(ra);
+    dec = parseDEC(dec);
+    if(ra == null || dec == null)
+        return null;
+    return [formatRA(ra/15),formatDEC(dec)];
+}
+
 function updateRADEFor(name,target_id)
 {
     var coord=['','']
@@ -1671,6 +1690,11 @@ function updateRADEFor(name,target_id)
     var no_sync = document.getElementsByClassName('mount_no_sync');
     if(name in jsdb) {
         coord = jsdb[name]
+        setDisplayStyle(sync,'inline');
+        setDisplayStyle(no_sync,'none');
+    }
+    else if(toRaDecCoord(name)) {
+        coord = toRaDecCoord(name);
         setDisplayStyle(sync,'inline');
         setDisplayStyle(no_sync,'none');
     }

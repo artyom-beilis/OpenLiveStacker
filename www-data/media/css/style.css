@@ -33,6 +33,7 @@
     .nowr { white-space: nowrap; }
     .slider { width: 100%; }
     .val_input { width: 15mm; }
+    .wide_input { width: 30mm; }
     .slider_elem { background-color: transparent; }
     .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
 
