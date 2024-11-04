@@ -37,8 +37,18 @@
     .slider_elem { background-color: transparent; }
     .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
 
-    .mount_input { width: 30mm; height:15mm; font-size:8mm; padding: 0;}
-    .mount_sq_but { width: 15mm ; height:15mm; font-size:8mm ; padding: 0; }
+    .mount_input { width: 40mm; height:20mm; font-size:10mm; padding: 0;}
+    .mount_sq_but { 
+        width: 20mm ;
+        height:20mm;
+        font-size:10mm ;
+        padding: 0;
+        -webkit-touch-callout: none; /* Safari */
+        -webkit-user-select: none; /* Chrome */
+           -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* Internet Explorer/Edge */
+                user-select: none;
+    }
     .mount_but { width: 45mm ; height:15mm; font-size:8mm ; padding: 0; }
 
     .stretch_background {

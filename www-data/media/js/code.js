@@ -26,6 +26,7 @@ var g_hist_move_start_x = -1;
 var g_mount_connected = false;
 var g_mount_driver_populated = null;
 var g_sync_counter = 0;
+var g_slew_direction = '';
 var g_mount_geolocation_updated = false;
 var g_stretch = {
     gain:1,
@@ -299,10 +300,20 @@ function setSlewEventListeners()
         let d = dirs[i];
         setPressUnpressEvents(`slew_${d}`,
             ()=>{
-                console.log('Slew  to ' + d);
-                slew(d);
+                if(g_slew_direction == '') {
+                    g_slew_direction = d;
+                    slew(d,null);
+                }
             },
-            noslew);
+            ()=> {
+                if(g_slew_direction != '' && g_slew_direction != 'unslew') {
+                    g_slew_direction = 'unslew';
+                    slew('',()=>{
+                        g_slew_direction = '';
+                    });
+                }
+            }
+        );
     }
     setPressUnpressEvents('mount_manual_sync',manualSyncPressStart,manualSyncPressEnd);
 }
@@ -1244,13 +1255,17 @@ function showMount(disp)
     document.getElementById('mount_controls').style.display = disp ? 'block' : 'none';
 }
 
-function noslew() { 
-    slew('',null);
-}
 
-function slew(direction)
+function slew(direction,complete_callback)
 {
-    restCall('post','/api/mount/slew',{"direction":direction,"speed" : g_slew_speed },(e) => {});
+    restCall('post','/api/mount/slew',{
+        "direction":direction,
+        "speed" : g_slew_speed 
+    },(e) => { 
+        if(complete_callback != null) {
+            complete_callback() ;
+        }
+    });
 }
 
 function openConfigTab(name)
