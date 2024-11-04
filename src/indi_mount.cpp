@@ -868,8 +868,8 @@ namespace {
     )
     {
         drivers.push_back(DriverInfo("indi:remote","localhost:7624",true));
-        size_t start_pos = drivers.size();
 #ifdef INDI_AS_LIBRARY
+        size_t start_pos = drivers.size();
         DIR *d = opendir(libdir.c_str());
         if(!d)
             return;
@@ -893,14 +893,15 @@ namespace {
 
     std::unique_ptr<MountDriver> indi_start_driver(std::string const &d,std::string const &opt,
             #ifdef INDI_AS_LIBRARY
-                std::string const &libdir,MountErrorCode &e
+                std::string const &libdir,
             #else                
-                std::string const &,MountErrorCode &
+                std::string const &,
             #endif
+            MountErrorCode &e
         )
     {
         std::unique_ptr<MountDriver> m;
-        if(d == "indi::remote") {
+        if(d == "indi:remote") {
             std::string indi_host = "localhost";
             int indi_port = 7624;
             size_t pos = opt.find(':');
