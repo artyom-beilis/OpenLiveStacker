@@ -284,14 +284,15 @@ function checkAndSetLocation(params)
 function setPressUnpressEvents(id,on_event,off_event)
 {
     var but = document.getElementById(id);
-    but.addEventListener('mousedown',(e)=>{on_event();});
-    but.addEventListener('touchstart',(e)=>{on_event();});
+    but.addEventListener('mousedown',(e)=>{e.preventDefault(); on_event();});
+    but.addEventListener('touchstart',(e)=>{e.preventDefault();on_event();});
 
-    but.addEventListener('mouseup',(e)=>{off_event();});
-    but.addEventListener('mouseout',(e)=>{off_event();});
-    but.addEventListener('touchend',(e)=>{off_event();});
-    but.addEventListener('touchcancel',(e)=>{off_event();});
+    but.addEventListener('mouseup',(e)=>{e.preventDefault();off_event();});
+    but.addEventListener('mouseout',(e)=>{e.preventDefault();off_event();});
+    but.addEventListener('touchend',(e)=>{e.preventDefault();off_event();});
+    but.addEventListener('touchcancel',(e)=>{e.preventDefault();off_event();});
 }
+
 
 function setSlewEventListeners()
 {
@@ -299,14 +300,14 @@ function setSlewEventListeners()
     for(var i=0;i<dirs.length;i++) {
         let d = dirs[i];
         setPressUnpressEvents(`slew_${d}`,
-            ()=>{
+            (m)=>{
                 if(g_slew_direction == '') {
                     g_slew_direction = d;
                     slew(d,null);
                 }
             },
-            ()=> {
-                if(g_slew_direction != '' && g_slew_direction != 'unslew') {
+            (m)=> {
+                if(g_slew_direction == d) {
                     g_slew_direction = 'unslew';
                     slew('',()=>{
                         g_slew_direction = '';
@@ -775,6 +776,8 @@ function updatePushEvents(e) {
         document.getElementById('mount_cfg_dec').innerHTML = stats.dec;
         document.getElementById('mount_cfg_alt').innerHTML = stats.alt.toFixed(2);
         document.getElementById('mount_cfg_az').innerHTML = stats.az.toFixed(2);
+        document.getElementById('mount_alt').innerHTML = stats.alt.toFixed(2);
+        document.getElementById('mount_az').innerHTML = stats.az.toFixed(2);
     }
 }
 
@@ -2391,6 +2394,10 @@ function updateMountFunc(data)
 function toggleRADE(disp)
 {
     document.getElementById('mount_ra_de_coord').style.display = disp ? 'inline' : 'none';
+}
+function toggleAltAz(disp)
+{
+    document.getElementById('mount_alt_az_coord').style.display = disp ? 'inline' : 'none';
 }
 
 function mountUpdateSlewSpeedUI(delta)

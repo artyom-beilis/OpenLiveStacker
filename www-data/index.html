@@ -19,9 +19,13 @@
 </div>
 <div style="position:absolute; right:0; bottom:0; text-align:right;">
     <span class="mount_connected_display_inline" style="display:none;" >
-        <span id="mount_ra_de_coord" >
+        <span id="mount_ra_de_coord" style='display:none' >
             Ra <span id="mount_ra"></span><br>
             Dec <span id="mount_dec"></span><br>
+        </span>
+        <span id="mount_alt_az_coord" style='display:none' >
+            Alt <span id="mount_alt"></span><br>
+            Az <span id="mount_az"></span><br>
         </span>
     </span>
     <span  id='stacking_ui_stats'></span>
@@ -42,7 +46,7 @@
     <button style="display:none" id="error_notification" class="comp_but error_background" onclick='showErrorNotification();'>&nbsp;</button>
 </p>
 <button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
-<div id="mount_controls" style="display:none">
+<div id="mount_controls" style="display:none; z-index:1;">
 <p>
     <table>
     <tr>
@@ -297,26 +301,55 @@
                 <button onclick="mountConnStrSet()" disabled="disabled" id="mount_connection_address_set">Set</button>
             <p><button id="mount_connect_button" onclick="mountConnect()">Connect</button></p>
         </div>
-        <p class="mount_connected_display_block" style="display:none">
-            Tracking: 
-            <select id="mount_tracking_mode" onchange="mountSetTrackingMode()">
-                <option value="sidereal">Sidereal</option>
-                <option value="solar">Solar</option>
-                <option value="lunar">Lunar</option>
-            </select>
-        </p>
-        <p class="mount_connected_display_block" style="display:none">
-            Min Altitude <input type="number" id="mount_alt_low"  value="-90" min="-90" max="90" step="1" ><br>
-            Max Altitude <input type="number" id="mount_alt_high" value="90"  min="-90" max="90" step="1" ><br>
-            <button onclick="setMoutAltLimits()" >Set Limits</button>
-        </p>
-        <p class="mount_connected_display_block" style="display:none" >Lat <span id="mount_lat"></span>, Lon <span id="mount_lon"></span></p>
-        <p class="mount_connected_display_block" style="display:none" >
-            Ra <span id="mount_cfg_ra"></span>, Dec <span id="mount_cfg_dec"></span>, Alt <span id="mount_cfg_alt"></span>, Az <span id="mount_cfg_az" ></span>
-        </p>
-        <p class="mount_connected_display_block" style="display:none"><input type="checkbox" class='saved_input' id="show_ra_de" checked onchange="toggleRADE(this.checked);" /><label for="show_ra_de">Display on screen RA/DEC</label></p>
-        <p class="mount_connected_display_block" style="display:none">Alignment: <span id="mount_alignment"></span> <button id="mount_alignment_reset" onclick="mountResetAlignment()">Reset</button></p>
-        <p class="mount_connected_display_block" style="display:none"><input type="checkbox" id="mount_sun_allow" onchange="notifySunWarning();" /><label for="mount_sun_allow">Sun is searchable</label></p>
+        <div class="mount_connected_display_block" style="display:none">
+            <table>
+            <tr>
+                <td>
+                Tracking: 
+                </td>
+                <td>
+                    <select id="mount_tracking_mode" onchange="mountSetTrackingMode()">
+                        <option value="sidereal">Sidereal</option>
+                        <option value="solar">Solar</option>
+                        <option value="lunar">Lunar</option>
+                    </select>
+                </td>
+            </tr>
+            <tr><td>Min Altitude:</td><td><input type="number" id="mount_alt_low"  value="-90" min="-90" max="90" step="1" ></td></tr>
+            <tr><td>Max Altitude:</td><td><input type="number" id="mount_alt_high" value="90"  min="-90" max="90" step="1" ></td></tr>
+            <tr><td>&nbsp;</td><td><button onclick="setMoutAltLimits()" >Set Limits</button></td></tr>
+            <tr>
+                <td>Alignment:</td>
+                <td><span id="mount_alignment"></span></td>
+            </tr>
+            <tr>
+                <td>&nbsp;</td>
+                <td><button id="mount_alignment_reset" onclick="mountResetAlignment()">Reset</button></td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <input type="checkbox" id="mount_sun_allow" onchange="notifySunWarning();" />
+                    <label for="mount_sun_allow">Sun is searchable</label>
+                </td>
+            </tr>
+            <tr><td>Lat</td><td><span id="mount_lat"></span></td></tr>
+            <tr><td>Lon</td><td><span id="mount_lon"></span></td></tr>
+            <tr>
+                <td colspan="2">
+                    <input type="checkbox" class='saved_input' id="show_ra_de" onchange="toggleRADE(this.checked);" /><label for="show_ra_de">Display on screen RA/DEC</label>
+                </td>
+            </tr>
+            <tr><td>RA </td><td><span id="mount_cfg_ra"></span></td></tr>
+            <tr><td>DEC</td><td><span id="mount_cfg_dec"></span></td></tr>
+            <tr>
+                <td colspan="2">
+                    <input type="checkbox" class='saved_input' id="show_alt_az" onchange="toggleAltAz(this.checked);" /><label for="show_alt_az">Display on screen Alt/Az</label>
+                </td>
+            </tr>
+            <tr><td>Alt</td><td><span id="mount_cfg_alt"></span></td></tr>
+            <tr><td>Az </td><td><span id="mount_cfg_az"></span></td></tr>
+            </table>
+        </div>
     </div>
 
 

@@ -37,11 +37,11 @@
     .slider_elem { background-color: transparent; }
     .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
 
-    .mount_input { width: 40mm; height:20mm; font-size:10mm; padding: 0;}
+    .mount_input { width: 36mm; height:18mm; font-size:9mm; padding: 0;}
     .mount_sq_but { 
-        width: 20mm ;
-        height:20mm;
-        font-size:10mm ;
+        width: 18mm ;
+        height:18mm;
+        font-size:9mm ;
         padding: 0;
         -webkit-touch-callout: none; /* Safari */
         -webkit-user-select: none; /* Chrome */
