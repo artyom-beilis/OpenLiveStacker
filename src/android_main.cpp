@@ -40,6 +40,7 @@ extern "C" {
     int ols_android_init(
             char const *data_path,          /// Path to data location
             char const *document_root,      /// Document root for html files
+            char const *usr_path,           /// Path to /usr simulation
             char const *http_ip,            /// IP to bind to, default should be 127.0.0.1
             int http_port,                  /// port to bind to, default should be 8080
             int mem_limit_mb,               /// memory size limit in MB, 0 for no limit
@@ -79,6 +80,7 @@ extern "C" {
 
             /// configure locations
             setenv("HOME",data_path,1);
+            setenv("INDIPREFIX",usr_path,1);
             setenv("INDI_MATH_PLUGINS_DIRECTORY",driver_dir,1);
 
             g_stacker.reset(new ols::OpenLiveStacker(data_path));
