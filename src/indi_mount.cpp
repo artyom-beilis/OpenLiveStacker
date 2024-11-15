@@ -21,6 +21,7 @@
 #include <mutex>
 #include <thread>
 #include <queue>
+#include <regex>
 #include "util.h"
 #include <booster/log.h>
 
@@ -244,6 +245,18 @@ namespace {
             setPropSwitch("CONNECTION_MODE",new_name,e);
         }
 
+        void to_lower(std::string &v)
+        {
+            for(char &e:v) {
+                e = std::tolower(e);
+            }
+        }
+        void to_upper(std::string &v)
+        {
+            for(char &e:v) {
+                e = std::toupper(e);
+            }
+        }
         virtual std::string get_conn_string(MountProto p,MountErrorCode &e) override
         {
             guard_type g(lock_);
@@ -253,6 +266,17 @@ namespace {
                 {
                     MountErrorCode err;
                     res = getPropText("DEVICE_ADDRESS","ADDRESS",err) + ":" + getPropText("DEVICE_ADDRESS","PORT",err);
+                    INDI::PropertySwitch ctype = device_.getProperty("CONNECTION_TYPE");
+                    if(ctype.isValid()) {
+                        for(unsigned i=0;i<ctype.count();i++) {
+                            if(ctype[i].getState() == ISS_ON) {
+                                std::string type = ctype[i].getName();
+                                to_lower(type);
+                                res = type + "/" + res;
+                                break;
+                            }
+                        }
+                    }
                     if(err)
                         return "";
                 }
@@ -279,11 +303,20 @@ namespace {
                 break;
             case proto_inet:
                 {
-                    size_t pos = s.find(':');
-                    if(pos == std::string::npos || pos == 0 || pos > s.size() - 2) {
+                    std::regex r("((.+)/)?(.+):(.+)");
+                    std::smatch m;
+                    if(!std::regex_match(s,m,r)) {
                         e="Invalud address string " + s;
+                        return;
                     }
-                    setPropText("DEVICE_ADDRESS",{ "ADDRESS",s.substr(0,pos), "PORT",s.substr(pos+1) },e);
+
+                    setPropText("DEVICE_ADDRESS",{ "ADDRESS",m[3].str(), "PORT",m[4].str() },e);
+                    if(m[1].matched) {
+                        std::string type = m[2].str();
+                        to_upper(type);
+                        std::cerr << "!! setting " << type << std::endl;
+                        setPropSwitch("CONNECTION_TYPE",type,e);
+                    }
                 }
                 break;
             default:
