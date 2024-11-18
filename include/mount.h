@@ -69,6 +69,12 @@ namespace ols {
         trac_lunar
     };
 
+    enum MountMeridianFlip {
+        on_meridian_unsupported,
+        on_meridian_flip,
+        on_meridian_stop,
+    };
+
     enum MountSlew {
         slew_stop    = 0,
         slew_NS_mask = (3<<1),
@@ -194,6 +200,8 @@ namespace ols {
         virtual void go_to(EqCoord coord,MountErrorCode &e) = 0;
         virtual void sync(EqCoord coord,MountErrorCode &e) = 0;
         virtual void slew(MountSlew direction,int speed,MountErrorCode &e) = 0;
+        virtual MountMeridianFlip get_meridian(MountErrorCode &e) = 0;
+        virtual void set_meridian(MountMeridianFlip flip,MountErrorCode &e) = 0;
         
         virtual bool connected()
         {

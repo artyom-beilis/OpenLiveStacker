@@ -163,7 +163,7 @@ void MountControlApp::get_status()
     MountTrac tr = client->get_tracking(e);
     e.check();
     std::vector<std::string> trmode{"sidereal","solar","lunar"};
-    response_["tracking_mode"] = trmode[tr];
+    response_["tracking_mode"] = trmode.at(tr);
     auto lat_lon = client->get_lat_lon(e);
     e.check();
     response_["lat"] = lat_lon.first;
@@ -173,6 +173,26 @@ void MountControlApp::get_status()
     auto limits = client->get_alt_limits(e);
     response_["alt_min"] = limits.first;
     response_["alt_max"] = limits.second;
+    e.check();
+    auto flip = client->get_meridian(e);
+    e.check();
+    std::vector<std::string> meridian{"unsupported","flip","stop"};
+    response_["meridian"] = meridian.at(flip);
+}
+
+void MountControlApp::set_meridian_behavior()
+{
+    auto g=mi_->guard();
+    auto client = check_connected();
+
+    MountErrorCode e;
+    std::string meridian = content_.get<std::string>("meridian");
+    if(meridian == "flip")
+        client->set_meridian(on_meridian_flip,e);
+    else if(meridian == "stop")
+        client->set_meridian(on_meridian_stop,e);
+    else
+        e="Unsuppoted behavior " + meridian;
     e.check();
 }
 

@@ -4,6 +4,7 @@
 #ifdef INDI_AS_LIBRARY
 #include "baseclient.h"
 #include "basedevice.h"
+#include "indicom.h"
 #include "indiserver_lib.h"
 #include "libastro.h"
 #include <dirent.h>
@@ -12,6 +13,7 @@
 #include <libindi/baseclient.h>
 #include <libindi/basedevice.h>
 #include <libindi/libastro.h>
+#include <libindi/indicom.h>
 #endif
 
 #include <sys/time.h>
@@ -294,6 +296,52 @@ namespace {
             }
             return res;
         }
+        virtual MountMeridianFlip get_meridian(MountErrorCode &) override
+        {
+            guard_type g(lock_);
+            INDI::PropertySwitch p = device_.getProperty("MERIDIAN_ACTION");
+            if(p.isValid()) {
+                for(unsigned i=0;i<p.count();i++) {
+                    if(p[i].getState() == ISS_ON) {
+                        if(p[i].getName() == std::string("IOP_MB_STOP"))
+                            return on_meridian_stop;
+                        else if(p[i].getName() == std::string("IOP_MB_FLIP"))
+                            return on_meridian_flip;
+                    }
+                }
+                return on_meridian_unsupported;
+            }
+            p = device_.getProperty("TELESCOPE_PIER_SIDE");
+            if(!p.isValid())
+                return on_meridian_unsupported;
+            p = device_.getProperty("TELESCOPE_TRACK_STATE");
+            if(!p.isValid())
+                return on_meridian_unsupported;
+            if(!p.findWidgetByName("TRACK_ON"))
+                return on_meridian_unsupported;
+            return flip_;
+        }
+
+        virtual void set_meridian(MountMeridianFlip flip,MountErrorCode &e) override
+        {
+            guard_type g(lock_);
+            if(flip == on_meridian_unsupported) {
+                e="Can't set unsuppored config";
+                return;
+            }
+
+            INDI::PropertySwitch p = device_.getProperty("MERIDIAN_ACTION");
+            if(p.isValid()) {
+                switchTo(p,(flip == on_meridian_flip ? "IOP_MB_FLIP" : "IOP_MB_STOP"),e);
+                return;
+            }
+            p = device_.getProperty("TELESCOPE_PIER_SIDE");
+            if(!p.isValid()) {
+                e = "Meridian action is not supported";
+            }
+            flip_ = flip;
+        }
+
         virtual void set_conn_string(MountProto p,std::string const &s,MountErrorCode &e) override
         {
             guard_type g(lock_);
@@ -388,13 +436,8 @@ namespace {
             }
             return true;
         }
-        virtual void go_to(EqCoord coord,MountErrorCode &e) override
+        void go_to_jnow_no_check(EqCoord coord,MountErrorCode &e) 
         {
-            guard_type g(lock_);
-            coord = j2000_to_eod(coord);
-            double alt = get_altitude_for_jnow(coord).Alt;
-            if(!check_altitude_in_limits(alt,e))
-                return;
             setPropSwitch("ON_COORD_SET","TRACK",e,true);
             if(e)
                 return;
@@ -402,6 +445,15 @@ namespace {
                 { "RA",  coord.RA  },
                 { "DEC", coord.DEC }
             },e,true);
+        }
+        virtual void go_to(EqCoord coord,MountErrorCode &e) override
+        {
+            guard_type g(lock_);
+            coord = j2000_to_eod(coord);
+            double alt = get_altitude_for_jnow(coord).Alt;
+            if(!check_altitude_in_limits(alt,e))
+                return;
+            go_to_jnow_no_check(coord,e);
         }
 
         virtual void sync(EqCoord coord,MountErrorCode &e) override
@@ -538,6 +590,7 @@ namespace {
             }
             else if(prop.isNameMatch("EQUATORIAL_EOD_COORD")) {
                 log_ra_de(prop);
+                coord_update_time_ = now();
             }
             else if(prop.isNameMatch("GEOGRAPHIC_COORD")) {
                 if(pending_lat_long_) {
@@ -560,12 +613,28 @@ namespace {
             else if(prop.isNameMatch("POLLING_PERIOD") && is_new) {
                 handle_polling(prop);
             }
+            else if(coord_update_time_ != 0 && (now() - coord_update_time_) > 1.1)  {
+                // in case there are updates but not coordinates update
+                INDI::PropertyNumber p=device_.getProperty("EQUATORIAL_EOD_COORD");
+                if(p.isValid()) {
+                    log_ra_de(p);
+                    coord_update_time_ = now();
+                }
+            }
             if(align_pointset_commit_ && align_pointset_action_ && !align_pointset_loaded_) {
                 align_pointset_loaded_ = true;
                 load_alignment();
             }
        }
     private:
+        static double now()
+        {
+            struct timeval tv;
+            gettimeofday(&tv,nullptr);
+            double unix_timestamp = tv.tv_sec;
+            unix_timestamp += tv.tv_usec * 1e-6;
+            return unix_timestamp;
+        }
         void handle_polling(INDI::PropertyNumber p)
         {
             if(!p.isValid() || p.count() != 1) {
@@ -630,7 +699,7 @@ namespace {
                 return 1000;
             return w->getValue();
         }
-        virtual void reset_alignment(MountErrorCode &e)
+        virtual void reset_alignment(MountErrorCode &e) override
         {
             guard_type g(lock_);
             setPropSwitch("ALIGNMENT_POINTSET_ACTION","CLEAR",e,true);
@@ -640,6 +709,54 @@ namespace {
             if(e)
                 return;
             save_alignment(e);
+        }
+
+        bool check_flip_for_RA(double RA)
+        {
+            INDI::PropertySwitch p = device_.getProperty("MERIDIAN_ACTION");
+            if(p.isValid())
+                return false; // handled by driver
+
+            p = device_.getProperty("TELESCOPE_PIER_SIDE");
+            if(!p.isValid())
+                return false;
+            auto pw = p.findWidgetByName("PIER_WEST");
+            auto pe = p.findWidgetByName("PIER_EAST");
+            if(!pw || !pe)
+                return false;
+            bool pier_east = pe->getState() == ISS_ON;
+            p = device_.getProperty("TELESCOPE_TRACK_STATE");
+            if(!p.isValid())
+                return false;
+            auto w_ton = p.findWidgetByName("TRACK_ON");
+            if(w_ton && w_ton->getState() == ISS_OFF) 
+                return false;
+            auto st = device_.getProperty("EQUATORIAL_EOD_COORD").getState();
+            if(st != IPS_OK && st != IPS_IDLE) 
+                return false;
+
+            
+            double lst = get_local_sidereal_time(lon_);
+            double ha = get_local_hour_angle(lst,RA);
+            if(pier_east) {
+                ha = rangeHA(ha + 12);
+            }
+            if(ha >= 9) {
+                ha -= 24;
+            }
+            double minutes_to_flip = -ha * 60;
+            if(0 < minutes_to_flip && minutes_to_flip <= 1.0 && (minutes_to_flip_prev_ > 1.0 || minutes_to_flip_prev_ == -24*60) ) {
+                LOGP("1 Minute to reaching meridian\n");
+                if(callback_) {
+                    callback_(EqCoord{0,0},AltAzCoord{0,0},"One minute to reaching meridian");
+                }
+            }
+            minutes_to_flip_prev_ = minutes_to_flip;
+            bool meridian_reached = minutes_to_flip <= 0;
+            if(fabs(minutes_to_flip) < 10.0/60.0) {
+                LOGP("Close to meridian RA=%.5f LST=%.5f HA=%.5f minutes_to_flip=%.5f pier_east=%d reached=%d\n",RA,lst,ha,minutes_to_flip,int(pier_east),int(meridian_reached));
+            }
+            return meridian_reached;
         }
 
         void log_ra_de(INDI::PropertyNumber prop) 
@@ -658,6 +775,31 @@ namespace {
             if(callback_) {
                 callback_(eod_to_j2000(coord),altaz,"");
             }
+
+            if(check_flip_for_RA(RA_)) {
+                if(flip_ == on_meridian_stop) {
+                    LOGP("Meridian reached: stopping per configuration\n");
+                    abort();
+                    if(callback_) {
+                        callback_(EqCoord{0,0},AltAzCoord{0,0},"Aborting motion, meridian reached");
+                    }
+                }
+                else {
+                    LOGP("Meridian reached: starting flip\n");
+                    MountErrorCode e;
+                    go_to_jnow_no_check(coord,e);
+                    if(callback_) {
+                        if(e) {
+                            callback_(EqCoord{0,0},AltAzCoord{0,0},"Flip failed: " + e.message());
+                        }
+                        else {
+                            callback_(EqCoord{0,0},AltAzCoord{0,0},"Initiating meridian flip");
+                        }
+                    }
+                }
+                return;
+            }
+
             double alt = altaz.Alt;
             MountErrorCode e;
             if(!check_altitude_in_limits(alt,e)) {
@@ -816,13 +958,16 @@ namespace {
         }
     
         std::string device_name_;
+        MountMeridianFlip flip_ = on_meridian_stop;
         bool device_loaded_ = false;
         bool align_pointset_action_ = false;
         bool align_pointset_commit_ = false;
         bool align_pointset_loaded_ = false;
         bool pending_save_ = false;
         bool disable_serial_;
+        double coord_update_time_ = 0.0;
         double prev_alt_ = -100;
+        double minutes_to_flip_prev_ = -24*60;
         INDI::BaseDevice device_;
     };
 

@@ -315,6 +315,16 @@
                     </select>
                 </td>
             </tr>
+            <tr>
+                <td>Meridian:</td>
+                <td>
+                    <span id="mount_meridian_unsupported" >Not supported</span>
+                    <select id="mount_meridian_mode" onchange="mountSetMeridianMode()">
+                        <option value="stop" selected>Stop</option>
+                        <option value="flip" >Flip</option>
+                    </select>
+                </td>
+            </tr>
             <tr><td>Min Altitude:</td><td><input type="number" id="mount_alt_low"  value="-90" min="-90" max="90" step="1" ></td></tr>
             <tr><td>Max Altitude:</td><td><input type="number" id="mount_alt_high" value="90"  min="-90" max="90" step="1" ></td></tr>
             <tr><td>&nbsp;</td><td><button onclick="setMoutAltLimits()" >Set Limits</button></td></tr>

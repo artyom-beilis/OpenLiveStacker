@@ -38,6 +38,7 @@ namespace ols {
             dispatcher().map("POST","/sync/?",&MountControlApp::sync,this);
             dispatcher().map("POST","/reset_alignment/?",&MountControlApp::reset_alignment,this);
             dispatcher().map("POST","/tracking/?",&MountControlApp::set_tracking_mode,this);
+            dispatcher().map("POST","/meridian/?",&MountControlApp::set_meridian_behavior,this);
         }
 
         ~MountControlApp();
@@ -55,6 +56,7 @@ namespace ols {
         void set_tracking_mode();
         void reset_alignment();
         void set_alt_limits();
+        void set_meridian_behavior();
     private:
         void setup_client();
         static void send_error_message(queue_pointer_type q,std::string const &msg);

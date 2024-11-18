@@ -2425,6 +2425,15 @@ function loadMountStatus()
         console.log(`max=${g_slew_max} cur=${g_slew_speed}`)
         mountUpdateSlewSpeedUI(0);
         document.getElementById("mount_tracking_mode").value = data.tracking_mode;
+        if(data.meridian == "unsupported") {
+            document.getElementById('mount_meridian_mode').style.display = 'none';
+            document.getElementById('mount_meridian_unsupported').style.display = 'inline';
+        }
+        else {
+            document.getElementById("mount_meridian_mode").value = data.meridian;
+            document.getElementById('mount_meridian_mode').style.display = 'inline';
+            document.getElementById('mount_meridian_unsupported').style.display = 'none';
+        }
         document.getElementById("mount_lat").innerHTML = data.lat.toFixed(2);
         document.getElementById("mount_lon").innerHTML = data.lon.toFixed(2);
         document.getElementById('mount_alignment_reset').disabled = data.alignment < 0;
@@ -2464,7 +2473,11 @@ function setMoutAltLimits()
     restCall('post','/api/mount/alt_limits',{'alt_min':low,'alt_max' : high},(e)=>{});
 }
 
-
+function mountSetMeridianMode()
+{
+    var mode = document.getElementById("mount_meridian_mode").value;
+    restCall("post","/api/mount/meridian",{"meridian":mode},(e)=>{});
+}
 function mountSetTrackingMode()
 {
     var mode = document.getElementById("mount_tracking_mode").value;
