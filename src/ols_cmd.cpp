@@ -158,8 +158,8 @@ int main(int argc,char **argv)
         }
         else if(driver == "indi") {
             driver_opt = cfg.get("indi.connection","");
-            server_cmd = cfg.get("indi.start_cmd",server_cmd);
         }
+        server_cmd = cfg.get("start_cmd",server_cmd);
 
         
         
