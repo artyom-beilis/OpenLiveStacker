@@ -172,12 +172,12 @@ else()
     message("- No Toupcam SDK header/lib found")
 endif()
 
-if(LIBCFITSIO AND LIBCFITSIO_HDR)
+if(LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROID_BUILD)
     set(OLS_EXTRA ${OLS_EXTRA} src/fitsmat.cpp)
     set(OLS_LIB_EXTRA ${LIBCFITSIO})
 endif()
 
-if(LIBCFITSIO AND LIBCFITSIO_HDR)
+if(LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROID_BUILD)
     include_directories(${LIBCFITSIO_HDR})
     add_definitions(-DWITH_CFITSIO)
     message("- Building OLS with fits support")
@@ -266,7 +266,7 @@ if(NOT ANDROID_BUILD AND NOT APPLE)
 endif()
 
 
-if(INDIGO_HEADER AND INDIGO_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR)
+if(INDIGO_HEADER AND INDIGO_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROID_BUILD)
     include_directories(${INDIGO_HEADER})
     add_library(ols_driver_indigo SHARED src/indigo_camera.cpp)
     target_link_libraries(ols_driver_indigo ${INDIGO_LIB})
