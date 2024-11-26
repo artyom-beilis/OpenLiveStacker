@@ -186,6 +186,9 @@ namespace ols {
         virtual int get_alignment_points(MountErrorCode &e) = 0;
         virtual void reset_alignment(MountErrorCode &e) = 0;
         virtual MountTrac get_tracking(MountErrorCode &e) = 0;
+        // return -1 if not reported 1 is tracking 0 is not
+        virtual int get_tracking_state(MountErrorCode &e) = 0;
+        virtual void set_tracking_state(bool track,MountErrorCode &e) = 0;
         virtual void set_tracking(MountTrac t,MountErrorCode &e) = 0;
         virtual void connect(MountErrorCode &e) = 0;
         virtual int supported_proto(MountErrorCode &e) = 0;

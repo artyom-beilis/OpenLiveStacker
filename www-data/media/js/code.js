@@ -2425,6 +2425,9 @@ function loadMountStatus()
         console.log(`max=${g_slew_max} cur=${g_slew_speed}`)
         mountUpdateSlewSpeedUI(0);
         document.getElementById("mount_tracking_mode").value = data.tracking_mode;
+        var is_tracking = document.getElementById('mount_is_tracking');
+        is_tracking.disabled = data.tracking_state < 0;
+        is_tracking.checked = data.tracking_state == 1
         if(data.meridian == "unsupported") {
             document.getElementById('mount_meridian_mode').style.display = 'none';
             document.getElementById('mount_meridian_unsupported').style.display = 'inline';
@@ -2481,7 +2484,8 @@ function mountSetMeridianMode()
 function mountSetTrackingMode()
 {
     var mode = document.getElementById("mount_tracking_mode").value;
-    restCall("post","/api/mount/tracking",{"tracking_mode":mode},(e)=>{});
+    var enabled = document.getElementById("mount_is_tracking").checked;
+    restCall("post","/api/mount/tracking",{"tracking_mode":mode,"enabled":enabled},(e)=>{});
 }
 
 function update_mnt() {

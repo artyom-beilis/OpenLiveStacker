@@ -289,6 +289,9 @@
         </p>
     </div>
     <div id="config_tab_mount" class="config_tab" style="display:none">
+        <p><strong>Experimental</strong></p>
+        <p>Don't leave your telescope unattended.</p>
+        <hr style='border-color: inherit'>
         <div id="mount_driver_selection" style='display:none' >
             <p>Select Driver</p>
             <p><select id="mount_driver_name" onchange="mountDriverSelect()"></select></p>
@@ -313,6 +316,15 @@
                         <option value="solar">Solar</option>
                         <option value="lunar">Lunar</option>
                     </select>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                &nbsp; 
+                </td>
+                <td>
+                    <input type="checkbox" id="mount_is_tracking" onchange="mountSetTrackingMode()" >
+                    <label for="mount_is_tracking">Enabled</label>
                 </td>
             </tr>
             <tr>

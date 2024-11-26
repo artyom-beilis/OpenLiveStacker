@@ -711,6 +711,28 @@ namespace {
             save_alignment(e);
         }
 
+        int is_tracking()
+        {
+            INDI::PropertySwitch p = device_.getProperty("TELESCOPE_TRACK_STATE");
+            if(!p.isValid())
+                return -1;
+            auto w_ton = p.findWidgetByName("TRACK_ON");
+            if(!w_ton)
+                return -1;
+            if(w_ton->getState() == ISS_OFF) 
+                return 0;
+            return 1;
+        }
+
+        virtual void set_tracking_state(bool track,MountErrorCode &e) 
+        {
+            std::string tracking = track ? "TRACK_ON" : "TRACK_OFF";
+            setPropSwitch("TELESCOPE_TRACK_STATE",tracking,e,true);
+        }
+        virtual int get_tracking_state(MountErrorCode &) override
+        {
+            return is_tracking();
+        }
         bool check_flip_for_RA(double RA)
         {
             INDI::PropertySwitch p = device_.getProperty("MERIDIAN_ACTION");
@@ -725,17 +747,12 @@ namespace {
             if(!pw || !pe)
                 return false;
             bool pier_east = pe->getState() == ISS_ON;
-            p = device_.getProperty("TELESCOPE_TRACK_STATE");
-            if(!p.isValid())
-                return false;
-            auto w_ton = p.findWidgetByName("TRACK_ON");
-            if(w_ton && w_ton->getState() == ISS_OFF) 
+            if(is_tracking() != 1)
                 return false;
             auto st = device_.getProperty("EQUATORIAL_EOD_COORD").getState();
             if(st != IPS_OK && st != IPS_IDLE) 
                 return false;
 
-            
             double lst = get_local_sidereal_time(lon_);
             double ha = get_local_hour_angle(lst,RA);
             if(pier_east) {

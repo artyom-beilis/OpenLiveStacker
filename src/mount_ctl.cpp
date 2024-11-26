@@ -164,6 +164,8 @@ void MountControlApp::get_status()
     e.check();
     std::vector<std::string> trmode{"sidereal","solar","lunar"};
     response_["tracking_mode"] = trmode.at(tr);
+    response_["tracking_state"] = client->get_tracking_state(e);
+    e.check();
     auto lat_lon = client->get_lat_lon(e);
     e.check();
     response_["lat"] = lat_lon.first;
@@ -209,6 +211,7 @@ void MountControlApp::set_tracking_mode()
     auto g = mi_->guard();
     auto client = check_connected();
     std::string m = content_.get<std::string>("tracking_mode");
+    bool tracking_on = content_.get<bool>("enabled");
     MountTrac t;
     if(m=="sidereal")
         t=trac_sidereal;
@@ -221,6 +224,11 @@ void MountControlApp::set_tracking_mode()
     MountErrorCode e;
     client->set_tracking(t,e);
     e.check();
+    int status = client->get_tracking_state(e);
+    e.check();
+    if(status != -1){
+        client->set_tracking_state(tracking_on,e);
+    }
 }
 
 void MountControlApp::setup_client()
