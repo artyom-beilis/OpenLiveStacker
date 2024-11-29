@@ -55,16 +55,23 @@ Please refer to <https://github.com/artyom-beilis/OpenLiveStacker/wiki/Open-Live
     - for UVC cameras libuvc and libusb
     - for DSLR (under development) libgphoto2
     - libraw for watch directory driver support of dng/raw files
-    - libcfitsio for watch directory driver support of raw/mono fits files
-    - For indigo cameras indigo development files
-    - For indi cameras indi development packages
+    - libcfitsio for watch directory driver support of raw/mono fits files and for indi or indigo cameras.
+    - For indigo cameras indigo development files (see below)
+    - For indi cameras indi development packages (see below)
 - For mount support indi development packages.
 
 Here the packages you can install on apt based distributions
 
     apt-get install libgphoto2-dev git python3 cmake libuvc-dev libtiff-dev libpcre3-dev libcurl4-openssl-dev zlib1g-dev libraw-dev libopencv-dev libopencv-imgcodecs-dev libopencv-imgproc-dev build-essential libpcre3-dev zlib1g-dev libcfitsio-dev
 
-For installation of indi packages refer to [the official documentation](https://indilib.org/download.html), specifically `libindi-dev` is required on apt based distributions, for indigo refer to [this documentation](https://www.indigo-astronomy.org/downloads.html) and `indigo` package is required on apt based distributions
+For Indi support camera and mount:
+
+- For installation refer to [the official documentation](https://indilib.org/download.html), specifically `libindi-dev` is required on apt based distributions
+- Additionally libnova-dev is required
+
+For ingigo camera support
+
+- Refer to [this documentation](https://www.indigo-astronomy.org/downloads.html) and `indigo` package is required on apt based distributions
 
 For installing CppCMS please refer to: <http://cppcms.com/wikipp/en/page/cppcms_1x_build>, in the nutshell
 
