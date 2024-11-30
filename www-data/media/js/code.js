@@ -1497,6 +1497,20 @@ function updatePP()
     updateHistogram();
 }
 
+function getRaDec()
+{
+    var ra,de;
+    if(g_mount_connected) {
+        ra = parseRA(document.getElementById("mount_ra").innerHTML);
+        de = parseDEC(document.getElementById("mount_dec").innerHTML);
+    }
+    else {
+        ra=parseRA(getVal("ra"));
+        de=parseDEC(getVal("de"));
+    }
+    return {"ra" : ra, "de" : de};
+}
+
 function startStack()
 {
     var type = getVal('type');
@@ -1519,8 +1533,9 @@ function startStack()
     var field_derotation=false,image_flip=false,remove_satellites=false,remove_gradient=false;
     var remove_hot_pixels=getBVal('remove_hot_pixels');
     if(type == 'dso') {
-        ra=parseRA(getVal("ra"));
-        de=parseDEC(getVal("de"));
+        let rade = getRaDec()
+        ra = rade.ra;
+        de = rade.de;
         lat = parseFloat(getVal("lat"));
         lon = parseFloat(getVal("lon"));
         synthetic_exposure_mpl = parseFloat(getVal("synthetic_exposure_mpl"));
