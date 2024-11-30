@@ -22,14 +22,19 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
         - SVBony - linux only (android SDK was not released yet by SVBony)
         - QHY - linux and Android
 - Featues:
-    - Live Stacking
+    - Live Stacking:
+        - Deep Space Objects
+        - Planetary
+        - Non-Tracking - point and observe
     - Auto/Manual stretch
-    - Plate solving
+    - Mount control via indi (both Android and Linux)
+    - Plate solving, synchronization with mount
+    - Gradient removal, satellite removal, hot pixel correction
     - Calibration frames: darks, flats, dark-flats
 
 ## Using on Android
 
-Install APK file that can be downloaded from Releases section:
+Install from [Google Play](https://play.google.com/store/apps/details?id=org.openlivestacker&hl=en) or APK file directly from release page
 
 Please refer to <https://github.com/artyom-beilis/OpenLiveStacker/wiki/Open-Live-Stacker-Manual> for use instructions
 
@@ -37,8 +42,6 @@ Please refer to <https://github.com/artyom-beilis/OpenLiveStacker/wiki/Open-Live
 ## Using on Linux
 
 ### Build Requirements
-
-
 
 3rd party libraries needed:
 
@@ -52,12 +55,23 @@ Please refer to <https://github.com/artyom-beilis/OpenLiveStacker/wiki/Open-Live
     - for UVC cameras libuvc and libusb
     - for DSLR (under development) libgphoto2
     - libraw for watch directory driver support of dng/raw files
-    - libcfitsio for watch directory driver support of raw/mono fits files
-
+    - libcfitsio for watch directory driver support of raw/mono fits files and for indi or indigo cameras.
+    - For indigo cameras indigo development files (see below)
+    - For indi cameras indi development packages (see below)
+- For mount support indi development packages.
 
 Here the packages you can install on apt based distributions
 
     apt-get install libgphoto2-dev git python3 cmake libuvc-dev libtiff-dev libpcre3-dev libcurl4-openssl-dev zlib1g-dev libraw-dev libopencv-dev libopencv-imgcodecs-dev libopencv-imgproc-dev build-essential libpcre3-dev zlib1g-dev libcfitsio-dev
+
+For Indi support camera and mount:
+
+- For installation refer to [the official documentation](https://indilib.org/download.html), specifically `libindi-dev` is required on apt based distributions
+- Additionally libnova-dev is required
+
+For ingigo camera support
+
+- Refer to [this documentation](https://www.indigo-astronomy.org/downloads.html) and `indigo` package is required on apt based distributions
 
 For installing CppCMS please refer to: <http://cppcms.com/wikipp/en/page/cppcms_1x_build>, in the nutshell
 
@@ -89,7 +103,6 @@ For 3rd part libraries or non-standard installations like SDK pass `-DCMAKE_INCL
     cmake -DCMAKE_INCLUDE_PATH=/home/me/ASI_linux_mac_SDK_V1.28/include -DCMAKE_LIBRARY_PATH=/home/me/ASI_linux_mac_SDK_V1.28/lib/x64/ ..
 
 For building for old Intel CPUs without SSE4 support add `-DNO_SSE4=OFF` to cmake.
-
 
 ### Running
 
