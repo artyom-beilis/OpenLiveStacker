@@ -2280,7 +2280,8 @@ function mountConnect()
 {
     g_wait_connected = 10;
     document.getElementById('mount_connect_button').disabled = true;
-    restCall('post','/api/mount/connect',{},(e) => {
+    var load_alignment = document.getElementById("mount_load_alignment").checked;
+    restCall('post','/api/mount/connect',{"load_alignment" : load_alignment},(e) => {
         waitMountConnUpdate({"connected":false})
     });
 }

@@ -279,7 +279,8 @@ void MountControlApp::connect()
         setup_client();
     }
     MountErrorCode e;
-    mi_->client()->connect(e);
+    bool load_alignment = content_.get<bool>("load_alignment");
+    mi_->client()->connect(load_alignment,e);
     e.check();
 }
 

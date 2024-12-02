@@ -371,10 +371,11 @@ namespace {
                 e="Unsupported protocol type";
             }
         }
-        virtual void connect(MountErrorCode & /*e*/) override
+        virtual void connect(bool load_alignment_on_connect,MountErrorCode & /*e*/) override
         {
             guard_type g(lock_);
-            LOGP("Connecting to %s\n",device_name_.c_str());
+            load_alignment_on_connect_ = load_alignment_on_connect;
+            LOGP("Connecting to %s load alignemnt = %d\n",device_name_.c_str(),int(load_alignment_on_connect_));
             connectDevice(device_name_.c_str());
         }
 
@@ -621,7 +622,7 @@ namespace {
                     coord_update_time_ = now();
                 }
             }
-            if(align_pointset_commit_ && align_pointset_action_ && !align_pointset_loaded_) {
+            if(align_pointset_commit_ && align_pointset_action_ && !align_pointset_loaded_ && load_alignment_on_connect_ && connected_) {
                 align_pointset_loaded_ = true;
                 load_alignment();
             }
@@ -980,6 +981,7 @@ namespace {
         bool align_pointset_action_ = false;
         bool align_pointset_commit_ = false;
         bool align_pointset_loaded_ = false;
+        bool load_alignment_on_connect_ = true;
         bool pending_save_ = false;
         bool disable_serial_;
         double coord_update_time_ = 0.0;

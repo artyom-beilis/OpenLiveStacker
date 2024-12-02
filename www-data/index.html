@@ -302,6 +302,7 @@
             <p>Connection: <select id="mount_connection_type" onchange="mountConnTypeMod()"></select></p>
             <p>Address/Port: <input id="mount_connection_address" type="text" oninput='document.getElementById("mount_connection_address_set").disabled=false;'></input>
                 <button onclick="mountConnStrSet()" disabled="disabled" id="mount_connection_address_set">Set</button>
+            <p><input id="mount_load_alignment" checked type="checkbox" /> <label for="mount_load_alignment" >Load Previous Alignment</label></p>
             <p><button id="mount_connect_button" onclick="mountConnect()">Connect</button></p>
         </div>
         <div class="mount_connected_display_block" style="display:none">

@@ -190,7 +190,7 @@ namespace ols {
         virtual int get_tracking_state(MountErrorCode &e) = 0;
         virtual void set_tracking_state(bool track,MountErrorCode &e) = 0;
         virtual void set_tracking(MountTrac t,MountErrorCode &e) = 0;
-        virtual void connect(MountErrorCode &e) = 0;
+        virtual void connect(bool load_alignent,MountErrorCode &e) = 0;
         virtual int supported_proto(MountErrorCode &e) = 0;
         virtual void set_proto(MountProto proto,MountErrorCode &e) = 0;
         virtual MountProto  get_proto(MountErrorCode &e) = 0;
