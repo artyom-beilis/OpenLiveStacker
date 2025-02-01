@@ -216,6 +216,7 @@ namespace ols {
                 return;
             fft_kern_ = cv::Mat(window_size_,window_size_,CV_32FC2);
             int rad = (window_size_/8);
+            window_sum_ = 0;
             for(int r=0;r<window_size_;r++) {
                 for(int c=0;c<window_size_;c++) {
                     int dy = fft_pos(r);
@@ -224,6 +225,7 @@ namespace ols {
                     if(dx*dx+dy*dy > rad*rad) {
                         val = 0;
                     }
+                    window_sum_ += val.real();
                     fft_kern_.at<std::complex<float> >(r,c) = val;
                 }
             }
@@ -232,6 +234,7 @@ namespace ols {
         cv::Mat sum_;
         cv::Mat fft_kern_;
         cv::Mat fft_roi_;
+        double window_sum_;
         int dx_,dy_,window_size_;
         int channels_;
         int width_,height_;
@@ -835,7 +838,7 @@ namespace ols {
                 cv::Mat fft_frame = calc_fft(frame,false);
                 double reg_score = 0;
                 cv::Point2f shift = get_dx_dy(fft_frame,reg_score);
-                float step_size = check_step(shift);
+                float step_size = check_step(shift,reg_score);
                 if(step_size > 0) {
                     failed_count_ ++;
                     constexpr int max_fails = 5;
@@ -856,8 +859,11 @@ namespace ols {
             return true;
         }
     private:
-        float check_step(cv::Point2f shift)
+        float check_step(cv::Point2f shift,double reg_score)
         {
+            if(reg_score / window_sum_ < 0.1 && shift.x == 0 && shift.y == 0) {
+                return 1000;
+            }
             if(std::abs(shift.x) > window_size_ / 8 || std::abs(shift.y) > window_size_ / 8) {
                 return 1000;
             }
@@ -873,9 +879,11 @@ namespace ols {
 
             float avg_diff_x = std::abs(avg_dx_ - dx);
             float avg_diff_y = std::abs(avg_dy_ - dy);
-            float result = std::max(avg_diff_x,avg_diff_y) / 3.0f;
-            if(result > 1.0f) {
-                BOOSTER_INFO("stacker") << "Step is too big " << log_txt;
+            float th_dx = std::max(3.0f,std::abs(avg_dx_) * 0.5f);
+            float th_dy = std::max(3.0f,std::abs(avg_dy_) * 0.5f);
+            float result = std::max(avg_diff_x,avg_diff_y);
+            if((avg_diff_x > th_dx || avg_diff_y > th_dy) && stacked_ > 1) {
+                BOOSTER_INFO("stacker") << "Step is too big " << avg_diff_x <<"," << avg_diff_y<< " " << log_txt;
             }
             else {
                 result = 0.0f;
