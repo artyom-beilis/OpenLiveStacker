@@ -881,6 +881,7 @@ namespace ols {
             float avg_diff_y = std::abs(avg_dy_ - dy);
             float th_dx = std::max(3.0f,std::abs(avg_dx_) * 0.5f);
             float th_dy = std::max(3.0f,std::abs(avg_dy_) * 0.5f);
+            //float th_dx = 2, th_dy = 2;
             float result = std::max(avg_diff_x,avg_diff_y);
             if((avg_diff_x > th_dx || avg_diff_y > th_dy) && stacked_ > 1) {
                 BOOSTER_INFO("stacker") << "Step is too big " << avg_diff_x <<"," << avg_diff_y<< " " << log_txt;
@@ -889,7 +890,7 @@ namespace ols {
                 result = 0.0f;
             }
             BOOSTER_INFO("stacker") << "Step Ok " << log_txt;
-            float w0 = 1.0f/(std::min(20,stacked_) + 1);
+            float w0 = 1.0f/(std::min(20,stacked_));
             float w1 = 1 - w0;
             avg_dx_ = dx * w0 + avg_dx_ * w1;
             avg_dy_ = dy * w0 + avg_dy_ * w1;
