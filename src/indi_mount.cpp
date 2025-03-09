@@ -614,6 +614,11 @@ namespace {
             else if(prop.isNameMatch("POLLING_PERIOD") && is_new) {
                 handle_polling(prop);
             }
+            else if(prop.isNameMatch("AUX_ENCODERS") && is_new) {
+                // disable encoders for skywatcherAltAz
+                MountErrorCode err;
+                switchTo(prop,"INDI_DISABLED",err);
+            }
             else if(coord_update_time_ != 0 && (now() - coord_update_time_) > 1.1)  {
                 // in case there are updates but not coordinates update
                 INDI::PropertyNumber p=device_.getProperty("EQUATORIAL_EOD_COORD");
