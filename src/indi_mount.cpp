@@ -525,13 +525,15 @@ namespace {
                         return trac_solar;
                     else if(name == "TRACK_LUNAR")
                         return trac_lunar;
-                    else {
+                    else if(p.findWidgetByName("TRACK_SIDEREAL")){
                         switchTo(p,"TRACK_SIDEREAL",e);
                         return trac_sidereal;
                     }
                 }
             }
-            switchTo(p,"TRACK_SIDEREAL",e);
+            if(p.findWidgetByName("TRACK_SIDEREAL")) {
+                switchTo(p,"TRACK_SIDEREAL",e);
+            }
             return trac_sidereal;
         }
         virtual void set_tracking(MountTrac t,MountErrorCode &e) override
