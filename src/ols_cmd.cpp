@@ -161,7 +161,8 @@ int main(int argc,char **argv)
         }
         server_cmd = cfg.get("start_cmd",server_cmd);
 
-        
+        std::string data_dir = cfg.get("data_dir","./data");
+        std::string www_dir = cfg.get("www_dir","./www-data");
         
         char const *driver_opt_ptr = nullptr;
         if(!driver_opt.empty()) {
@@ -174,7 +175,7 @@ int main(int argc,char **argv)
         {
             ols::CameraDriver::load_driver(driver,path,driver_opt_ptr,cfg.get("camera.log","/tmp/ols_camera.log"),cfg.get("camera.debug",false));
             ols::PlateSolver::init(astap_db,astap_exe);
-            ols::OpenLiveStacker stacker;
+            ols::OpenLiveStacker stacker(data_dir);
             stacker.config_libdir(libdir);
             if(!libdir.empty()) {
                 setenv("INDI_MATH_PLUGINS_DIRECTORY",libdir.c_str(),1);
@@ -182,6 +183,7 @@ int main(int argc,char **argv)
             stacker.mem_limit_mb = mem_limit_mb;
             stacker.http_ip = cfg.get("http.ip",stacker.http_ip);
             stacker.http_port = cfg.get("http.port",stacker.http_port);
+            stacker.document_root = www_dir;
             stacker.init(driver);
             stacker.run();
             stacker.shutdown();

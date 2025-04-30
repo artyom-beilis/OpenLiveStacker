@@ -1,5 +1,6 @@
 {
     "libdir" : "./build",
+    "data_dir": "./data",
     "driver" : "sim",
     "sim" : {
         "path" : "sim"
