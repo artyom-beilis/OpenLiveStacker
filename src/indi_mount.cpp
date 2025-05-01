@@ -36,15 +36,18 @@ namespace {
             if(!log_file) {
                 char name[512];
                 char prev_name[512];
-                #ifdef ANDROID_SUPPORT
                 char const *fname = "debug/indi_mount_prop_log.txt";
                 char const *prev_fname = "debug/indi_mount_prop_log.1.txt";
+                #ifdef ANDROID_SUPPORT
                 char const *home_dir = getenv("HOME");
                 #else
-                char const *fname = "indi_mount_prop_log.txt";
-                char const *prev_fname = "indi_mount_prop_log.1.txt";
-                char const *home_dir = "/tmp";
+                char const *home_dir = getenv("OLS_DATA_DIR");
                 #endif    
+                if(!home_dir) {
+                    fprintf(stderr,"Internal error OLS_DATA_DIR/HOME are not defined\n");
+                    log_file = stderr;
+                    return;
+                }
                 snprintf(name,sizeof(name),"%s/%s",home_dir,fname);
                 snprintf(prev_name,sizeof(prev_name),"%s/%s",home_dir,prev_fname);
                 rename(name,prev_name);

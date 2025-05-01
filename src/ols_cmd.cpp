@@ -162,6 +162,7 @@ int main(int argc,char **argv)
         server_cmd = cfg.get("start_cmd",server_cmd);
 
         std::string data_dir = cfg.get("data_dir","./data");
+        setenv("OLS_DATA_DIR",data_dir.c_str(),1);
         std::string www_dir = cfg.get("www_dir","./www-data");
         
         char const *driver_opt_ptr = nullptr;
