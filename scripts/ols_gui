@@ -44,7 +44,7 @@ def _default_config(install_dir = None,src_dir = None):
             "oem": False
         },
         "astap" : {
-            "exe": "astap_cli",
+            "exe": astap_cli,
             "db": data_dir + "/db"
         },
         "http": {
@@ -97,6 +97,8 @@ def get_default_config():
 
 def _merge_config(default_cfg,loaded):
     for key in default_cfg:
+        if key in {"libdir","ols_cmd","www_dir","astap","sim"}:
+            continue
         if isinstance(default_cfg[key],dict):
             _merge_config(default_cfg[key],loaded.get(key,{}))
         elif key in loaded:
@@ -218,8 +220,8 @@ class UI:
             cams = glob.glob(self.config["libdir"] + "/libgphoto2/*/*.so")
             ports = glob.glob(self.config["libdir"] + "/libgphoto2_port/*/*.so")
             if cams and ports:
-                cam_dir = os.dirname(cams[0])
-                port_dir = os.dirname(ports[0])
+                cam_dir = os.path.dirname(cams[0])
+                port_dir = os.path.dirname(ports[0])
                 env["CAMLIBS"] = cam_dir
                 env["IOLIBS"] = port_dir
         return env
