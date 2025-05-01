@@ -127,6 +127,33 @@ def _save_config(cfg):
     return path
 
 
+def _make_desktop(icon_path):
+    exe_path = os.path.realpath(__file__)
+    icon_path = os.path.realpath(icon_path)
+    desktop_file = f"""
+[Desktop Entry]
+Name=OpenLiveStacker
+Comment=OpenLiveStacker live stacking Suite
+Exec={exe_path}
+Icon={icon_path}
+Terminal=false
+Type=Application
+Categories=Astronomy;Education;Science
+"""
+    desktop_path = os.environ['HOME'] + '/.local/share/applications/OpenLiveStacker.desktop'
+    same=False
+    try:
+        with open(desktop_path,'r') as f:
+            ref = f.read()
+        if ref == desktop_file:
+            same = True
+    except:
+        pass
+    if same:
+        return
+    with open(desktop_path,'w') as f:
+        f.write(desktop_file)
+    
 
 
 
@@ -144,8 +171,10 @@ class UI:
 
         self.variables = dict()
         self.root.title("OpenLiveStacker Server Control UI")
-        img = PhotoImage(file=self.config["www_dir"] + "/media/img/facicon.png")
+        icon_path = self.config["www_dir"] + "/media/img/facicon.png"
+        img = PhotoImage(file=icon_path)
         self.root.tk.call('wm', 'iconphoto', self.root._w, img)
+        _make_desktop(icon_path)
 
         driver_label = ttk.Label(self.root, text = "Camera Driver:")
         driver_label.grid(column = 0, row = 0,sticky=W) 
