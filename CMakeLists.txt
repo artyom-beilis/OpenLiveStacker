@@ -101,10 +101,8 @@ else()
 endif()
 
 
-if(NOT ANDROID_BUILD)
-    find_path(LIBCFITSIO_HDR fitsio.h)
-    find_library(LIBCFITSIO cfitsio)
-endif()    
+find_path(LIBCFITSIO_HDR fitsio.h)
+find_library(LIBCFITSIO cfitsio)
 
 
 if(WITH_SSE)
@@ -172,12 +170,9 @@ else()
     message("- No Toupcam SDK header/lib found")
 endif()
 
-if(LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROID_BUILD)
+if(LIBCFITSIO AND LIBCFITSIO_HDR)
     set(OLS_EXTRA ${OLS_EXTRA} src/fitsmat.cpp)
     set(OLS_LIB_EXTRA ${LIBCFITSIO})
-endif()
-
-if(LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROID_BUILD)
     include_directories(${LIBCFITSIO_HDR})
     add_definitions(-DWITH_CFITSIO)
     message("- Building OLS with fits support")
@@ -278,10 +273,10 @@ else()
     message(" -- Indigo camera driver disabled")
 endif()
 
-if(INDI_HEADER AND INDI_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROID_BUILD)
+if(INDI_HEADER AND INDI_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR)
     include_directories(${INDI_HEADER})
     add_library(ols_driver_indi SHARED src/indi_camera.cpp)
-    target_link_libraries(ols_driver_indi ${INDI_LIB})
+    target_link_libraries(ols_driver_indi ${INDI_LIB} ols ${OPENCV_CORE})
     message(" -- Building indi camera driver")
     install(TARGETS ols_driver_indi
             LIBRARY DESTINATION lib

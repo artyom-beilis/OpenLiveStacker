@@ -15,6 +15,7 @@
 #include "indigo_camera.h"
 #include "sync_queue.h"
 #include "fitsmat.h"
+#include "fits_guard.h"
 #include "shift_bit.h"
 #define INDIGO_LINUX
 #include <indigo/indigo_bus.h>
@@ -180,21 +181,6 @@ namespace ols {
             streaming_ = true;
         }
 
-        struct TMPFIleGuard {
-            std::string fname;
-            TMPFIleGuard(void *ptr,size_t len)
-            {
-                fname = "/tmp/ols_tmp.fits";
-                std::ofstream f(fname);
-                f.write((char *)(ptr),len);
-                f.close();
-            }
-            ~TMPFIleGuard()
-            {
-                std::remove(fname.c_str());
-            }
-        };
-
         void handle_frame(void *ptr,size_t len)
         {
             if(!callback_)
@@ -204,22 +190,25 @@ namespace ols {
             gettimeofday(&tv,nullptr);
             frm.unix_timestamp = tv.tv_sec;
             frm.unix_timestamp += tv.tv_usec * 1e-6;
-            TMPFIleGuard g(ptr,len);
-            auto res = load_fits(g.fname);
-            auto img = res.first; 
-            frm.bayer  = res.second;
-            frm.data = img.data;
-            frm.data_size = img.rows * img.cols * img.elemSize();
-            frm.height = img.rows;
-            frm.width = img.cols;
-            frm.format = stream_.format;
-            frm.frame_counter = frame_counter_++;
-
-            if(img.elemSize1() == 2 && current_bits_ > 8 && current_bits_ < 16) {
-                shift_to16(current_bits_,(unsigned short *)frm.data,frm.data_size/2);
+            TempFileGuard g(ptr,len);
+            if(!g) {
+                LOG("Failed to save fits file %s\n",g.error_message);
+                return;
             }
-
             try {
+                auto res = load_fits(g.fname);
+                auto img = res.first; 
+                frm.bayer  = res.second;
+                frm.data = img.data;
+                frm.data_size = img.rows * img.cols * img.elemSize();
+                frm.height = img.rows;
+                frm.width = img.cols;
+                frm.format = stream_.format;
+                frm.frame_counter = frame_counter_++;
+
+                if(img.elemSize1() == 2 && current_bits_ > 8 && current_bits_ < 16) {
+                    shift_to16(current_bits_,(unsigned short *)frm.data,frm.data_size/2);
+                }
                 callback_(frm);
             }
             catch(std::exception const &e) {
@@ -687,9 +676,11 @@ extern "C" {
         ols::IndigoCameraDriver::connection_string = s;
         return 0;
     }
-    void ols_set_indigo_driver_log(char const *log_path,int /*debug*/)
+    void ols_set_indigo_driver_log(char const *log_path,int debug)
     {
-        ols::error_stream = fopen(log_path,"w");
+        if(debug) {
+            ols::error_stream = fopen(log_path,"w");
+        }
     }
     ols::CameraDriver *ols_get_indigo_driver(int /*unused*/,ols::CamErrorCode *e)
     {
