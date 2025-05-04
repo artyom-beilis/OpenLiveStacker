@@ -332,6 +332,7 @@ namespace ols {
                 }
                 switch(cap.ControlType) {
                 case ASI_GAIN: opt_id = opt_gain; break;
+                case ASI_OFFSET: opt_id = opt_black_level; break;
                 case ASI_EXPOSURE: opt_id = opt_exp; break;
                 case ASI_WB_R: opt_id = opt_wb_r; break;
                 case ASI_WB_B: opt_id = opt_wb_b; break;
@@ -402,6 +403,7 @@ namespace ols {
                 }
                 break;
             case opt_gain:
+            case opt_black_level:
             case opt_wb_r:
             case opt_wb_b:
                 {
@@ -511,6 +513,7 @@ namespace ols {
             case opt_wb_b:
             case opt_cooler_target:
             case opt_cooler_on:
+            case opt_black_level:
             case opt_fan_on:
             case opt_cooler_power_perc:
                 code = ASISetControlValue(info_.CameraID,cap.ControlType,long(value),ASI_FALSE);
