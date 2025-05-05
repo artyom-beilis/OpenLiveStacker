@@ -160,7 +160,7 @@ Categories=Astronomy;Education;Science
 
 class UI:
 
-    camera_driver_names = [ 'sim', 'asi', 'toup', 'uvc', 'gphoto2','indi', 'indigo', "wdir" ] 
+    camera_driver_names = [ 'sim', 'asi', 'toup', 'svb', 'uvc', 'gphoto2','indi', 'indigo', "wdir" ] 
     
     def __init__(self):
         self.process = None
@@ -179,7 +179,7 @@ class UI:
         driver_label = ttk.Label(self.root, text = "Camera Driver:")
         driver_label.grid(column = 0, row = 0,sticky=W) 
         self.driver_select = ttk.Combobox(self.root,justify=LEFT,width=30)
-        self.driver_select['values'] = ( 'Simulated', 'ASI ZWO', 'ToupTek', 'UVC', 'GPhoto2', 'Indi', 'Indigo', "Watch Directory" )
+        self.driver_select['values'] = ( 'Simulated', 'ASI ZWO', 'ToupTek', 'SVBony', 'UVC', 'GPhoto2', 'Indi', 'Indigo', "Watch Directory" )
         self.driver_select.grid(column = 1, row = 0,sticky = W)
         self.driver_select.current(self._driver_index())
         self.driver = self.camera_driver_names[self._driver_index()]
