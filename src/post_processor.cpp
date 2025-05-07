@@ -179,7 +179,9 @@ namespace ols {
             std::string path = base_name + ".jpeg";
             std::string ipath = base_name + ".txt";
             std::string tpath = base_name + ".tiff";
-            save_tiff(to16bit(last_frame_->frame),tpath);
+            if(save_tiff_) {
+                save_tiff(to16bit(last_frame_->frame),tpath);
+            }
             auto img = pp_->post_process_image(last_frame_->frame,last_frame_->roi);
             auto frames = generate_output_frame(img,false);
             auto frame = frames.first;
@@ -214,6 +216,13 @@ namespace ols {
 
         std::pair<std::shared_ptr<CameraFrame>,std::shared_ptr<CameraFrame> > handle_video(std::shared_ptr<StackedFrame> video)
         {
+            if(dynamic_ && save_after_ > 0 && last_frame_)
+            {
+                if(video->stacked < last_frame_->stacked && last_frame_->stacked * get_exp_s() >= save_after_)
+                {
+                    save_stacked_image_and_send();
+                }
+            }
             last_frame_ = video;
             std::shared_ptr<CameraFrame> res;
             std::shared_ptr<CameraFrame> ps;
@@ -299,8 +308,11 @@ namespace ols {
                 height_ = ctl->height;
                 mono_ = ctl->mono;
                 saved_count_ = 0;
+                save_tiff_ = ctl->save_tiff;
+                save_after_ = ctl->save_after;
                 version_ = 0;
                 calibration_ = ctl->method == stack_calibration;
+                dynamic_ = ctl->method == stack_dynamic;
                 output_path_ = ctl->output_path;
                 name_ = ctl->name;
                 dropped_count_ = 0;
@@ -375,8 +387,11 @@ namespace ols {
         std::string data_dir_;
         int width_,height_;
         bool mono_;
+        bool save_tiff_ = true;
         int version_;
         bool calibration_=false;
+        bool dynamic_ = false;
+        int save_after_ = 0;
         std::string output_path_,name_;
         cv::Mat cframe_;
         int cframe_count_;

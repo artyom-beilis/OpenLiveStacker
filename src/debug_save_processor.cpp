@@ -146,6 +146,8 @@ namespace ols {
                     v["stretch_high"] = ctl->stretch_high;
                     v["stretch_gamma"] = ctl->stretch_gamma;
                     v["remove_satellites" ] = ctl->remove_satellites;
+                    v["save_tiff"] = ctl->save_tiff;
+                    v["save_after"] = ctl->save_after;
                     
                     v["filters"]["remove_first"] = ctl->filters.remove_first;
                     v["filters"]["min_stat_size"] = ctl->filters.min_stat_size;

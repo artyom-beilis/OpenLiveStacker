@@ -1532,6 +1532,10 @@ function startStack()
     var ra=null,de=null,lat=null,lon=null,synthetic_exposure_mpl=1;
     var field_derotation=false,image_flip=false,remove_satellites=false,remove_gradient=false;
     var remove_hot_pixels=getBVal('remove_hot_pixels');
+    var save_after = parseFloat(getVal("save_after"));
+    if(isNaN(save_after))
+        save_after = 0;
+    
     if(type == 'dso') {
         let rade = getRaDec()
         ra = rade.ra;
@@ -1622,6 +1626,8 @@ function startStack()
         remove_hot_pixels:  remove_hot_pixels,
         rollback_on_pause:  rollback_on_pause,
         auto_stretch:       getBVal("auto_stretch"),
+        save_tiff:          getBVal("save_tiff"),
+        save_after:         save_after,
         stretch_low:        g_stretch.cut,
         stretch_high:       g_stretch.gain,
         stretch_gamma:      g_stretch.gamma,
@@ -2507,6 +2513,22 @@ function mountSetTrackingMode()
 function update_mnt() {
     restCall('get','/api/mount/config',null,updateMountFunc);
 }
+
+function selectStackConfig(cfg)
+{
+    var cfgs = ['main','filters','saving'];
+    for(var i=0;i<cfgs.length;i++) {
+        var obj = document.getElementById('stack_tab_' + cfgs[i]);
+        console.log(cfgs[i],cfg,obj)
+        if(cfgs[i] == cfg) {
+            obj.style.display = 'block';
+        }
+        else {
+            obj.style.display = 'none';
+        }
+    }
+}
+
 
 function selectConfig(cfg)
 {
