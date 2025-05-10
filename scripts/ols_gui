@@ -140,7 +140,8 @@ Terminal=false
 Type=Application
 Categories=Astronomy;Education;Science
 """
-    desktop_path = os.environ['HOME'] + '/.local/share/applications/OpenLiveStacker.desktop'
+    desktop_dir = os.environ['HOME'] + '/.local/share/applications'
+    desktop_path = desktop_dir + '/OpenLiveStacker.desktop'
     same=False
     try:
         with open(desktop_path,'r') as f:
@@ -151,6 +152,7 @@ Categories=Astronomy;Education;Science
         pass
     if same:
         return
+    os.makedirs(desktop_dir,exist_ok=True)
     with open(desktop_path,'w') as f:
         f.write(desktop_file)
     
