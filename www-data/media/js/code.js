@@ -34,6 +34,11 @@ var g_stretch = {
     gamma:2.2
 };
 
+
+var g_config_storage = null;
+var g_config_profiles = null;
+
+
 function zoom(offset)
 {
     if(offset > 0 && global_zoom < 4)
@@ -173,17 +178,12 @@ function restCall(method,url,request,on_response,on_error = showError)
 
 function getStoageValue()
 {
-    var storage = window.localStorage;
-    var data = storage.getItem('ols_data');
-    if(!data)
-        return {};
-    return JSON.parse(data);
+    return g_config_storage;
 }
 
 function setStorageValue(obj)
 {
-    var data = JSON.stringify(obj);
-    window.localStorage.setItem('ols_data',data);
+    restCall('post','/api/config/ols_data',{'value':obj},(r)=>{})
 }
 
 function loadSavedInputValue(id)
@@ -339,8 +339,38 @@ function setCanvasEventListeners()
     canvas.addEventListener('touchmove',(e)=>histEvent(e.touches[0],'move'))
 }
 
+function loadConfigIfNull(d,key,saveCallback)
+{
+    if(d)
+        return d;
+    var res = window.localStorage.getItem(key);
+    if(!res)
+        return null;
+    var result = JSON.parse(res);
+    saveCallback(result);
+    return result;
+}
+
+function loadConfig()
+{
+    restCall('get','/api/config/ols_profiles',null, (d)=> {
+        var prof = loadConfigIfNull(d.value,'ols_profiles',saveProfiles);
+        g_config_profiles = prof ? prof : [];
+        restCall('get','/api/config/ols_data',null, (d)=> {
+            var cfg = loadConfigIfNull(d.value,'ols_data',setStorageValue);
+            g_config_storage = cfg? cfg:{};
+            run_continue();
+        });
+    });
+}
+
 
 function run()
+{
+    loadConfig()
+}
+
+function run_continue()
 {
     var params = getQueryParameters();
     console.log(params)
@@ -2558,19 +2588,12 @@ function selectConfig(cfg)
 
 function getProfiles()
 {
-    var storage = window.localStorage;
-    var data = storage.getItem('ols_profiles');
-    if(!data)
-        data = [];
-    else
-        data = JSON.parse(data);
-    return data;
+    return g_config_profiles;
 }
 
 function saveProfiles(data)
 {
-    var storage = window.localStorage;
-    storage.setItem('ols_profiles',JSON.stringify(data));
+    restCall('post','/api/config/ols_profiles',{'value':data},(r)=>{});
 }
 
 function selectProfile()

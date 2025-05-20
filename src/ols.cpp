@@ -15,12 +15,14 @@
 #include "plate_solver_ctl_app.h"
 #include "astap_db_download_app.h"
 #include "allocator.h"
+#include "config_app.h"
 
 namespace ols {
 
 std::atomic<int> OpenLiveStacker::received_;
 std::atomic<int> CameraControlApp::live_stretch_;
 std::atomic<int> CameraControlApp::defaults_configured_;
+std::recursive_mutex ConfigApp::lock_;
 
 OpenLiveStacker::OpenLiveStacker(std::string data_dir)
 {
@@ -184,6 +186,7 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     stats_stream_app_ = new StackerStatsNotification(*web_service_);
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
     web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
+    web_service_->applications_pool().mount(cppcms::create_pool<ConfigApp>(data_dir_),cppcms::mount_point("/config((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this,video_generator_queue_),cppcms::mount_point("/camera((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<MountControlApp>(stacker_stats_queue_,this),cppcms::mount_point("/mount((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(this,data_dir_,video_generator_queue_),
