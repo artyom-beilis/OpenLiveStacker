@@ -202,7 +202,7 @@ namespace ols {
                     callback_ = callback;
                 }
                 stream_active_ = 1;
-                thread_ = std::move(std::thread([=]() {
+                thread_ = std::thread([=]() {
                     int size = frames_.size();
                     double next_time = timestamp() + exposure_ * 1e-3;
                     while(stream_active_) {
@@ -234,7 +234,7 @@ namespace ols {
                             }
                         }
                     }
-                }));
+                });
             }
             catch(std::exception const &err) {
                 e = CamErrorCode(err);
@@ -269,7 +269,6 @@ namespace ols {
         virtual CamParam get_parameter(CamOptionId id,bool current_only,CamErrorCode &e) 
         {
             CamParam r;
-            memset(&r,0,sizeof(r));
             r.option = id;
             switch(id) {
             case opt_exp:

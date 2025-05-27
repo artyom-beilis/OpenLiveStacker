@@ -209,7 +209,7 @@ namespace ols {
             std::shared_ptr<StatsData> stats(new StatsData(*last_frame_));
             stats->since_saved_s = get_exp_s() * (stats->stacked - saved_count_);
             if(stats->stacked>0 && !calibration_) {
-                stats->histogramm = std::move(pp_->get_histogramm());
+                stats->histogramm = pp_->get_histogramm();
             }
             return stats;
         }
@@ -394,7 +394,6 @@ namespace ols {
         int save_after_ = 0;
         std::string output_path_,name_;
         cv::Mat cframe_;
-        int cframe_count_;
         int dropped_count_ = 0;
         std::unique_ptr<PostProcessorBase> pp_;
         std::shared_ptr<StackedFrame> last_frame_;

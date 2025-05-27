@@ -258,8 +258,8 @@ namespace ols {
             fully_stacked_count_ = 0;
         }
 
-        void set_filters(bool throw_frames,int frames_to_judge,int /*dynamic_delay*/,
-                         float sharp_percetile,float reg_percentile,float brightness_sigma)
+        virtual void set_filters(bool throw_frames,int frames_to_judge,int /*dynamic_delay*/,
+                         float sharp_percetile,float reg_percentile,float brightness_sigma) override
         {
             throw_first_frames_ = throw_frames;
             min_size_to_judge_ = std::max(3,frames_to_judge);
@@ -275,12 +275,12 @@ namespace ols {
 
         }
 
-        void set_rollback_on_pause(bool v)
+        virtual void set_rollback_on_pause(bool v) override
         {
             rollback_on_pause_ = v;
         }
 
-        void set_remove_satellites(bool v)
+        virtual void set_remove_satellites(bool v) override
         {
             remove_satellites_ = v;
             if(remove_satellites_) {
@@ -290,21 +290,21 @@ namespace ols {
 
 
 
-        int total_count()
+        virtual int total_count() override
         {
             return total_count_;
         }
-        int stacked_count()
+        virtual int stacked_count() override
         {
             return fully_stacked_count_;
         }
 
-        cv::Rect fully_stacked_area()
+        virtual cv::Rect fully_stacked_area() override
         {
             return fully_stacked_area_;
         }
 
-        cv::Mat get_raw_stacked_image()
+        virtual cv::Mat get_raw_stacked_image() override
         {
             BOOSTER_INFO("stacked") << "So far stacked " << fully_stacked_count_ << std::endl;
             if(remove_satellites_ && fully_stacked_count_ > 1) {
@@ -317,7 +317,7 @@ namespace ols {
         }
 
 
-        void handle_pause()
+        virtual void handle_pause() override
         {
             if(rollback_on_pause_ && fully_stacked_count_ > 1) {
                 prev_sum_.copyTo(sum_);
@@ -803,28 +803,28 @@ namespace ols {
             fully_stacked_ = cv::Rect(border_w,border_h,width_-2*border_w,height_ - 2*border_h);
         }
 
-        virtual void set_filters(bool, int ,int dynamic_delay,float,float,float) 
+        virtual void set_filters(bool, int ,int dynamic_delay,float,float,float) override
         {
             filter_frames_ = dynamic_delay;
             BOOSTER_INFO("stacker") << "Delay after reset " << dynamic_delay;
         }
-        virtual void set_rollback_on_pause(bool) {}
-        virtual void set_remove_satellites(bool) {}
-        virtual void handle_pause() {}
+        virtual void set_rollback_on_pause(bool)  override {}
+        virtual void set_remove_satellites(bool)  override {}
+        virtual void handle_pause() override {}
         
-        virtual int total_count() 
+        virtual int total_count() override 
         {
             return total_;
         }
-        virtual int stacked_count() 
+        virtual int stacked_count() override 
         {
             return stacked_;
         }
-        virtual cv::Rect fully_stacked_area() 
+        virtual cv::Rect fully_stacked_area() override 
         {
             return fully_stacked_;
         }
-        virtual cv::Mat get_raw_stacked_image() 
+        virtual cv::Mat get_raw_stacked_image() override 
         {
             return sum_.clone();
         }

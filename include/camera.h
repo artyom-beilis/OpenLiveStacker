@@ -108,14 +108,14 @@ namespace ols {
     CamOptionType cam_option_type_from_str(std::string const &name);
 
     struct CamParam {
-        CamOptionId option;
-        CamOptionType type;
+        CamOptionId option = opt_auto_exp;
+        CamOptionType type = type_number;
         bool read_only = false;
-        double step_size;
-        double min_val;
-        double max_val;
-        double def_val;
-        double cur_val;
+        double step_size = 0;
+        double min_val = 0;
+        double max_val = 0;
+        double def_val = 0;
+        double cur_val = 0;
         std::vector<std::string> names;
     };
 

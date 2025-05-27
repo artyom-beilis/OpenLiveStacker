@@ -87,7 +87,7 @@ void OpenLiveStacker::open_camera(int id)
     close_camera();
     guard g(camera_lock_);
     CamErrorCode e;
-    camera_ = std::move(driver_->open_camera(id,e));
+    camera_ = driver_->open_camera(id,e);
     e.check();
     stream_active_ = false;
 }
@@ -152,7 +152,7 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     if(driver_it == drivers.end())
         throw CamError("No such driver " + driver_name);
     int driver_id = driver_it - drivers.begin();
-    driver_ = std::move(CameraDriver::get(driver_id,external_option));
+    driver_ = CameraDriver::get(driver_id,external_option);
 
     cppcms::json::value config;
     config["service"]["api"]="http";
@@ -271,20 +271,20 @@ void OpenLiveStacker::run()
     stacker_stats_queue_->call_on_push(stats_stream_app_->get_callback());
     plate_solving_queue_->call_on_push(set_plate_solving_image);
 
-    video_generator_thread_ = std::move(start_generator(video_generator_queue_,
+    video_generator_thread_ = start_generator(video_generator_queue_,
                                                         preprocessor_queue_,
                                                         video_display_queue_,
                                                         debug_save_queue_,
-                                                        plate_solving_queue_));
+                                                        plate_solving_queue_);
 
-    debug_save_thread_ = std::move(start_debug_saver(debug_save_queue_,stacker_stats_queue_,debug_dir_));
-    preprocessor_thread_ = std::move(start_preprocessor(preprocessor_queue_,stacker_queue_,stacker_stats_queue_));
-    stacker_thread_ = std::move(start_stacker(stacker_queue_,pp_queue_));
-    pp_thread_ = std::move(start_post_processor(pp_queue_,
+    debug_save_thread_ = start_debug_saver(debug_save_queue_,stacker_stats_queue_,debug_dir_);
+    preprocessor_thread_ = start_preprocessor(preprocessor_queue_,stacker_queue_,stacker_stats_queue_);
+    stacker_thread_ = start_stacker(stacker_queue_,pp_queue_);
+    pp_thread_ = start_post_processor(pp_queue_,
                                               stack_display_queue_,
                                               stacker_stats_queue_,
                                               plate_solving_queue_,
-                                              data_dir_));
+                                              data_dir_);
     try {
         web_service_->run();
     }
