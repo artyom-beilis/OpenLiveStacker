@@ -641,47 +641,68 @@ namespace ols {
         void reset_step(cv::Point2f p)
         {
             current_position_ = p;
+            suspected_current_position_ = p;
             step_sum_sq_ = 0;
             count_frames_ = 0;
             missed_frames_ = 0;
+            susp_ok_frames_ = 0;
+        }
+
+        float calc_step_sq(cv::Point2f a,cv::Point2f b)
+        {
+            float dx = a.x - b.x;
+            float dy = a.y - b.y;
+            return dx*dx + dy*dy;
         }
         bool check_step(cv::Point2f p)
         {
-            float dx = current_position_.x - p.x;
-            float dy = current_position_.y - p.y;
-            float step_sq_ = dx*dx + dy*dy;
+            float step_sq = calc_step_sq(current_position_,p);
             if(count_frames_ == 0) {
                 current_position_ = p;
-                step_sum_sq_ = dx*dx + dy*dy;
+                suspected_current_position_ = p;
+                step_sum_sq_ = step_sq;
                 count_frames_ = 1;
                 missed_frames_ = 0;
+                susp_ok_frames_ = 0;
                 return true;
             }
             else {
-                float step_avg_ = sqrt(step_sum_sq_ / count_frames_);
-                constexpr int missed_in_a_row_limit = INT_MAX;
+                float step_avg_ = sqrt(step_sum_sq_);
                 constexpr float pixel_0_threshold = 3;
-                float step = sqrt(step_sq_);
+                float step = sqrt(step_sq);
+                float susp_step_sq = calc_step_sq(suspected_current_position_,p);
+                float susp_step = sqrt(susp_step_sq);
                 float step_limit = std::max((2 + (float)sqrt(missed_frames_)) * step_avg_,pixel_0_threshold);
-                char log_txt[256];
-                snprintf(log_txt,sizeof(log_txt),
-                        "Step size %5.2f from (%0.1f,%0.1f) to (%0.1f,%0.1f) limit =%5.1f avg_step=%5.1f\n",step,
-                        current_position_.x,current_position_.y,
-                        p.x,p.y,
-                        step_limit,step_avg_);
-                BOOSTER_INFO("stacker") << log_txt;
 
-                if(missed_frames_ > missed_in_a_row_limit || step > step_limit) {
+                // If more than 2 prev steps are ok steps return to normal stacking - stable selection
+                bool status;
+                if((step > step_limit) && (step > window_size_*0.4 || susp_step > step_limit || (susp_step <= step_limit && susp_ok_frames_ < 1))) {
+                    if(susp_step < step_limit)
+                        susp_ok_frames_ += 1;
+                    else
+                        susp_ok_frames_ = 0;
                     missed_frames_ ++;
-                    return false;
+                    suspected_current_position_ = p;
+                    status = false;
                 }
                 else {
-                    current_position_ = p;
+                    suspected_current_position_ = current_position_ = p;
+                    int N = std::min(5,count_frames_);
+                    float step_add = (step > step_limit) ? susp_step_sq : step_sq;
+                    step_sum_sq_ = (step_sq + N * step_add) / (N + 1);
                     count_frames_ ++;
-                    step_sum_sq_+=step_sq_;
                     missed_frames_ = 0;
-                    return true;
+                    susp_ok_frames_ = 0;
+                    status = true;
                 }
+                char log_txt[256];
+                snprintf(log_txt,sizeof(log_txt),
+                        "Step size %5.2f from (%0.1f,%0.1f) to (%0.1f,%0.1f) limit =%5.1f avg_step=%5.1f susp_step=%5.1f window_size=%d stepok=%d\n",step,
+                        current_position_.x,current_position_.y,
+                        p.x,p.y,
+                        step_limit,step_avg_,susp_step,window_size_,int(status));
+                BOOSTER_INFO("stacker") << log_txt;
+                return status;
             }
         }
 
@@ -739,9 +760,10 @@ namespace ols {
         cv::Mat prev_sum_,prev_frame_max_;
         int prev_fully_stacked_count_ = 0;
         cv::Point2f current_position_;
+        cv::Point2f suspected_current_position_;
 
         cv::Mat stacked_res_;
-        int count_frames_,missed_frames_;
+        int count_frames_,missed_frames_,susp_ok_frames_;
         float step_sum_sq_;
         int manual_exposure_counter_ = 0;
         int exp_multiplier_;
