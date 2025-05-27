@@ -251,6 +251,8 @@ function setGPS(lat,lon)
 {
     document.getElementById("stack_lat").value=lat.toFixed(2);
     document.getElementById("stack_lon").value=lon.toFixed(2);
+    saveInputValue("stack_lat");
+    saveInputValue("stack_lon");
 }
 
 function getQueryParameters()
@@ -275,6 +277,7 @@ function checkParams(params)
 {
     if('android_view' in params && params.android_view == 1) {
         document.getElementById('FS_tooggle').style.display = 'none'
+        document.getElementById('manual_geolocation').style.display = 'none'
     }
 }
 
@@ -376,6 +379,20 @@ function run()
     loadConfig()
 }
 
+function geolocationDefined()
+{
+    return document.getElementById("stack_lat").value!='' && document.getElementById("stack_lon").value!='';
+}
+
+function getBrowserGeolocation()
+{
+    if(navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos)=>{
+            setGPS(pos.coords.latitude,pos.coords.longitude);
+        });
+    }
+}
+
 function run_continue()
 {
     var params = getQueryParameters();
@@ -386,10 +403,8 @@ function run_continue()
     updateSavedInputs();
     update_mnt();
     startUIUpdates();
-    if(!checkAndSetLocation(params) && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos)=>{
-            setGPS(pos.coords.latitude,pos.coords.longitude);
-        });
+    if(!checkAndSetLocation(params) && !geolocationDefined()) {
+        getBrowserGeolocation();
     }
 }
 
