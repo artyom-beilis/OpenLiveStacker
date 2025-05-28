@@ -132,12 +132,12 @@ namespace ols {
             return false;
         }
         /// Camera name
-        virtual std::string name(CamErrorCode &)
+        virtual std::string name(CamErrorCode &) override
         {
             return name_;
         }
         /// Return list of suppored video formats
-        virtual std::vector<CamStreamFormat> formats(CamErrorCode &e)
+        virtual std::vector<CamStreamFormat> formats(CamErrorCode &e) override
         {
             if(!wait_ready(e))
                 return std::vector<CamStreamFormat>();
@@ -179,7 +179,7 @@ namespace ols {
         }
 
         /// Start a video stream with provided callback 
-        virtual void start_stream(CamStreamFormat format,frame_callback_type callback,CamErrorCode &e) 
+        virtual void start_stream(CamStreamFormat format,frame_callback_type callback,CamErrorCode &e) override 
         {
             guard_type g(lock_);
             unsigned int i=0;
@@ -289,7 +289,7 @@ namespace ols {
         }
 
         /// stop the stream - once function ends callback will not be called any more
-        virtual void stop_stream(CamErrorCode &) 
+        virtual void stop_stream(CamErrorCode &) override 
         {
             guard_type g(lock_);
             if(!streaming_)
@@ -299,7 +299,7 @@ namespace ols {
         }
 
         /// list of camera controls that the camera supports
-        virtual std::vector<CamOptionId> supported_options(CamErrorCode &e)
+        virtual std::vector<CamOptionId> supported_options(CamErrorCode &e) override
         {
             std::vector<CamOptionId> opts;
             if(!wait_ready(e)) {
@@ -310,7 +310,7 @@ namespace ols {
             }
             return opts;
         }
-        virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e)
+        virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e) override
         {
             guard_type g(lock_);
             auto p = parameters_.find(id);
@@ -403,7 +403,7 @@ namespace ols {
             }
         }
         /// set camera control
-        virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e)
+        virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e) override
         {
             guard_type g(lock_);
             if(parameters_.find(id) == parameters_.end()) {
@@ -706,7 +706,7 @@ namespace ols {
         {
         }
 
-        virtual std::vector<std::string> list_cameras(CamErrorCode &)
+        virtual std::vector<std::string> list_cameras(CamErrorCode &) override
         {
             for(int i=0;i<50;i++) {
                 {
@@ -720,7 +720,7 @@ namespace ols {
             return device_names_;
         }
 
-        virtual std::unique_ptr<Camera> open_camera(int id, CamErrorCode &e)
+        virtual std::unique_ptr<Camera> open_camera(int id, CamErrorCode &e) override
         {
             guard_type g(lock_);
             if (size_t(id) >= device_names_.size())

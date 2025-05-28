@@ -507,9 +507,9 @@ namespace ols {
             }
             stream_active_ = 1;
             stop_=false;
-            thread_ = std::move(std::thread([=]() {
+            thread_ = std::thread([=]() {
                 capture_thread();
-            }));
+            });
         }
         void handle_cmd_queue()
         {
@@ -807,7 +807,6 @@ namespace ols {
     private:
         GPContext *ctx_ = nullptr;
         ::Camera *camera_ = nullptr;
-        bool has_camera_ = false;
         std::vector<std::string> camera_list_;        
     };
 }

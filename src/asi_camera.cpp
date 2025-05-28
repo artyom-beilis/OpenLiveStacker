@@ -256,7 +256,7 @@ namespace ols {
             }
                 
             stream_active_ = 1;
-            thread_ = std::move(std::thread([=]() {
+            thread_ = std::thread([=]() {
                 std::vector<unsigned char> buf(format.width*format.height*bpp);
                 while(true) {
                     ASI_ERROR_CODE status = ASIGetVideoData(info_.CameraID,buf.data(),buf.size(),500); 
@@ -272,7 +272,7 @@ namespace ols {
                         break;
                     }
                 }
-            }));
+            });
             
         }
 
@@ -368,7 +368,6 @@ namespace ols {
                 return r;
             }
             auto cap = p->second;
-            memset(&r,0,sizeof(r));
             r.option = id;
             long val;
             ASI_BOOL auto_val;

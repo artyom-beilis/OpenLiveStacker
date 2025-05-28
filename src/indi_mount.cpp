@@ -735,7 +735,7 @@ namespace {
             return 1;
         }
 
-        virtual void set_tracking_state(bool track,MountErrorCode &e) 
+        virtual void set_tracking_state(bool track,MountErrorCode &e) override
         {
             std::string tracking = track ? "TRACK_ON" : "TRACK_OFF";
             setPropSwitch("TELESCOPE_TRACK_STATE",tracking,e,true);
@@ -992,7 +992,6 @@ namespace {
         bool align_pointset_commit_ = false;
         bool align_pointset_loaded_ = false;
         bool load_alignment_on_connect_ = true;
-        bool pending_save_ = false;
         bool disable_serial_;
         double coord_update_time_ = 0.0;
         double prev_alt_ = -100;

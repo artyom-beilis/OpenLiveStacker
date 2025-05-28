@@ -35,7 +35,7 @@
     .val_input { width: 15mm; }
     .wide_input { width: 30mm; }
     .slider_elem { background-color: transparent; }
-    .comp_but, .incdec_but { width: 10mm ; height:10mm; font-size:5mm ; padding: 0 }
+    .comp_but, .incdec_but { width: 12mm ; height:12mm; font-size:6mm ; padding: 0 }
 
     .mount_input { width: 36mm; height:18mm; font-size:9mm; padding: 0;}
     .mount_sq_but { 
@@ -53,51 +53,51 @@
 
     .stretch_background {
         background: url(/media/img/stretch.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .sharp_background {
         background: url(/media/img/sharp.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .mount_background {
         background: url(/media/img/mount.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .solve_background {
         background: url(/media/img/solve.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .no_sync_background {
         background: url(/media/img/no_sync.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .pause_background {
         background: url(/media/img/pause.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .resume_background {
         background: url(/media/img/resume.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .save_background {
         background: url(/media/img/save.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .stop_background {
         background: url(/media/img/stop.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .cancel_background {
         background: url(/media/img/cancel.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .error_background {
         background: url(/media/img/error.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .settings_background {
         background: url(/media/img/settings.png) no-repeat center center;
-        background-size: 10mm 10mm;
+        background-size: 12mm 12mm;
     }
     .N_background {
         background: url(/media/img/N.png) no-repeat center center;
@@ -195,9 +195,9 @@
     .config_div {
         position:absolute;
         left:10mm;
-        top:12mm;
+        top:15mm;
         right:10mm;
-        bottom:12mm;
+        bottom:15mm;
         z-index:2;
         padding: 2mm 2mm 2mm 2mm;
         border: 1px solid red;

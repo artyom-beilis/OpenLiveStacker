@@ -276,7 +276,6 @@ namespace ols {
         virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e) 
         {
             CamParam r;
-            memset(&r,0,sizeof(r));
             r.option = id;
             if(id == opt_keep_images) {
                 r.option = id;
