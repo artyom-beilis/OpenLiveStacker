@@ -413,6 +413,49 @@ namespace {
             guard_type g(lock_);
             return eod_to_j2000(EqCoord{RA_,DEC_});
         }
+        virtual bool pulse_guiding_supported(float &ns_guide_rate, float &we_guide_rate,MountErrorCode &)
+        {
+            guard_type g(lock_);
+            ns_guide_rate = -1.0f;
+            we_guide_rate = -1.0f;
+            INDI::PropertyNumber pns = device_.getProperty("TELESCOPE_TIMED_GUIDE_NS");
+            INDI::PropertyNumber pwe = device_.getProperty("TELESCOPE_TIMED_GUIDE_WE");
+            if(!pns.isValid() || !pwe.isValid())
+                return false;
+            INDI::PropertyNumber prop = device_.getProperty("GUIDE_RATE");
+            if(prop.isValid()) {
+                auto w_ns = prop.findWidgetByName("GUIDE_RATE_NS");
+                if(w_ns)
+                    ns_guide_rate = w_ns->getValue();
+                auto w_we = prop.findWidgetByName("GUIDE_RATE_WE");
+                if(w_we)
+                    we_guide_rate = w_we->getValue();
+            }
+            return true;
+        }
+        virtual void pulse_guide(float NS_ms,float WE_ms,MountErrorCode &e) 
+        {
+            if(NS_ms > 0) {
+                setPropNumeric("TELESCOPE_TIMED_GUIDE_NS",{
+                    { "TIMED_GUIDE_N", double(NS_ms) },
+                },e,true);
+            }
+            else if(NS_ms < 0) {
+                setPropNumeric("TELESCOPE_TIMED_GUIDE_NS",{
+                    { "TIMED_GUIDE_S", double(-NS_ms) },
+                },e,true);
+            }
+            if(WE_ms > 0) {
+                setPropNumeric("TELESCOPE_TIMED_GUIDE_WE",{
+                    { "TIMED_GUIDE_W", double(WE_ms) },
+                },e,true);
+            }
+            else if(WE_ms < 0) {
+                setPropNumeric("TELESCOPE_TIMED_GUIDE_WE",{
+                    { "TIMED_GUIDE_E", double(-WE_ms) },
+                },e,true);
+            }
+        }
         virtual std::pair<int,int> get_slew_rate(MountErrorCode &/*e*/) override
         {
             guard_type g(lock_);

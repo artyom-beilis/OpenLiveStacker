@@ -87,6 +87,7 @@
         <button onclick="selectStackConfig('main');">Main</button>
         <button onclick="selectStackConfig('filters');">Filters</button>
         <button onclick="selectStackConfig('saving');">Saving</button>
+        <button id="dithering_button" onclick="selectStackConfig('dithering');" style='display:none' ">Dithering</button>
     <p>
     <div id="stack_tab_main" class="config_tab" >
     <table>
@@ -183,6 +184,16 @@
         <td>seconds of data collected</td></tr>
     </table>
     </div>
+    <div id="stack_tab_dithering" class="config_tab"  style="display:none">
+    <table>
+        <tr class="dso_config stack_opt" ><td colspan="2" style="text-align:center;"><b>Dithering</b></td></tr>
+        <tr class="stack_opt dso_config" ><td>Enable</td><td><input class="saved_input"  id="dithering_enabled" type="checkbox" ></td></tr>
+        <tr class="stack_opt dso_config" ><td>Radius (arcsec)</td><td><input class="saved_input"  id="dithering_radius" min="1" max="50" step="1" value="10" ></td></tr>
+        <tr class="stack_opt dso_config" ><td>Frequency (s)</td><td><input class="saved_input"  id="dithering_frequency" min="30" max="3600" step="10" value="30" ></td></tr>
+        <tr class="stack_opt dso_config" ><td>Delay (s)</td><td><input class="saved_input"  id="dithering_delay" min="1"  max="600"  step="1" value="3" ></td></tr>
+    </table>
+    </div>
+
 </div>
 
 <div class="config_div" id="sharp_control" style="display:none; background-color: transparent; ">

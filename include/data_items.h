@@ -52,6 +52,12 @@ namespace ols {
         virtual ~MountPositionNotification() {}
     };
 
+    struct PulseGuide : public QueueData {
+        double NS_ms=0;
+        double WE_ms=0;
+        virtual ~PulseGuide(){}
+    };
+
     struct CameraFrame : public QueueData {
         CamStreamFormat format;
         CamBayerType bayer = bayer_na;
@@ -128,6 +134,12 @@ namespace ols {
         int  save_after = 0;
 
         double source_gamma = 1.0; /// to linear space gamma
+
+        double dither_radius = 0;
+        double dither_frequency = 0;
+        double dither_delay = 0;
+        double guide_rate_ns = 0.5;
+        double guide_rate_we = 0.5;
 
         std::string darks_path; /// if darks applied darks frame
         std::string flats_path;

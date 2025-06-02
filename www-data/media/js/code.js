@@ -27,6 +27,10 @@ var g_mount_connected = false;
 var g_mount_driver_populated = null;
 var g_sync_counter = 0;
 var g_slew_direction = '';
+var g_guiding = false;
+var g_guiding_rate = {"ns":0.5,"we":0.5};
+var g_dithering_center = {"y":0,"x":0};
+var g_dithering_last = null;
 var g_mount_geolocation_updated = false;
 var g_prev_touch = null;
 var g_prev_pinch = null;
@@ -803,6 +807,7 @@ function updateHistogram()
         ctx.stroke();
     }
 }
+
 
 function updatePushEvents(e) {
     var stats = JSON.parse(e);
@@ -2633,6 +2638,14 @@ function loadMountStatus()
         else
             alignment_status = `on ${data.alignment} points`;
         document.getElementById('mount_alignment').innerHTML = alignment_status;
+        g_guiding = data.guiding;
+        if(data.guiding && data.guiding_ns > 0 && data.guiding_we > 0) {
+            g_guiding_rate.ns = data.guiding_ns;
+            g_guiding_rate.we = data.guiding_we;
+        }
+        if(data.guiding) {
+            document.getElementById('dithering_button').style.display = 'inline';
+        }
         if(!g_mount_geolocation_updated) {
             var lat = parseFloat(getVal("lat"));
             var lon = parseFloat(getVal("lon"));
@@ -2675,10 +2688,9 @@ function update_mnt() {
 
 function selectStackConfig(cfg)
 {
-    var cfgs = ['main','filters','saving'];
+    var cfgs = ['main','filters','saving','dithering'];
     for(var i=0;i<cfgs.length;i++) {
         var obj = document.getElementById('stack_tab_' + cfgs[i]);
-        console.log(cfgs[i],cfg,obj)
         if(cfgs[i] == cfg) {
             obj.style.display = 'block';
         }

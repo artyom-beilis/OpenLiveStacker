@@ -180,6 +180,25 @@ void MountControlApp::get_status()
     e.check();
     std::vector<std::string> meridian{"unsupported","flip","stop"};
     response_["meridian"] = meridian.at(flip);
+    float ns=-1,we=-1;
+    bool guiding =  client->pulse_guiding_supported(ns,we,e);
+    e.check();
+    response_["guiding"] = guiding;
+    response_["guiding_rate_ns"] = ns;
+    response_["guiding_rate_we"] = we;
+}
+
+void MountControlApp::pulse_guide()
+{
+    auto g=mi_->guard();
+    auto client = check_connected();
+
+    MountErrorCode e;
+    float ns = content_.get<double>("guide_ns",0);
+    float we = content_.get<double>("guide_we",0);
+    client->pulse_guide(ns,we,e);
+    e.check();
+    
 }
 
 void MountControlApp::set_meridian_behavior()

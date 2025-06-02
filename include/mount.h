@@ -205,6 +205,9 @@ namespace ols {
         virtual void slew(MountSlew direction,int speed,MountErrorCode &e) = 0;
         virtual MountMeridianFlip get_meridian(MountErrorCode &e) = 0;
         virtual void set_meridian(MountMeridianFlip flip,MountErrorCode &e) = 0;
+
+        virtual bool pulse_guiding_supported(float &ns_guide_rate, float &we_guide_rate,MountErrorCode &e) = 0;
+        virtual void pulse_guide(float NS_ms,float WE_ms,MountErrorCode &e) = 0;
         
         virtual bool connected()
         {
