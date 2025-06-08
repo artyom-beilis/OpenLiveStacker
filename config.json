@@ -1,8 +1,8 @@
 {
-    "libdir" : "./build",
-    "driver" : "sim",
+    "libdir" : ".",
+    "driver" : "toup",
     "sim" : {
-        "path" : "sim"
+        "path" : "."
     },
     "mem_limit_mb" : 0,
     "wdir" : {

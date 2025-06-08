@@ -55,6 +55,7 @@ namespace ols {
         opt_wb,
         opt_wb_r,
         opt_wb_b,
+	opt_tint,
         opt_focus,
         opt_gain,
         opt_gamma,

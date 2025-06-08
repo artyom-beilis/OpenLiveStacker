@@ -501,6 +501,7 @@ namespace ols
             if (!(info_.model->flag & TOUPCAM_FLAG_MONO)) {
                 opts.push_back(opt_auto_wb);
                 opts.push_back(opt_wb);
+                opts.push_back(opt_tint);
             }
             if (info_.model->flag & TOUPCAM_FLAG_TEC) // Thermoelectric Cooler Present
             {
@@ -601,6 +602,20 @@ namespace ols
                 r.def_val = 6503;
                 return r;
             }
+	    break;
+            case opt_tint:
+            {
+                int temp=6503,tint=1000;
+                Toupcam_get_TempTint(hcam_,&temp,&tint);
+                r.type = type_number;
+                r.min_val = 200;
+                r.max_val = 2500;
+                r.step_size = 1;
+                r.cur_val = tint;
+                r.def_val = 1000;
+                return r;
+            }
+	    break;
             case opt_average_bin:
             {
                 r.type = type_bool;
@@ -799,8 +814,17 @@ namespace ols
             break;
             case opt_wb:
             {
-                int temp = value;
-                int tint = 1000; // default
+                int temp,tint;
+                Toupcam_get_TempTint(hcam_,&temp,&tint); //get tint
+                temp = value;
+                hr = Toupcam_put_TempTint(hcam_,temp,tint);
+            }
+            break;
+            case opt_tint:
+            {
+                int temp,tint;
+                Toupcam_get_TempTint(hcam_,&temp,&tint); //get temp
+                tint = value;
                 hr = Toupcam_put_TempTint(hcam_,temp,tint);
             }
             break;
