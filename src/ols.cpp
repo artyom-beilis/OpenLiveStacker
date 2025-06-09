@@ -239,6 +239,7 @@ void OpenLiveStacker::handle_video_frame(CamFrame const &cf)
     frame->format.width  = cf.width;
     frame->format.height = cf.height;
     frame->bayer = cf.bayer;
+    frame->byteorder = cf.byteorder;
     frame->timestamp = cf.unix_timestamp;
     frame->source_frame = std::shared_ptr<VideoFrame>(new VideoFrame(cf.data,cf.data_size));
     frame->dropped = dropped_since_last_update_;

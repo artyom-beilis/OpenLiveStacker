@@ -267,25 +267,59 @@ namespace ols
                 bpp = 2; // update to 1/2 if TOUPCAM_OPTION_BITDEPTH 0/1 for now using 1 unconditionaly
                 frm.format = !(info_.model->flag & TOUPCAM_FLAG_MONO) ? stream_raw16 : stream_mono16;
             }
-            // printf("handle_frame=%dx%d(raw=%d, bpp=%d)\n", nW, nH, raw, bpp);
+//            printf("handle_frame=%dx%d(raw=%d, bpp=%d)\n", nW, nH, raw, bpp);
             size_t bufSize = nW * nH * bpp;
             if (buf_.size() != bufSize) // Just in case
                 buf_.resize(bufSize);
-            unsigned w = 0, h = 0;
-            hr = Toupcam_PullImage(hcam_, buf_.data(), bpp * 8, &w, &h);
+//            unsigned w = 0, h = 0;
+            ToupcamFrameInfoV4 info = { 0 };
+//            hr = Toupcam_PullImage(hcam_, buf_.data(), bpp * 8, &w, &h);
+            hr = Toupcam_PullImageV4(hcam_, buf_.data(), 0, bpp * 8, 0, &info);
             if (FAILED(hr)) {
                 handle_error("Toupcam_PullImage",hr);
                 return;
             }
 
-/*            // printf("handle_frame: Toupcam_PullImage=(%ux%u)\n", w, h);
-            hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FLUSH, 2);
+//            printf("handle_frame: Toupcam_PullImage=(%ux%u)\n", info.v3.width, info.v3.height);
+/*
+            //RGB frame
+            for (int i=0; i < 1920*1080*3; i+=3) {
+                buf_[i] = 255;
+                buf_[i+1] = 0;
+                buf_[i+2] = 0;
+            }
+*/
+//          printf("Frame color sample r:%d g:%d b:%d\n", buf_[0], buf_[1], buf_[2]);
+/*
+            //RAW16 frame
+
+            uint16_t pattern[2][2] = {
+                {0xFFFF, 0x0},  // top-left and top-right
+                {0x0, 0x0}   // bottom-left and bottom-right
+            };
+
+            for (int y = 0; y < 1080; ++y) {
+                for (int x = 0; x < 1920; ++x) {
+                    int px = x % 2;
+                    int py = y % 2;
+                    uint16_t val = pattern[py][px];
+
+                    size_t index = (y * 1920 + x) * 2;
+                    buf_[index]     = val & 0xFF;        // low byte
+                    buf_[index + 1] = (val >> 8) & 0xFF; // high byte
+                }
+            }
+*/
+
+            // printf("handle_frame: Toupcam_PullImage=(%ux%u)\n", w, h);
+/*
+	    hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_FLUSH, 2);
             if (FAILED(hr))
             {
                 handle_error("Toupcam_put_Option FLUSH",hr);
                 // printf("handle_frame:Toupcam_put_Option(TOUPCAM_OPTION_FLUSH, 2)=%d\n", hr);
-            }*/
-
+            }
+*/
             if(bpp == 2) {
                 int bits=16;
                 if(info_.model->flag & TOUPCAM_FLAG_RAW10)
@@ -302,12 +336,13 @@ namespace ols
             gettimeofday(&tv, nullptr);
             frm.unix_timestamp = tv.tv_sec;
             frm.unix_timestamp += tv.tv_usec * 1e-6;
-            frm.width = w;
-            frm.height = h;
+            frm.width = info.v3.width;
+            frm.height = info.v3.height;
             frm.data = buf_.data();
             frm.data_size = buf_.size();
             frm.frame_counter = frame_counter_++;
             frm.bayer = bayerPattern_;
+            frm.byteorder = byteorder_rgb;
             {
                 std::unique_lock<std::mutex> guard(lock_);
                 if (callback_)
@@ -420,7 +455,6 @@ namespace ols
 
             stream_active_ = 1;
 
-
 #ifndef MAKEFOURCC
 #define MAKEFOURCC(a, b, c, d) ((unsigned)(unsigned char)(a) | ((unsigned)(unsigned char)(b) << 8) | ((unsigned)(unsigned char)(c) << 16) | ((unsigned)(unsigned char)(d) << 24))
 #endif
@@ -435,23 +469,23 @@ namespace ols
                 switch (nFourCC)
                 {
                 case MAKEFOURCC('G', 'B', 'R', 'G'):
-                    // printf("Toupcam_get_RawFormat(%s, %d)\n", "GBRG", bitsperpixel);
+                    printf("Toupcam_get_RawFormat(%s, %d)\n", "GBRG", bitsperpixel);
                     bayerPattern_ = bayer_gr;
                     break;
                 case MAKEFOURCC('R', 'G', 'G', 'B'):
-                    // printf("Toupcam_get_RawFormat(%s, %d)\n", "RGGB", bitsperpixel);
+                    printf("Toupcam_get_RawFormat(%s, %d)\n", "RGGB", bitsperpixel);
                     bayerPattern_ = bayer_bg;
                     break;
                 case MAKEFOURCC('B', 'G', 'G', 'R'):
-                    // printf("Toupcam_get_RawFormat(%s, %d)\n", "BGGR", bitsperpixel);
+                    printf("Toupcam_get_RawFormat(%s, %d)\n", "BGGR", bitsperpixel);
                     bayerPattern_ = bayer_rg;
                     break;
                 case MAKEFOURCC('G', 'R', 'B', 'G'):
-                    // printf("Toupcam_get_RawFormat(%s, %d)\n", "GRBG", bitsperpixel);
+                    printf("Toupcam_get_RawFormat(%s, %d)\n", "GRBG", bitsperpixel);
                     bayerPattern_ = bayer_gb;
                     break;
                 case MAKEFOURCC('Y', 'Y', 'Y', 'Y'):
-                    // printf("Toupcam_get_RawFormat(%s, %d)\n", "YYYY", bitsperpixel);
+                    printf("Toupcam_get_RawFormat(%s, %d)\n", "YYYY", bitsperpixel);
                     break; // monochromatic sensor
                 default:
                     break;

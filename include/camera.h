@@ -140,6 +140,12 @@ namespace ols {
         bayer_gb
     };
 
+    enum CamByteOrder {
+        byteorder_rgb,
+        byteorder_bgr
+    };
+
+
     std::string bayer_type_to_str(CamBayerType bayer);
     CamBayerType bayer_type_from_str(std::string const &s);
 
@@ -168,7 +174,8 @@ namespace ols {
     ///
     struct CamFrame {
         CamStreamType format; /// image format
-        CamBayerType bayer = bayer_na;
+ 	CamBayerType bayer = bayer_na;
+        CamByteOrder byteorder = byteorder_bgr; /// byte order of camera
         int frame_counter;    /// frame counter since camera started
         double unix_timestamp; /// time in sconds since Jan 1, 1970 when image was captured, inlcuding subsecond units
         int width;  /// image width
