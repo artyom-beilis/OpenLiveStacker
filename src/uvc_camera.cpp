@@ -286,7 +286,6 @@ namespace ols {
         virtual CamParam get_parameter(CamOptionId op_id,bool current_only,CamErrorCode &e)
         {
             CamParam r;
-            memset(&r,0,sizeof(r));
             r.option = op_id;
             try {
                 switch(op_id) {

@@ -286,7 +286,6 @@ namespace ols {
 
         size_t read_ = 0,total_ = sizeof(Header);
         std::string output_dir_;
-        bool done_ = false;
         std::function<bool(char const *)> callback_;
         char const *error_ = "Unknown error";
     };

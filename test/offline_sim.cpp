@@ -180,6 +180,9 @@ namespace ols {
             cfg.stretch_high = v.get<double>("stretch_high");
             cfg.stretch_gamma = v.get<double>("stretch_gamma");
             cfg.remove_satellites = v.get("remove_satellites",cfg.remove_satellites);
+
+            cfg.save_after = v.get("save_after",cfg.save_after);
+            cfg.save_tiff = v.get("save_tiff",cfg.save_tiff);
             
             cfg.filters.remove_first=v.get("filters.remove_first",cfg.filters.remove_first);
             cfg.filters.min_stat_size=v.get("filters.min_stat_size",cfg.filters.min_stat_size);

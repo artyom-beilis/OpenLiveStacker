@@ -101,10 +101,8 @@ else()
 endif()
 
 
-if(NOT ANDROID_BUILD)
-    find_path(LIBCFITSIO_HDR fitsio.h)
-    find_library(LIBCFITSIO cfitsio)
-endif()    
+find_path(LIBCFITSIO_HDR fitsio.h)
+find_library(LIBCFITSIO cfitsio)
 
 
 if(WITH_SSE)
@@ -172,12 +170,9 @@ else()
     message("- No Toupcam SDK header/lib found")
 endif()
 
-if(LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROID_BUILD)
+if(LIBCFITSIO AND LIBCFITSIO_HDR)
     set(OLS_EXTRA ${OLS_EXTRA} src/fitsmat.cpp)
     set(OLS_LIB_EXTRA ${LIBCFITSIO})
-endif()
-
-if(LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROID_BUILD)
     include_directories(${LIBCFITSIO_HDR})
     add_definitions(-DWITH_CFITSIO)
     message("- Building OLS with fits support")
@@ -271,15 +266,21 @@ if(INDIGO_HEADER AND INDIGO_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROI
     add_library(ols_driver_indigo SHARED src/indigo_camera.cpp)
     target_link_libraries(ols_driver_indigo ${INDIGO_LIB})
     message(" -- Building indigo camera driver")
+    install(TARGETS ols_driver_indigo
+            LIBRARY DESTINATION lib
+    )
 else()
     message(" -- Indigo camera driver disabled")
 endif()
 
-if(INDI_HEADER AND INDI_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR AND NOT ANDROID_BUILD)
+if(INDI_HEADER AND INDI_LIB AND LIBCFITSIO AND LIBCFITSIO_HDR)
     include_directories(${INDI_HEADER})
     add_library(ols_driver_indi SHARED src/indi_camera.cpp)
-    target_link_libraries(ols_driver_indi ${INDI_LIB})
+    target_link_libraries(ols_driver_indi ${INDI_LIB} ols ${OPENCV_CORE})
     message(" -- Building indi camera driver")
+    install(TARGETS ols_driver_indi
+            LIBRARY DESTINATION lib
+    )
 else()
     message(" -- Indi camera driver disabled")
 endif()
@@ -329,6 +330,8 @@ install(TARGETS ols ols_driver_sim
             LIBRARY DESTINATION lib
 )
 
+
+
 if(NOT ANDROID_BUILD)
     include_directories(src)
     add_executable(test_indigo_format_parsing test/test_indigo_format_parsing.cpp)
@@ -345,6 +348,9 @@ if(NOT ANDROID_BUILD)
             RUNTIME DESTINATION bin
             LIBRARY DESTINATION lib
     )
+    install(DIRECTORY www-data DESTINATION share/ols)
+    install(DIRECTORY sim DESTINATION share/ols)
+    install(PROGRAMS scripts/ols_gui DESTINATION bin)
 endif()
 
 

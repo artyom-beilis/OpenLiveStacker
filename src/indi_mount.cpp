@@ -36,15 +36,18 @@ namespace {
             if(!log_file) {
                 char name[512];
                 char prev_name[512];
-                #ifdef ANDROID_SUPPORT
                 char const *fname = "debug/indi_mount_prop_log.txt";
                 char const *prev_fname = "debug/indi_mount_prop_log.1.txt";
+                #ifdef ANDROID_SUPPORT
                 char const *home_dir = getenv("HOME");
                 #else
-                char const *fname = "indi_mount_prop_log.txt";
-                char const *prev_fname = "indi_mount_prop_log.1.txt";
-                char const *home_dir = "/tmp";
+                char const *home_dir = getenv("OLS_DATA_DIR");
                 #endif    
+                if(!home_dir) {
+                    fprintf(stderr,"Internal error OLS_DATA_DIR/HOME are not defined\n");
+                    log_file = stderr;
+                    return;
+                }
                 snprintf(name,sizeof(name),"%s/%s",home_dir,fname);
                 snprintf(prev_name,sizeof(prev_name),"%s/%s",home_dir,prev_fname);
                 rename(name,prev_name);
@@ -525,13 +528,15 @@ namespace {
                         return trac_solar;
                     else if(name == "TRACK_LUNAR")
                         return trac_lunar;
-                    else {
+                    else if(p.findWidgetByName("TRACK_SIDEREAL")){
                         switchTo(p,"TRACK_SIDEREAL",e);
                         return trac_sidereal;
                     }
                 }
             }
-            switchTo(p,"TRACK_SIDEREAL",e);
+            if(p.findWidgetByName("TRACK_SIDEREAL")) {
+                switchTo(p,"TRACK_SIDEREAL",e);
+            }
             return trac_sidereal;
         }
         virtual void set_tracking(MountTrac t,MountErrorCode &e) override
@@ -613,6 +618,11 @@ namespace {
             }
             else if(prop.isNameMatch("POLLING_PERIOD") && is_new) {
                 handle_polling(prop);
+            }
+            else if(prop.isNameMatch("AUX_ENCODERS") && is_new) {
+                // disable encoders for skywatcherAltAz
+                MountErrorCode err;
+                switchTo(prop,"INDI_DISABLED",err);
             }
             else if(coord_update_time_ != 0 && (now() - coord_update_time_) > 1.1)  {
                 // in case there are updates but not coordinates update
@@ -725,7 +735,7 @@ namespace {
             return 1;
         }
 
-        virtual void set_tracking_state(bool track,MountErrorCode &e) 
+        virtual void set_tracking_state(bool track,MountErrorCode &e) override
         {
             std::string tracking = track ? "TRACK_ON" : "TRACK_OFF";
             setPropSwitch("TELESCOPE_TRACK_STATE",tracking,e,true);
@@ -982,7 +992,6 @@ namespace {
         bool align_pointset_commit_ = false;
         bool align_pointset_loaded_ = false;
         bool load_alignment_on_connect_ = true;
-        bool pending_save_ = false;
         bool disable_serial_;
         double coord_update_time_ = 0.0;
         double prev_alt_ = -100;

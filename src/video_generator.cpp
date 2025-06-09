@@ -274,8 +274,13 @@ namespace ols {
                     handle_live_ctl(live_ptr);
                     continue;
                 }
-                
-                BOOSTER_ERROR("stacker") << "Invalid data for video generator got " << (data_ptr? typeid(*data_ptr).name() : "nullptr");
+               
+                char const *name = "nullptr";
+                if(data_ptr) {
+                    auto &v=*data_ptr;
+                    name = typeid(v).name();
+                }
+                BOOSTER_ERROR("stacker") << "Invalid data for video generator got " << name;
             }
         }
         void handle_live_ctl(std::shared_ptr<LiveControl> ctl)

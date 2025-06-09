@@ -12,11 +12,11 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
         - ToupTek and Meade (based on ToupTek)
         - UVC Based like webcam, sv105
         - DSLR/DSLM support using gphoto2
+        - Indi CCD - remote camera
         - Android Camera
         - Watch directoy for files (universal integration with ekos, Linux only)
         - Sim - simulation for development
     - Linux Only:
-        - Indi CCD
         - Indigo CCD
     - Planned to be supported:
         - SVBony - linux only (android SDK was not released yet by SVBony)
@@ -38,8 +38,15 @@ Install from [Google Play](https://play.google.com/store/apps/details?id=org.ope
 
 Please refer to <https://github.com/artyom-beilis/OpenLiveStacker/wiki/Open-Live-Stacker-Manual> for use instructions
 
-
 ## Using on Linux
+
+For Linux AMD64 arch you can just download tar that contains everything, untar and run bin/ols_gui
+
+## How to combine OpenLiveStacker in your EAA rig
+
+![RIG](https://github.com/artyom-beilis/OpenLiveStacker/blob/main/docs/connection-charts.png)
+
+## Building
 
 ### Build Requirements
 

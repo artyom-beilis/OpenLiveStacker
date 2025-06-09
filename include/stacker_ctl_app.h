@@ -183,6 +183,8 @@ namespace ols {
             cmd->stretch_high = content_.get("stretch_high",cmd->stretch_high);
             cmd->stretch_gamma = content_.get("stretch_gamma",cmd->stretch_gamma);
             cmd->remove_satellites = content_.get("remove_satellites",cmd->remove_satellites);
+            cmd->save_after = content_.get("save_after",cmd->save_after);
+            cmd->save_tiff = content_.get("save_tiff",cmd->save_tiff);
 
             cmd->filters.remove_first=content_.get("filters.remove_first",cmd->filters.remove_first);
             cmd->filters.min_stat_size=content_.get("filters.min_stat_size",cmd->filters.min_stat_size);

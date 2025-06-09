@@ -15,12 +15,14 @@
 #include "plate_solver_ctl_app.h"
 #include "astap_db_download_app.h"
 #include "allocator.h"
+#include "config_app.h"
 
 namespace ols {
 
 std::atomic<int> OpenLiveStacker::received_;
 std::atomic<int> CameraControlApp::live_stretch_;
 std::atomic<int> CameraControlApp::defaults_configured_;
+std::recursive_mutex ConfigApp::lock_;
 
 OpenLiveStacker::OpenLiveStacker(std::string data_dir)
 {
@@ -85,7 +87,7 @@ void OpenLiveStacker::open_camera(int id)
     close_camera();
     guard g(camera_lock_);
     CamErrorCode e;
-    camera_ = std::move(driver_->open_camera(id,e));
+    camera_ = driver_->open_camera(id,e);
     e.check();
     stream_active_ = false;
 }
@@ -150,7 +152,7 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     if(driver_it == drivers.end())
         throw CamError("No such driver " + driver_name);
     int driver_id = driver_it - drivers.begin();
-    driver_ = std::move(CameraDriver::get(driver_id,external_option));
+    driver_ = CameraDriver::get(driver_id,external_option);
 
     cppcms::json::value config;
     config["service"]["api"]="http";
@@ -184,6 +186,7 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     stats_stream_app_ = new StackerStatsNotification(*web_service_);
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
     web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
+    web_service_->applications_pool().mount(cppcms::create_pool<ConfigApp>(data_dir_),cppcms::mount_point("/config((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this,video_generator_queue_),cppcms::mount_point("/camera((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<MountControlApp>(stacker_stats_queue_,this),cppcms::mount_point("/mount((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(this,data_dir_,video_generator_queue_),
@@ -269,20 +272,20 @@ void OpenLiveStacker::run()
     stacker_stats_queue_->call_on_push(stats_stream_app_->get_callback());
     plate_solving_queue_->call_on_push(set_plate_solving_image);
 
-    video_generator_thread_ = std::move(start_generator(video_generator_queue_,
+    video_generator_thread_ = start_generator(video_generator_queue_,
                                                         preprocessor_queue_,
                                                         video_display_queue_,
                                                         debug_save_queue_,
-                                                        plate_solving_queue_));
+                                                        plate_solving_queue_);
 
-    debug_save_thread_ = std::move(start_debug_saver(debug_save_queue_,stacker_stats_queue_,debug_dir_));
-    preprocessor_thread_ = std::move(start_preprocessor(preprocessor_queue_,stacker_queue_,stacker_stats_queue_));
-    stacker_thread_ = std::move(start_stacker(stacker_queue_,pp_queue_));
-    pp_thread_ = std::move(start_post_processor(pp_queue_,
+    debug_save_thread_ = start_debug_saver(debug_save_queue_,stacker_stats_queue_,debug_dir_);
+    preprocessor_thread_ = start_preprocessor(preprocessor_queue_,stacker_queue_,stacker_stats_queue_);
+    stacker_thread_ = start_stacker(stacker_queue_,pp_queue_);
+    pp_thread_ = start_post_processor(pp_queue_,
                                               stack_display_queue_,
                                               stacker_stats_queue_,
                                               plate_solving_queue_,
-                                              data_dir_));
+                                              data_dir_);
     try {
         web_service_->run();
     }

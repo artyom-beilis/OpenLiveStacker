@@ -125,6 +125,9 @@ namespace ols {
         double unsharp_sig = 3.0;
         double unsharp_strength = 1.5;
 
+        bool save_tiff = true;
+        int  save_after = 0;
+
         double source_gamma = 1.0; /// to linear space gamma
 
         std::string darks_path; /// if darks applied darks frame

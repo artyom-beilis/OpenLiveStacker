@@ -1,0 +1,19 @@
+{
+	"auto_stretch" :	true,
+	"calibration" :	false,
+    "remove_satellites" : false,
+	"darks" :	"./data/calibration/g200_s5.0.tiff",
+	"de" :	19.67777777777778,
+	"derotate" :	true,
+	"derotate_mirror" :	false,
+	"height" :	976,
+	"lat" :	31.9,
+	"lon" :	34.74,
+	"name" :	"m44_20230216_233637",
+	"ra" :	130.0916666666667,
+	"source_gamma" :	1,
+	"stretch_gamma" :	0.4,
+	"stretch_high" :	0,
+	"stretch_low" :	1,
+	"width" :	1304
+}

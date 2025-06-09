@@ -15,6 +15,7 @@
 #include "indigo_camera.h"
 #include "sync_queue.h"
 #include "fitsmat.h"
+#include "fits_guard.h"
 #include "shift_bit.h"
 
 #ifdef INDI_AS_LIBRARY
@@ -131,12 +132,12 @@ namespace ols {
             return false;
         }
         /// Camera name
-        virtual std::string name(CamErrorCode &)
+        virtual std::string name(CamErrorCode &) override
         {
             return name_;
         }
         /// Return list of suppored video formats
-        virtual std::vector<CamStreamFormat> formats(CamErrorCode &e)
+        virtual std::vector<CamStreamFormat> formats(CamErrorCode &e) override
         {
             if(!wait_ready(e))
                 return std::vector<CamStreamFormat>();
@@ -178,7 +179,7 @@ namespace ols {
         }
 
         /// Start a video stream with provided callback 
-        virtual void start_stream(CamStreamFormat format,frame_callback_type callback,CamErrorCode &e) 
+        virtual void start_stream(CamStreamFormat format,frame_callback_type callback,CamErrorCode &e) override 
         {
             guard_type g(lock_);
             unsigned int i=0;
@@ -241,20 +242,6 @@ namespace ols {
             sendNewProperty(ccd_exposure);
         }
 
-        struct TMPFIleGuard {
-            std::string fname;
-            TMPFIleGuard(void *ptr,size_t len)
-            {
-                fname = "/tmp/ols_tmp.fits";
-                std::ofstream f(fname);
-                f.write((char *)(ptr),len);
-                f.close();
-            }
-            ~TMPFIleGuard()
-            {
-                std::remove(fname.c_str());
-            }
-        };
 
         void handle_frame(INDI::PropertyBlob prop)
         {
@@ -269,24 +256,28 @@ namespace ols {
             gettimeofday(&tv,nullptr);
             frm.unix_timestamp = tv.tv_sec;
             frm.unix_timestamp += tv.tv_usec * 1e-6;
-            TMPFIleGuard g(ptr,len);
-            auto res = load_fits(g.fname);
-            auto img = res.first; 
-            frm.bayer  = res.second;
-            frm.data = img.data;
-            frm.data_size = img.rows * img.cols * img.elemSize();
-            frm.height = img.rows;
-            frm.width = img.cols;
-            frm.format = stream_.format;
-            frm.frame_counter = frame_counter_++;
-            
-            LOG("Got fits frame %dx%d channels=%d bytes_per_ch=%d\n",img.rows,img.cols,int(img.elemSize()/img.elemSize1()),int(img.elemSize1()));
-
-            if(img.elemSize1() == 2 && current_bits_ > 8 && current_bits_ < 16) {
-                shift_to16(current_bits_,(unsigned short *)frm.data,frm.data_size/2);
+            TempFileGuard g(ptr,len);
+            if(!g) {
+                LOG("Faled to save file %s\n",g.error_message);
+                return;
             }
-
             try {
+                auto res = load_fits(g.fname);
+                auto img = res.first; 
+                frm.bayer  = res.second;
+                frm.data = img.data;
+                frm.data_size = img.rows * img.cols * img.elemSize();
+                frm.height = img.rows;
+                frm.width = img.cols;
+                frm.format = stream_.format;
+                frm.frame_counter = frame_counter_++;
+                
+                LOG("Got fits frame %dx%d channels=%d bytes_per_ch=%d\n",img.rows,img.cols,int(img.elemSize()/img.elemSize1()),int(img.elemSize1()));
+
+                if(img.elemSize1() == 2 && current_bits_ > 8 && current_bits_ < 16) {
+                    shift_to16(current_bits_,(unsigned short *)frm.data,frm.data_size/2);
+                }
+
                 callback_(frm);
             }
             catch(std::exception const &e) {
@@ -298,7 +289,7 @@ namespace ols {
         }
 
         /// stop the stream - once function ends callback will not be called any more
-        virtual void stop_stream(CamErrorCode &) 
+        virtual void stop_stream(CamErrorCode &) override 
         {
             guard_type g(lock_);
             if(!streaming_)
@@ -308,7 +299,7 @@ namespace ols {
         }
 
         /// list of camera controls that the camera supports
-        virtual std::vector<CamOptionId> supported_options(CamErrorCode &e)
+        virtual std::vector<CamOptionId> supported_options(CamErrorCode &e) override
         {
             std::vector<CamOptionId> opts;
             if(!wait_ready(e)) {
@@ -319,7 +310,7 @@ namespace ols {
             }
             return opts;
         }
-        virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e)
+        virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e) override
         {
             guard_type g(lock_);
             auto p = parameters_.find(id);
@@ -412,7 +403,7 @@ namespace ols {
             }
         }
         /// set camera control
-        virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e)
+        virtual void set_parameter(CamOptionId id,double value,CamErrorCode &e) override
         {
             guard_type g(lock_);
             if(parameters_.find(id) == parameters_.end()) {
@@ -715,7 +706,7 @@ namespace ols {
         {
         }
 
-        virtual std::vector<std::string> list_cameras(CamErrorCode &)
+        virtual std::vector<std::string> list_cameras(CamErrorCode &) override
         {
             for(int i=0;i<50;i++) {
                 {
@@ -729,7 +720,7 @@ namespace ols {
             return device_names_;
         }
 
-        virtual std::unique_ptr<Camera> open_camera(int id, CamErrorCode &e)
+        virtual std::unique_ptr<Camera> open_camera(int id, CamErrorCode &e) override
         {
             guard_type g(lock_);
             if (size_t(id) >= device_names_.size())
@@ -768,9 +759,11 @@ extern "C" {
         ols::IndiCameraDriver::connection_string = s;
         return 0;
     }
-    void ols_set_indi_driver_log(char const *log_path,int /*debug*/)
+    void ols_set_indi_driver_log(char const *log_path,int debug)
     {
-        ols::error_stream = fopen(log_path,"w");
+        if(debug) {
+            ols::error_stream = fopen(log_path,"w");
+        }
     }
     ols::CameraDriver *ols_get_indi_driver(int /*unused*/,ols::CamErrorCode *e)
     {

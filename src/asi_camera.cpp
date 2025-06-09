@@ -256,7 +256,7 @@ namespace ols {
             }
                 
             stream_active_ = 1;
-            thread_ = std::move(std::thread([=]() {
+            thread_ = std::thread([=]() {
                 std::vector<unsigned char> buf(format.width*format.height*bpp);
                 while(true) {
                     ASI_ERROR_CODE status = ASIGetVideoData(info_.CameraID,buf.data(),buf.size(),500); 
@@ -272,7 +272,7 @@ namespace ols {
                         break;
                     }
                 }
-            }));
+            });
             
         }
 
@@ -332,6 +332,7 @@ namespace ols {
                 }
                 switch(cap.ControlType) {
                 case ASI_GAIN: opt_id = opt_gain; break;
+                case ASI_OFFSET: opt_id = opt_black_level; break;
                 case ASI_EXPOSURE: opt_id = opt_exp; break;
                 case ASI_WB_R: opt_id = opt_wb_r; break;
                 case ASI_WB_B: opt_id = opt_wb_b; break;
@@ -367,7 +368,6 @@ namespace ols {
                 return r;
             }
             auto cap = p->second;
-            memset(&r,0,sizeof(r));
             r.option = id;
             long val;
             ASI_BOOL auto_val;
@@ -402,6 +402,7 @@ namespace ols {
                 }
                 break;
             case opt_gain:
+            case opt_black_level:
             case opt_wb_r:
             case opt_wb_b:
                 {
@@ -511,6 +512,7 @@ namespace ols {
             case opt_wb_b:
             case opt_cooler_target:
             case opt_cooler_on:
+            case opt_black_level:
             case opt_fan_on:
             case opt_cooler_power_perc:
                 code = ASISetControlValue(info_.CameraID,cap.ControlType,long(value),ASI_FALSE);
