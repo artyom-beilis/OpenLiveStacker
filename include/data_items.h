@@ -55,6 +55,7 @@ namespace ols {
     struct CameraFrame : public QueueData {
         CamStreamFormat format;
         CamBayerType bayer = bayer_na;
+	CamByteOrder byteorder = byteorder_bgr;
         double timestamp;
         std::shared_ptr<VideoFrame> source_frame;
         std::shared_ptr<VideoFrame> jpeg_frame;

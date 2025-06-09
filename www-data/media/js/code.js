@@ -903,6 +903,7 @@ function updateAllDependent(optid,value)
         updateDependent('wb',enable);
         updateDependent('wb_r',enable);
         updateDependent('wb_b',enable);
+        updateDependent('tint',enable);
     }
 }
 
@@ -964,7 +965,7 @@ function prepareControls(ctls)
             aexp_on = ctl.cur != 0;
             console.log('AEXP on=' + aexp_on);
         }
-        else if(ctl.option_id == 'wb' || ctl.option_id == 'wb_r' || ctl.option_id == 'wb_b') {
+        else if(ctl.option_id == 'wb' || ctl.option_id == 'wb_r' || ctl.option_id == 'wb_b' || ctl.option_id == 'tint') {
             if(has_awb && awb_on)
                 disabled = true;
         }
@@ -2823,7 +2824,7 @@ function newProfileOptions(ctls)
             has_ae = true;
         if((ctl.option_id == 'exp' || ctl.option_id == 'gain') && has_ae)
             continue;
-        if((ctl.option_id == 'wb' || ctl.option_id == 'wb_r' || ctl.option_id == 'wb_b') && has_awb)
+        if((ctl.option_id == 'wb' || ctl.option_id == 'wb_r' || ctl.option_id == 'wb_b' || ctl.option_id == 'tint') && has_awb)
             continue;
         var str = `<li id="prof_opt_${ctl.option_id}">${ctl.name}: ${ctl.cur} <button onclick="deleteProfOpt('${ctl.option_id}');">del</button></li>\n`;
         res = res + str;
