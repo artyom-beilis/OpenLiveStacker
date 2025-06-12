@@ -805,27 +805,34 @@ namespace {
             }
 
             if(check_flip_for_RA(RA_)) {
-                if(flip_ == on_meridian_stop) {
-                    LOGP("Meridian reached: stopping per configuration\n");
-                    abort();
-                    if(callback_) {
-                        callback_(EqCoord{0,0},AltAzCoord{0,0},"Aborting motion, meridian reached");
-                    }
-                }
-                else {
-                    LOGP("Meridian reached: starting flip\n");
-                    MountErrorCode e;
-                    go_to_jnow_no_check(coord,e);
-                    if(callback_) {
-                        if(e) {
-                            callback_(EqCoord{0,0},AltAzCoord{0,0},"Flip failed: " + e.message());
-                        }
-                        else {
-                            callback_(EqCoord{0,0},AltAzCoord{0,0},"Initiating meridian flip");
+                flip_detected_count_ ++;
+                LOGP("On wrong side of meridian, count %d\n",flip_detected_count_);
+                if(flip_detected_count_ >= 5) {
+                    if(flip_ == on_meridian_stop) {
+                        LOGP("Meridian reached: stopping per configuration\n");
+                        abort();
+                        if(callback_) {
+                            callback_(EqCoord{0,0},AltAzCoord{0,0},"Aborting motion, meridian reached");
                         }
                     }
+                    else {
+                        LOGP("Meridian reached: starting flip\n");
+                        MountErrorCode e;
+                        go_to_jnow_no_check(coord,e);
+                        if(callback_) {
+                            if(e) {
+                                callback_(EqCoord{0,0},AltAzCoord{0,0},"Flip failed: " + e.message());
+                            }
+                            else {
+                                callback_(EqCoord{0,0},AltAzCoord{0,0},"Initiating meridian flip");
+                            }
+                        }
+                    }
+                    return;
                 }
-                return;
+            }
+            else {
+                flip_detected_count_ = 0;
             }
 
             double alt = altaz.Alt;
@@ -996,6 +1003,7 @@ namespace {
         double coord_update_time_ = 0.0;
         double prev_alt_ = -100;
         double minutes_to_flip_prev_ = -24*60;
+        int flip_detected_count_ = 0;
         INDI::BaseDevice device_;
     };
 
