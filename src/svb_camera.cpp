@@ -228,7 +228,12 @@ namespace ols {
             int start_y = (props_.MaxWidth/bin  - format.width) / 2;
             start_x -= start_x % 8;
             start_y -= start_y % 2;
-            SVB_ERROR_CODE code  = SVBSetROIFormatEx(info_.CameraID, start_x, start_y, format.width, format.height, bin, img_type);
+            SVB_ERROR_CODE code =  SVBSetOutputImageType(info_.CameraID,img_type);
+            if(code != SVB_SUCCESS) {
+                e = make_message("Failed to set image format",code);
+                return;
+            }
+            code  = SVBSetROIFormat(info_.CameraID, start_x, start_y, format.width, format.height, bin);
             if(code != SVB_SUCCESS) {
                 std::ostringstream ss;
                 ss << "Failed to set ROI of " << format.width << "x" << format.height;
@@ -350,14 +355,13 @@ namespace ols {
         /// get camera control
         virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e) 
         {
-            CamParam r;
+            CamParam r = CamParam();
             auto p = ops_map_.find(id);
             if(p==ops_map_.end()) {
                 e="Unsupported option";
                 return r;
             }
             auto cap = p->second;
-            memset(&r,0,sizeof(r));
             r.option = id;
             long val;
             SVB_BOOL auto_val;
