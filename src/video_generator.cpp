@@ -126,7 +126,13 @@ namespace ols {
                 break;
             case stream_rgb24:
                 {
-                    cv::Mat rgb(frame->format.height,frame->format.width,CV_8UC3,frame->source_frame->data());
+                    cv::Mat tmp(frame->format.height,frame->format.width,CV_8UC3,frame->source_frame->data());
+                    cv::Mat rgb;
+                    if (frame->byteorder == byteorder_rgb) {
+                        cv::cvtColor(tmp,rgb,cv::COLOR_RGB2BGR);
+                    } else {
+                        rgb = tmp;
+                    }
                     frame->frame_dr = 255;
                     frame->raw = rgb;
                     handle_jpeg_stack(frame,rgb,true);
@@ -144,7 +150,7 @@ namespace ols {
             case stream_raw16:
                 {
                     cv::Mat bayer(frame->format.height,frame->format.width,(bpp==1 ? CV_8UC1 : CV_16UC1),frame->source_frame->data());
-                    cv::Mat desp,rgb;
+                   cv::Mat desp,rgb;
                     if(remove_hot_pixels_) 
                         desp = remove_hot_pixels(bayer,false);
                     else
@@ -157,6 +163,27 @@ namespace ols {
                     case bayer_na:  cv::cvtColor(desp,rgb,cv::COLOR_GRAY2BGR);    break; // handle case when indigo reports raw but it actually mono
                     default:
                         BOOSTER_ERROR("stacker") << "Invalid bayer patter";
+                    }
+                    if (frame->byteorder == byteorder_rgb) {
+                        switch(frame->bayer) {
+                        case bayer_rg:  cv::cvtColor(desp,rgb,cv::COLOR_BayerBG2RGB); break; // COLOR_BayerRGGB2RGB = COLOR_BayerBG2RGB
+                        case bayer_gr:  cv::cvtColor(desp,rgb,cv::COLOR_BayerGB2RGB); break; // COLOR_BayerGRBG2RGB = COLOR_BayerGB2RGB
+                        case bayer_bg:  cv::cvtColor(desp,rgb,cv::COLOR_BayerRG2RGB); break; // COLOR_BayerBGGR2RGB = COLOR_BayerRG2RGB
+                        case bayer_gb:  cv::cvtColor(desp,rgb,cv::COLOR_BayerGR2RGB); break; // COLOR_BayerGBRG2RGB = COLOR_BayerGR2RGB
+                        case bayer_na:  cv::cvtColor(desp,rgb,cv::COLOR_GRAY2RGB);    break; // handle case when indigo reports raw but it actually mono
+                        default:
+                            BOOSTER_ERROR("stacker") << "Invalid bayer patter";
+                        }
+                    } else {
+                        switch(frame->bayer) {
+                        case bayer_rg:  cv::cvtColor(desp,rgb,cv::COLOR_BayerBG2BGR); break; // COLOR_BayerRGGB2BGR = COLOR_BayerBG2BGR
+                        case bayer_gr:  cv::cvtColor(desp,rgb,cv::COLOR_BayerGB2BGR); break; // COLOR_BayerGRBG2BGR = COLOR_BayerGB2BGR
+                        case bayer_bg:  cv::cvtColor(desp,rgb,cv::COLOR_BayerRG2BGR); break; // COLOR_BayerBGGR2BGR = COLOR_BayerRG2BGR
+                        case bayer_gb:  cv::cvtColor(desp,rgb,cv::COLOR_BayerGR2BGR); break; // COLOR_BayerGBRG2BGR = COLOR_BayerGR2BGR
+                        case bayer_na:  cv::cvtColor(desp,rgb,cv::COLOR_GRAY2BGR);    break; // handle case when indigo reports raw but it actually mono
+                        default:
+                            BOOSTER_ERROR("stacker") << "Invalid bayer patter";
+                        }
                     }
                     frame->frame_dr = (bpp==1 ? 255 : 65535);
                     handle_jpeg_stack(frame,rgb,false);
