@@ -1270,7 +1270,7 @@ namespace ols
                 }
                 if(!sscanf(line,"%d,%d,%x,%x",&bus,&dev,&vendor_id,&product_id))
                     break;
-                char const *name = len >= (3*2+4*2+4) ? line +  (3*2+4*2+4) : "Camera";
+                std::string name = len >= (3*2+4*2+4) ? line +  (3*2+4*2+4) : "Camera";
                 int tp_vid = vendor_id, tp_pid = product_id;
                 oem_to_touptek(tp_vid,tp_pid);
                 // non OEM - skip
@@ -1278,9 +1278,8 @@ namespace ols
                     continue;
                 if(N>=TOUPCAM_MAX)
                     continue;
-                printf("GOT [%s]\n",name);
                 snprintf(info[N].id,sizeof(info[N].id),"tp-%d-%d-%d-%d",bus,dev,tp_vid,tp_pid);
-                snprintf(info[N].displayname,sizeof(info[N].displayname),"%s",name);
+                snprintf(info[N].displayname,sizeof(info[N].displayname),"%s",name.c_str());
                 info[N].model = Toupcam_get_Model(0x547,tp_pid);
                 if(!info[N].model)
                     continue;

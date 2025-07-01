@@ -18,6 +18,7 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
         - Sim - simulation for development
     - Linux Only:
         - Indigo CCD
+        - SVBony
     - Planned to be supported:
         - SVBony - linux only (android SDK was not released yet by SVBony)
         - QHY - linux and Android

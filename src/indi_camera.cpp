@@ -310,21 +310,63 @@ namespace ols {
             }
             return opts;
         }
+
+        void handle_iso_switch(INDI::PropertySwitch prop)
+        {
+            // Só adiciona uma vez
+            if (parameters_.find(opt_iso) != parameters_.end())
+                return;
+
+            CamParam r;
+            r.option = opt_iso;
+            r.type = type_selection;
+            r.names.clear();
+            int cur_idx = 0;
+            for (size_t i = 0; i < prop.size(); ++i)
+            {
+                r.names.push_back(prop[i].getLabel());
+                if (prop[i].getState() == ISS_ON)
+                    cur_idx = int(i);
+            }
+            r.min_val = 0;
+            r.max_val = int(prop.size()) - 1;
+            r.step_size = 1;
+            r.cur_val = cur_idx;
+            r.def_val = cur_idx;
+            r.read_only = (prop.getPermission() == IP_RO);
+            parameters_[opt_iso] = r;
+        }
+        
+
+        
         virtual CamParam get_parameter(CamOptionId id,bool /*current_only*/,CamErrorCode &e) override
         {
             guard_type g(lock_);
-            auto p = parameters_.find(id);
-            if(p==parameters_.end()) {
+            auto it = parameters_.find(id);
+            if(it == parameters_.end()) {
                 e = "Unsupported parameters";
                 return CamParam();
             }
-            return p->second;
+            if(id == opt_iso) {
+                INDI::PropertySwitch prop = device_.getProperty("CCD_ISO");
+                if(prop.isValid() && prop.size() > 0) {
+                    CamParam r = it->second;
+                    int cur_idx = 0;
+                    for(size_t i=0; i<prop.size(); ++i) {
+                        if(prop[i].getState() == ISS_ON) {
+                            cur_idx = int(i);
+                            break;
         }
-        void defer(CamOptionId id,double value)
-        {
-            deferred_.insert(id);
-            LOG("Deferring option %s:%f\n",cam_option_id_to_string_id(id).c_str(),value);
         }
+                    r.cur_val = cur_idx;
+                    return r;
+                }
+            }
+            return it->second;
+        }
+        
+
+        
         void set_indi_parameter(CamOptionId id)
         {
             char const *control_name = nullptr;
@@ -368,6 +410,30 @@ namespace ols {
                     prop_name = "CCD_COOLER";
                 }
                 break;
+            
+            case opt_iso:
+                {
+                    INDI::PropertySwitch prop = device_.getProperty("CCD_ISO");
+                    if (!prop.isValid() || prop.size() < 1)
+                    {
+                        LOG("Can't find CCD_ISO property\n");
+                        return;
+                    }
+                    int idx = int(parameters_[opt_iso].cur_val);
+                    if (idx < 0 || idx >= int(prop.size()))
+                    {
+                        LOG("ISO idx out of range\n");
+                        return;
+                    }
+                    // Desliga todos, liga só o pretendido
+                    for (size_t i = 0; i < prop.size(); ++i)
+                        prop[i].setState(i == size_t(idx) ? ISS_ON : ISS_OFF);
+
+                    sendNewProperty(prop);
+                    LOG("Set CCD_ISO to %s\n", prop[idx].getLabel());
+                    return;
+                }
+            
             default:
                 ;
             }
@@ -414,6 +480,13 @@ namespace ols {
             switch(id) {
             case opt_exp:
                 break;
+            case opt_iso:
+                if(streaming_) {
+                    defer(id, value);
+                } else {
+                    set_indi_parameter(id);
+                }
+                break;
             default:
                 if(streaming_) {
                     defer(id,value);
@@ -422,6 +495,13 @@ namespace ols {
                     set_indi_parameter(id);
                 }
             }
+        }
+        
+
+        void defer(CamOptionId id,double value)
+        {
+            deferred_.insert(id);
+            LOG("Deferring option %s:%f\n",cam_option_id_to_string_id(id).c_str(),value);
         }
 
     protected:
@@ -589,6 +669,9 @@ namespace ols {
             }
             else if(prop.isNameMatch("CCD_EXPOSURE")) {
                 handle_exposure(prop);
+            }
+            else if(prop.isNameMatch("CCD_ISO") && prop.getType() == INDI_SWITCH) {
+                handle_iso_switch(prop);
             }
             else if(prop.isNameMatch("CCD_FRAME")) {
                 handle_ccd_frame(prop);

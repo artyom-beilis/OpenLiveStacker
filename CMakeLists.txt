@@ -10,6 +10,9 @@ option(USE_INDI_AS_LIBRARY "Use special variand of indi - embedded server/client
 
 find_library(ASI_CAMERA_LIB ASICamera2)
 find_path(ASI_CAMERA_HDR ASICamera2.h)
+find_library(LIBUSB_LIB usb-1.0) 
+find_library(SVB_CAMERA_LIB SVBCameraSDK) 
+find_path(SVB_CAMERA_HDR SVBCameraSDK.h)
 
 if(USE_INDI_AS_LIBRARY)
     find_library(INDI_LIB1 indi_unified_client_server HINT /opt/indi_as_library/lib)
@@ -157,6 +160,19 @@ if(ASI_CAMERA_HDR AND ASI_CAMERA_LIB)
 else()
     message("- No ASI SDK header/lib found")
 endif()
+
+if(SVB_CAMERA_HDR AND SVB_CAMERA_LIB AND LIBUSB_LIB )
+    include_directories(${SVB_CAMERA_HDR})
+    add_library(ols_driver_svb SHARED src/svb_camera.cpp)
+    target_link_libraries(ols_driver_svb ${SVB_CAMERA_LIB} ${LIBUSB_LIB})
+    install(TARGETS ols_driver_svb
+            LIBRARY DESTINATION lib
+    )
+    message("- Building SVBony Driver")
+else()
+    message("- No SVBony SDK header/lib found")
+endif()
+
 
 if(TOUPCAM_CAMERA_HDR AND TOUPCAM_CAMERA_LIB)
     include_directories(${TOUPCAM_CAMERA_HDR})
