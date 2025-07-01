@@ -425,6 +425,9 @@
             <button class="mount_connected_display_inline" style="display:none" onclick="solveSyncAndGoTo();" >Solve, Sync &amp; GoTo </button>
             <button onclick="polarAlign();" >Pol. Align</button>
         </p>
+        <p class="polar_align_second" style="display:none" >
+            <button onclick="polarAlign2nd()" >Polar Align 2nd Point</button>
+        </p>
         <p>Object <input class="wide_input saved_input" id="solver_object" type="text" oninput='updateSolverRADE(this.value)'  value="" /> (M31, RA, DEC)</p>
         <p>
             <span class="nowr" >RA <input class="val_input" id="solver_ra" type="text" value="" disabled/>,</span>
@@ -451,6 +454,9 @@
         </p>
         <p>Status: <span id="solver_status"></span></p>
         <p><button onclick="solverRestart();" >Restart</button><input id="solver_auto_restart" type="checkbox" onchange="startSolvingIfNeeded();" /> <label for="solver_auto_restart">Continuous resolving every </label><input class="val_input saved_input" type="number" min="1" max="5" step="1" value="1" id="restart_solver_timeout" />s</p>
+        <p class="polar_align_second" style="display:none" >
+            <button onclick="polarAlign2nd()" >Polar Align 2nd Point</button>
+        </p>
     </div>
 </div>
 <div class="alert_div" id="error_alert" style=" ">

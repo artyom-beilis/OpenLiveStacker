@@ -2093,12 +2093,32 @@ function plateSolveWithOpt(background,result_callback,sync_op,flag='normal')
     restCall('post','/api/plate_solver',req,(r) => { solveResult(r,result_callback,show_image); })
 }
 
+function polarAlignSetStatus(v)
+{
+    g_polar_align_status = v;
+    var buts = document.getElementsByClassName('polar_align_second');
+    for(var i=0;i<buts.length;i++) {
+        buts[i].style.display=v == 1 ? 'block' : 'none';
+    }
+}
+
 function polarAlign()
 {
-    g_polar_align_status = 0;
+    polarAlignSetStatus(0);
     document.getElementById('solver_object').value = '';
     updateSolverRADE('');
     requestConfirmation("Make sure the scope is pointed close to the pole",polarAlignExec);
+}
+
+
+function polarAlign2nd()
+{
+    if(g_polar_align_status != 1) {
+        showError("Restart Align");
+        polarAlignSetStatus(0);
+        return;
+    }
+    polarAlignExec();
 }
 
 function polarAlignExec()
@@ -2118,28 +2138,27 @@ function polarAlignExec()
         plateSolveWithOpt(false,onPAStartCallback,false,'polar_start');
     }
     else if(g_polar_align_status == 1) {
-        plateSolveWithOpt(true,onPATargetCallback,false,'polar_find_target');
+        plateSolveWithOpt(false,onPATargetCallback,false,'polar_find_target');
     }
 }
 function onPAStartCallback(v)
 {
-    g_polar_align_status = 1;
-    requestConfirmation("Now rotate the mount around RA axis about 45 to 90 degrees and press OK",()=>{
-        polarAlignExec();
-    });
+    polarAlignSetStatus(1);
+    showAlertDialog("Now rotate the mount around RA axis about 45 to 90 degrees tap: Polar Align 2nd Point");
 }
 
 function onPATargetCallback(v)
 {
-    g_polar_align_status = 0;
+    polarAlignSetStatus(0);
     var ra_str = formatRA(v.polar_target_ra / 15);
     var de_str = formatDEC(v.polar_target_de)
+    openConfigTab('solve');
     document.getElementById('solver_de').value = de_str;
     document.getElementById('solver_ra').value = ra_str
     saveInputValue('solver_ra');
     saveInputValue('solver_de');
     document.getElementById('solver_auto_restart').checked = true;
-    requestConfirmation(`Error Alt ${v.polar_error_alt.toFixed(2)}°/Az ${v.polar_error_az.toFixed(2)}° Adjust the mount alt/az till you reach the target`,()=>{});
+    showAlertDialog(`Error Alt ${v.polar_error_alt.toFixed(2)}°/Az ${v.polar_error_az.toFixed(2)}° Adjust the mount alt/az till you reach the target`)
 }
 
 function plateSolve()
