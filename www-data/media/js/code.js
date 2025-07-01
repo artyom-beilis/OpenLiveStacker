@@ -39,6 +39,7 @@ var g_stretch = {
 
 var g_config_storage = null;
 var g_config_profiles = null;
+var g_polar_align_status = 0;
 
 
 function zoom(offset)
@@ -2024,12 +2025,14 @@ function toggleFS(fs)
 }
 
 
-function plateSolveWithOpt(background,result_callback,sync_op)
+function plateSolveWithOpt(background,result_callback,sync_op,flag='normal')
 {
     var req;
     try {
         var ra,de,mount_ra,mount_de,fov,rad,lat,non,timeout;
         var use_mount_pos = g_mount_connected && document.getElementById('use_mount_coordinates').checked;
+        if (flag != 'normal')
+            use_mount_pos = false;
         ra = parseRA(document.getElementById('solver_ra').value);
         de = parseDEC(document.getElementById('solver_de').value);
         if(use_mount_pos) {
@@ -2065,7 +2068,8 @@ function plateSolveWithOpt(background,result_callback,sync_op)
             "rad" : rad,
             "lat" : lat,
             "lon" : lon,
-            "timeout" : timeout
+            "timeout" : timeout,
+            "flag" : flag
         };
         JSON.stringify(req); // check it is OK
     }
@@ -2085,7 +2089,57 @@ function plateSolveWithOpt(background,result_callback,sync_op)
         document.getElementById('solver_result').style.display = 'none';
     }
     g_solving = true;
-    restCall('post','/api/plate_solver',req,(r) => { solveResult(r,result_callback); })
+    var show_image = flag != 'polar_start';
+    restCall('post','/api/plate_solver',req,(r) => { solveResult(r,result_callback,show_image); })
+}
+
+function polarAlign()
+{
+    g_polar_align_status = 0;
+    document.getElementById('solver_object').value = '';
+    updateSolverRADE('');
+    requestConfirmation("Make sure the scope is pointed close to the pole",polarAlignExec);
+}
+
+function polarAlignExec()
+{
+    var lat = parseFloat(getVal("lat"));
+    var lon = parseFloat(getVal("lon"));
+    if(isNaN(lat) || isNaN(lon)) {
+        showError("Polar Alignment needs geolocation")
+        return;
+    }
+    var dec_val = (lat > 0? "+":"-") + '89:59:00';
+    document.getElementById('solver_de').value = dec_val;
+    document.getElementById('solver_ra').value = '00:00:00';
+    saveInputValue('solver_ra');
+    saveInputValue('solver_de');
+    if(g_polar_align_status == 0) {
+        plateSolveWithOpt(false,onPAStartCallback,false,'polar_start');
+    }
+    else if(g_polar_align_status == 1) {
+        plateSolveWithOpt(true,onPATargetCallback,false,'polar_find_target');
+    }
+}
+function onPAStartCallback(v)
+{
+    g_polar_align_status = 1;
+    requestConfirmation("Now rotate the mount around RA axis about 45 to 90 degrees and press OK",()=>{
+        polarAlignExec();
+    });
+}
+
+function onPATargetCallback(v)
+{
+    g_polar_align_status = 0;
+    var ra_str = formatRA(v.polar_target_ra / 15);
+    var de_str = formatDEC(v.polar_target_de)
+    document.getElementById('solver_de').value = de_str;
+    document.getElementById('solver_ra').value = ra_str
+    saveInputValue('solver_ra');
+    saveInputValue('solver_de');
+    document.getElementById('solver_auto_restart').checked = true;
+    requestConfirmation(`Error Alt ${v.polar_error_alt.toFixed(2)}°/Az ${v.polar_error_az.toFixed(2)}° Adjust the mount alt/az till you reach the target`,()=>{});
 }
 
 function plateSolve()
@@ -2265,7 +2319,7 @@ function solveSyncAndGoTo()
 
 
 
-function solveResult(v,callback)
+function solveResult(v,callback,showImage  = true)
 {
     g_solving = false;
     g_solver_result = null;
@@ -2273,7 +2327,7 @@ function solveResult(v,callback)
         return;
     g_solver_result = v;
     updateSolverTable();
-    var jpeg = v.solved ? v.result_image + '?' + Date.now() : null;
+    var jpeg = (v.solved && showImage) ? v.result_image + '?' + Date.now() : null;
     if(jpeg) {
         document.getElementById('solver_result_image').src = jpeg;
     }
