@@ -29,8 +29,6 @@ var g_sync_counter = 0;
 var g_slew_direction = '';
 var g_guiding = false;
 var g_guiding_rate = {"ns":0.5,"we":0.5};
-var g_dithering_center = {"y":0,"x":0};
-var g_dithering_last = null;
 var g_mount_geolocation_updated = false;
 var g_prev_touch = null;
 var g_prev_pinch = null;
@@ -1700,7 +1698,10 @@ function startStack()
     var save_after = parseFloat(getVal("save_after"));
     if(isNaN(save_after))
         save_after = 0;
-    
+   
+    var dither_radius = 0;
+    var dither_frequency = 0;
+    var dither_delay = 0; 
     if(type == 'dso') {
         let rade = getRaDec()
         ra = rade.ra;
@@ -1712,6 +1713,24 @@ function startStack()
         image_flip =         getBVal("image_flip");
         remove_satellites =  getBVal("remove_satellites");
         remove_gradient =    getBVal("remove_gradient");
+        if(getBVal("dithering_enabled") && g_guiding) {
+            dither_radius = parseFloat(getVal("dithering_radius"));
+            dither_frequency = parseFloat(getVal("dithering_frequency"));
+            dither_delay = parseFloat(getVal("dithering_delay"));
+            if( isNaN(dither_radius)
+                || isNaN(dither_frequency)
+                || isNaN(dither_delay)
+                || dither_radius < 1 || dither_radius > 30
+                || dither_frequency < 10)
+            {
+                showError('Invalid diethering configuration')
+                return;
+            }
+            if(dither_delay * 2 > dither_frequency) {
+                showError('Dithering delay should be at most 1/2 of the frequency');
+                return;
+            }
+        }
     }
     var filters = {
         remove_first:false,
@@ -1796,6 +1815,11 @@ function startStack()
         stretch_low:        g_stretch.cut,
         stretch_high:       g_stretch.gain,
         stretch_gamma:      g_stretch.gamma,
+        dither_radius: dither_radius,
+        dither_frequency : dither_frequency,
+        dither_delay : dither_delay,
+        guide_rate_ns : g_guiding_rate.ns,
+        guide_rate_we : g_guiding_rate.we,
         type:               type,
         location : {
             lat:            lat,

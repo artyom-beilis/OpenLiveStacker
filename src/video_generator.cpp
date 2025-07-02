@@ -190,53 +190,57 @@ namespace ols {
                 return;
             }
             live_out_->push(frame);
-            if(stacking_active_)
+            if(stacking_active_ && !dither_is_progress_)
                 stack_out_->push(frame);
-            if(debug_active_ && stacking_active_)
+            if(debug_active_ && stacking_active_ && !dither_is_progress_)
                 debug_out_->push(frame);
             if(plate_solving_out_ && !stacking_in_process_)
                 plate_solving_out_->push(frame);
         }
         void stacker_ctl(std::shared_ptr<StackerControl> ctl_ptr)
         {
-                    switch(ctl_ptr->op) {
-                    case StackerControl::ctl_init:
-                        if(ctl_ptr->dither_radius > 0 && ctl_ptr->method == stack_dso) {
-                            dither_radius_ = ctl_ptr->dither_radius_;
-                            last_dither_ = 0;
-                            guide_rate_ns_ = ctl_ptr->guide_rate_ns;
-                            guide_rate_we_ = ctl_ptr->guide_rate_we;
-                            dither_frequency_ = ctl_ptr->dither_frequency;
-                            dither_delay_ = ctl_ptr->dither_delay;
-                        }
-                        else {
-                            dither_radius_ = 0;
-                        }
-                        stacking_active_ = true;
-                        remove_hot_pixels_ = ctl_ptr->remove_hot_pixels; 
-                        stacking_in_process_ = true;
-                        debug_active_ = ctl_ptr->save_inputs;
-                        break;
-                    case StackerControl::ctl_resume:
-                        stacking_active_ = true;
-                        stacking_in_process_ = true;
-                        break;
-                    case StackerControl::ctl_pause:
-                        stacking_active_ = false;
-                        stacking_in_process_ = true;
-                        break;
-                    case StackerControl::ctl_cancel:
-                        stacking_active_ = false;
-                        stacking_in_process_ = false;
-                        remove_hot_pixels_ = false;
-                        break;
-                    case StackerControl::ctl_save:
-                    case StackerControl::ctl_update:
-                        break;
+                switch(ctl_ptr->op) {
+                case StackerControl::ctl_init:
+                    if(ctl_ptr->dither_radius > 0 && ctl_ptr->method == stack_dso) {
+                        dither_radius_ = ctl_ptr->dither_radius;
+                        last_dither_ = 0;
+                        frames_dropped_ = 0;
+                        guide_rate_ns_ = ctl_ptr->guide_rate_ns;
+                        guide_rate_we_ = ctl_ptr->guide_rate_we;
+                        dither_frequency_ = ctl_ptr->dither_frequency;
+                        dither_delay_ = ctl_ptr->dither_delay;
+                        delta_ns_ = delta_we_ = 0;
+                        last_pulse_ = 0;
                     }
-                    live_out_->push(data_ptr);
-                    stack_out_->push(data_ptr);
-                    debug_out_->push(data_ptr);
+                    else {
+                        dither_radius_ = 0;
+                    }
+                    dither_is_progress_ = false;
+                    stacking_active_ = true;
+                    remove_hot_pixels_ = ctl_ptr->remove_hot_pixels; 
+                    stacking_in_process_ = true;
+                    debug_active_ = ctl_ptr->save_inputs;
+                    break;
+                case StackerControl::ctl_resume:
+                    stacking_active_ = true;
+                    stacking_in_process_ = true;
+                    break;
+                case StackerControl::ctl_pause:
+                    stacking_active_ = false;
+                    stacking_in_process_ = true;
+                    break;
+                case StackerControl::ctl_cancel:
+                    stacking_active_ = false;
+                    stacking_in_process_ = false;
+                    remove_hot_pixels_ = false;
+                    break;
+                case StackerControl::ctl_save:
+                case StackerControl::ctl_update:
+                    break;
+                }
+                live_out_->push(ctl_ptr);
+                stack_out_->push(ctl_ptr);
+                debug_out_->push(ctl_ptr);
         }
         void run()
         {
@@ -251,10 +255,10 @@ namespace ols {
                 }
                 auto frame_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
                 if(frame_ptr) {
-                    if(dither_radius_ > 0 && stacking_in_process_){
-                        handle_dither(frame_ptr->timestamp);
-                    }
                     process_frame(frame_ptr);
+                    if(dither_radius_ > 0 && stacking_in_process_){
+                        handle_dither();
+                    }
                     continue;
                 }
                 auto ctl_ptr = std::dynamic_pointer_cast<StackerControl>(data_ptr);
@@ -276,14 +280,70 @@ namespace ols {
                 BOOSTER_ERROR("stacker") << "Invalid data for video generator got " << name;
             }
         }
-        void handle_dither(double timestamp)
+        double argsec_to_pulse_ms(double asec,double guide_rate)
         {
+            double rate_arcsec_per_sec = 15.0 * guide_rate; // 15 arcseconds per second  
+            double pulse_sec = asec / rate_arcsec_per_sec;
+            double pulse_msec = pulse_sec * 1000;
+            return pulse_msec;
+        }
+
+        void make_pulse()
+        {
+            double target_ns,target_we;
+            do {
+                target_ns = (2 * double(rand()) / RAND_MAX - 1) * dither_radius_;
+                target_we = (2 * double(rand()) / RAND_MAX - 1) * dither_radius_;
+            } while(target_we*target_we + target_ns*target_ns > dither_radius_ * dither_radius_);
+            double d_ns = target_ns - delta_ns_;
+            double d_we = target_we - delta_we_;
+            delta_ns_ = target_ns;
+            delta_we_ = target_we;
+
+
+            
+            std::shared_ptr<PulseGuide> pulse(new PulseGuide());
+
+            pulse->NS_ms = argsec_to_pulse_ms(d_ns,guide_rate_ns_);
+            pulse->WE_ms = argsec_to_pulse_ms(d_we,guide_rate_we_);
+
+            BOOSTER_INFO("stacker") << "Guide pulse: NS "<<pulse->NS_ms<<"ms WE "<<pulse->WE_ms << "ms to " << delta_ns_ <<"/"<< delta_we_ << " ns/we arcsec";
+            if(guiding_out_)
+                guiding_out_->push(pulse);
+            last_pulse_ = std::max(pulse->NS_ms,pulse->WE_ms) / 1000.0;
+        }
+
+        void handle_dither()
+        {
+            double timestamp = time(nullptr);
             if(last_dither_ == 0) {
-                timestamp = last_dither_;
+                last_dither_ = timestamp;
+                dither_is_progress_ = false;
+                frames_dropped_ = 0;
                 return;
             }
-            if(timestamp - last_dither_ > dither_frequency_ && stacking_in_process_) {
-                std::shared_ptr<PulseGuide> pg = make_pulse();
+            if(!dither_is_progress_) {
+                if(timestamp - last_dither_ > dither_frequency_ + last_pulse_) {
+                    last_dither_ = timestamp;
+                    dither_is_progress_ = true;
+                    frames_dropped_ = 0;
+                    make_pulse();
+                }
+            }
+            else {
+                if(timestamp - last_dither_ > dither_delay_ + last_pulse_) {
+                    if(frames_dropped_ == 0)
+                        frames_dropped_ = 1;
+                    else
+                        dither_is_progress_ = false;
+                }
+                if(!dither_is_progress_) {
+                    std::shared_ptr<StackerControl> ctl_ptr(new StackerControl());
+                    // let know stacker something moved
+                    ctl_ptr->op = StackerControl::ctl_pause;
+                    stack_out_->push(ctl_ptr);
+                    debug_out_->push(ctl_ptr);
+                }
             }
         }
         void handle_live_ctl(std::shared_ptr<LiveControl> ctl)
@@ -298,13 +358,21 @@ namespace ols {
             }
         }
     private:
-        queue_pointer_type data_queue_, stack_out_, live_out_, debug_out_, plate_solving_out_;
+        queue_pointer_type data_queue_, stack_out_, live_out_, debug_out_, plate_solving_out_, guiding_out_;
         bool stacking_active_ = false;
         bool stacking_in_process_ = false;
         bool debug_active_ = false;
         bool remove_hot_pixels_ = false;
         bool live_auto_stretch_ = true;
         float cached_factor_ = -1;
+        double dither_radius_ = 0;
+        double delta_ns_=0,delta_we_=0;
+        double last_dither_ = 0;
+        bool dither_is_progress_ = false;
+        int frames_dropped_ = 0;
+        double dither_frequency_ = 0, dither_delay_ = 0;
+        double guide_rate_ns_ = 0.5, guide_rate_we_ = 0.5;
+        double last_pulse_ = 0;
         booster::ptime cached_factor_updated_;
     };
 
@@ -312,9 +380,10 @@ namespace ols {
                                 queue_pointer_type stacking_output,
                                 queue_pointer_type live_output,
                                 queue_pointer_type debug_save,
-                                queue_pointer_type plate_solving_out)
+                                queue_pointer_type plate_solving_out,
+                                queue_pointer_type guide_out)
     {
-        std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,stacking_output,live_output,debug_save,plate_solving_out));
+        std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,stacking_output,live_output,debug_save,plate_solving_out,guide_out));
         std::thread t([=](){vg->run();});
         return t;
     }

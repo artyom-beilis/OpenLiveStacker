@@ -188,19 +188,6 @@ void MountControlApp::get_status()
     response_["guiding_rate_we"] = we;
 }
 
-void MountControlApp::pulse_guide()
-{
-    auto g=mi_->guard();
-    auto client = check_connected();
-
-    MountErrorCode e;
-    float ns = content_.get<double>("guide_ns",0);
-    float we = content_.get<double>("guide_we",0);
-    client->pulse_guide(ns,we,e);
-    e.check();
-    
-}
-
 void MountControlApp::set_meridian_behavior()
 {
     auto g=mi_->guard();

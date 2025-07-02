@@ -193,6 +193,14 @@ namespace ols {
             cmd->filters.reg_score_percentile=content_.get("filters.reg_score_percentile",cmd->filters.reg_score_percentile);
             cmd->filters.avg_brightness_sigma=content_.get("filters.avg_brightness_sigma",cmd->filters.avg_brightness_sigma);
 
+
+            cmd->dither_radius = content_.get("dither_radius",cmd->dither_radius);
+            cmd->dither_frequency = content_.get("dither_frequency",cmd->dither_frequency);
+            cmd->dither_delay = content_.get("dither_delay",cmd->dither_delay);
+            cmd->guide_rate_ns = content_.get("guide_rate_ns",cmd->guide_rate_ns);
+            cmd->guide_rate_we = content_.get("guide_rate_we",cmd->guide_rate_we);
+
+
             if(!cmd->darks_path.empty())
                 cmd->darks_path = calibration_path_ + "/" + cmd->darks_path + ".tiff";
 

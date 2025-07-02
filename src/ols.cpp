@@ -264,18 +264,44 @@ void OpenLiveStacker::set_plate_solving_image(data_pointer_type p)
     PlateSolver::set_image(ps_frame,frame->live_is_stretched);
 }
 
+void OpenLiveStacker::guide(data_pointer_type p)
+{
+    std::shared_ptr<PulseGuide> guide_ptr = std::dynamic_pointer_cast<PulseGuide>(p);
+    if(!guide_ptr) {
+        BOOSTER_ERROR("ols") << "Wrong type for guiding";
+        return;
+    }
+    guard_type g = guard(); 
+    if(!mount_is_loaded()) {
+        BOOSTER_ERROR("ols") << "Mount is not loaded";
+        return;
+    }
+    Mount *mcl = client();
+    if(!mcl->connected()) {
+        BOOSTER_ERROR("ols") << "Mount is not connected";
+        return;
+    }
+    MountErrorCode e;
+    mcl->pulse_guide(guide_ptr->NS_ms,guide_ptr->WE_ms,e);
+    if(e) {
+        BOOSTER_ERROR("ols") << "Pulse Guide Failed " << e.message();
+    }
+}
+
 void OpenLiveStacker::run()
 {
     video_display_queue_->call_on_push(video_generator_app_->get_callback());
     stack_display_queue_->call_on_push(stacked_video_generator_app_->get_callback());
     stacker_stats_queue_->call_on_push(stats_stream_app_->get_callback());
     plate_solving_queue_->call_on_push(set_plate_solving_image);
+    guide_queue_->call_on_push([=](data_pointer_type p) { this->guide(p); });
 
     video_generator_thread_ = start_generator(video_generator_queue_,
                                                         preprocessor_queue_,
                                                         video_display_queue_,
                                                         debug_save_queue_,
-                                                        plate_solving_queue_);
+                                                        plate_solving_queue_,
+                                                        guide_queue_);
 
     debug_save_thread_ = start_debug_saver(debug_save_queue_,stacker_stats_queue_,debug_dir_);
     preprocessor_thread_ = start_preprocessor(preprocessor_queue_,stacker_queue_,stacker_stats_queue_);

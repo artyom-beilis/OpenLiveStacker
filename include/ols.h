@@ -62,6 +62,7 @@ namespace ols {
         std::string log_queues();
 
     private:
+        void guide(data_pointer_type p);
         void stop();
         void handle_video_frame(CamFrame const &cf);
         static void set_plate_solving_image(data_pointer_type p);
@@ -77,6 +78,7 @@ namespace ols {
         queue_pointer_type debug_save_queue_         = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type stacker_stats_queue_      = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type plate_solving_queue_      = std::shared_ptr<queue_type>(new queue_type());
+        queue_pointer_type guide_queue_              = std::shared_ptr<queue_type>(new queue_type());
         
         std::recursive_mutex camera_lock_;
         std::unique_ptr<Camera> camera_;
