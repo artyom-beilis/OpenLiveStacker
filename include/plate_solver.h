@@ -4,11 +4,20 @@
 #include <vector>
 #include <mutex>
 #include <memory>
+#include "plate_solver_result.h"
 
 namespace cv { class Mat; }
 namespace ols {
+
+    
+
     class PlateSolver {
     public:
+        enum SolverFlag {
+            solve_normal = 0,
+            polar_start  = 1,
+            polar_find_target = 2
+        };
         struct Result {
             double center_ra_deg;
             double center_de_deg;
@@ -17,6 +26,8 @@ namespace ols {
             int target_row;
             int target_col;
             double angle_to_target_deg;
+            SolverFlag flag;
+            PolarAlignResult polar_alignment;
         };
 
         static std::string db_path();
@@ -29,7 +40,9 @@ namespace ols {
                                         double mount_ra_deg,
                                         double mount_de_deg,
                                         double search_radius_deg,
-                                        double timeout);
+                                        double timeout,
+                                        SolverFlag flag,
+                                        double lat, double lon);
 
 
         PlateSolver(std::string const &db_path,std::string const &path_to_astap_cli);
@@ -44,7 +57,9 @@ namespace ols {
                                 double mount_ra_deg,
                                 double mount_de_deg,
                                 double search_radius_deg,
-                                double timeout);
+                                double timeout,
+                                SolverFlag flag,
+                                double lat, double lon);
             
 
         Result solve(   std::string const &img_path,
@@ -54,15 +69,20 @@ namespace ols {
                         double mount_ra_deg,
                         double mount_de_deg,
                         double search_radius_deg,
-                        double timeout);
+                        double timeout,
+                        SolverFlag flag,
+                        double lat, double lon);
     private:
+        SolverResult extract_result_from_ini(std::string const &path);
         std::string trim(std::string const &s);
+        Result make_result(SolverResult const &sr,double ra,double de);
         Result make_result(std::string const &path,double ra,double de);
         double get(std::map<std::string,double> const &vals,std::string const &name);
         std::map<std::string,double> parse_ini(std::string const &path,std::string &error);
         int run(std::vector<std::string> &opts,std::string ini_path,double timeout);
         std::string db_,exe_;
         std::string temp_dir_;
+        SolverResult saved_result_;
 
         static std::mutex lock_;
         static std::mutex img_lock_;

@@ -2,6 +2,7 @@
 #include "tiffmat.h"
 #include "util.h"
 #include "live_stretch.h"
+#include "polar_align.h"
 
 #include <cmath>
 #include <fstream>
@@ -35,7 +36,7 @@ namespace ols {
     {
         temp_dir_ = p;
     }
-    PlateSolver::Result PlateSolver::solve(std::string const &img_path,double fov,double ra,double de,double mra,double mde,double rad,double timeout)
+    PlateSolver::Result PlateSolver::solve(std::string const &img_path,double fov,double ra,double de,double mra,double mde,double rad,double timeout,SolverFlag flag,double lat, double lon)
     {
         std::vector<std::string> cmd = {
             exe_,
@@ -67,44 +68,83 @@ namespace ols {
         case 33:throw std::runtime_error("Error reading star database " + db_);
         default:throw std::runtime_error("astap returned error code " + std::to_string(status));
         }
-        return make_result(res_file,ra,de);
+        Result result;
+        switch(flag) {
+            case solve_normal: 
+                {
+                    result = make_result(res_file,ra,de);
+                }
+                break;
+            case polar_start:
+                {
+                    SolverResult sr = extract_result_from_ini(res_file);
+                    saved_result_ = sr;
+                    result = make_result(sr,ra,de);
+                }
+                break;
+            case polar_find_target:
+                {
+                    SolverResult sr = extract_result_from_ini(res_file);
+                    PolarAlignResult polar_result;
+                    if(!PA_utils::solve_polar_align(saved_result_,sr,lat,lon,polar_result))
+                        throw std::runtime_error("Failed to find rotation axis... Have you moved the scope on RA axis 45 to 90 degrees?");
+                    result = make_result(sr,polar_result.target_ra_deg,polar_result.target_de_deg);
+                    result.polar_alignment = polar_result;
+                }
+                break;
+            default:
+                throw std::runtime_error("Invalid flag");
+        }
+        result.flag = flag;
+        return result;
     }
 
-    PlateSolver::Result PlateSolver::make_result(std::string const &path,double ra,double de)
+    SolverResult PlateSolver::extract_result_from_ini(std::string const &path)
     {
         std::string err;
         std::map<std::string,double> vals = parse_ini(path,err);
         if(!vals["PLTSOLVD"])
             throw std::runtime_error("Plate solving failed:" + err);
-        double x0 = get(vals,"CRPIX1");
-        double y0 = get(vals,"CRPIX2");
-        double ra0 = get(vals,"CRVAL1");
-        double de0 = get(vals,"CRVAL2");
-        double delta_ra = (ra - ra0)*std::cos(de0/180*M_PI);
-        double delta_de = de - de0;
-        double c11 = get(vals,"CD1_1");
-        double c12 = get(vals,"CD1_2");
-        double c21 = get(vals,"CD2_1");
-        double c22 = get(vals,"CD2_2");
+        SolverResult res;
+        res.x0 = get(vals,"CRPIX1");
+        res.y0 = get(vals,"CRPIX2");
+        res.ra0 = get(vals,"CRVAL1");
+        res.de0 = get(vals,"CRVAL2");
+        res.c11 = get(vals,"CD1_1");
+        res.c12 = get(vals,"CD1_2");
+        res.c21 = get(vals,"CD2_1");
+        res.c22 = get(vals,"CD2_2");
+        return res;
+    }
+    PlateSolver::Result PlateSolver::make_result(SolverResult const &sr,double ra,double de)
+    {
+        double delta_ra = (ra - sr.ra0)*std::cos(sr.de0/180*M_PI);
+        double delta_de = de - sr.de0;
 
-        double D=1.0/(c11*c22 - c12*c21);
+        double D=1.0/(sr.c11*sr.c22 - sr.c12*sr.c21);
         double Mi[2][2] = {
-            { c22*D, -c12*D},
-            {-c21*D,  c11*D}
+            { sr.c22*D, -sr.c12*D},
+            {-sr.c21*D,  sr.c11*D}
         };
-        double xt = Mi[0][0] * delta_ra + Mi[0][1] * delta_de + x0;
-        double yt = Mi[1][0] * delta_ra + Mi[1][1] * delta_de + y0;
+        double xt = Mi[0][0] * delta_ra + Mi[0][1] * delta_de + sr.x0;
+        double yt = Mi[1][0] * delta_ra + Mi[1][1] * delta_de + sr.y0;
         double diff_deg = std::sqrt(delta_ra*delta_ra + delta_de*delta_de);
-        int rows = y0 * 2;
+        int rows = sr.y0 * 2;
         Result r;
-        r.center_col = x0;
-        r.center_row = y0;
+        r.center_col = sr.x0;
+        r.center_row = sr.y0;
         r.target_col = xt;
         r.target_row = rows - yt;
         r.angle_to_target_deg = diff_deg;
-        r.center_ra_deg = ra0;
-        r.center_de_deg = de0;
+        r.center_ra_deg = sr.ra0;
+        r.center_de_deg = sr.de0;
         return r;
+    }
+
+    PlateSolver::Result PlateSolver::make_result(std::string const &path,double ra,double de)
+    {
+        SolverResult sr = extract_result_from_ini(path);
+        return make_result(sr,ra,de);
     }
     double PlateSolver::get(std::map<std::string,double> const &vals,std::string const &name)
     {
@@ -158,11 +198,13 @@ namespace ols {
             double mount_ra_deg,
             double mount_de_deg,
             double search_radius_deg,
-            double timeout)
+            double timeout,
+            SolverFlag flag,
+            double lat, double lon)
     {
         std::string tiff = temp_dir_ + "/ols_astap_input.tiff";
         save_tiff(img,tiff);
-        auto r = solve(tiff,fov_deg,target_ra_deg,target_de_deg,mount_ra_deg,mount_de_deg,search_radius_deg,timeout);
+        auto r = solve(tiff,fov_deg,target_ra_deg,target_de_deg,mount_ra_deg,mount_de_deg,search_radius_deg,timeout,flag,lat,lon);
         if(img.channels() != 3) {
             cv::Mat tmp;
             cv::cvtColor(img,tmp,cv::COLOR_GRAY2BGR);
@@ -298,7 +340,9 @@ namespace ols {
                                         double mount_ra,
                                         double mount_de,
                                         double rad,
-                                        double timeout)
+                                        double timeout,
+                                        SolverFlag flag,
+                                        double lat,double lon)
     {
         cv::Mat img;
         bool do_stretch;
@@ -313,7 +357,7 @@ namespace ols {
             std::unique_lock<std::mutex> g(lock_);
             if(!instance_)
                 throw std::runtime_error("plate solver is not ready");
-            return instance_->solve_and_mark(img,do_stretch,jpeg_with_marks,fov,ra,de,mount_ra,mount_de,rad,timeout);
+            return instance_->solve_and_mark(img,do_stretch,jpeg_with_marks,fov,ra,de,mount_ra,mount_de,rad,timeout,flag,lat,lon);
         }
     }
 
