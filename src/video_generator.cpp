@@ -15,13 +15,15 @@ namespace ols {
                        queue_pointer_type live_output,
                        queue_pointer_type debug,
                        queue_pointer_type plate_solving_output,
-                       queue_pointer_type guiding_output): 
+                       queue_pointer_type guiding_output,
+                       queue_pointer_type message_output): 
             data_queue_(queue),
             stack_out_(stacking_output),
             live_out_(live_output),
             debug_out_(debug),
             plate_solving_out_(plate_solving_output),
-            guiding_out_(guiding_output)
+            guiding_out_(guiding_output),
+            msg_out_(message_output)
         {
         }
         void handle_jpeg_stack(std::shared_ptr<CameraFrame> frame,cv::Mat image,bool copy)
@@ -183,6 +185,7 @@ namespace ols {
                     char const *end = begin + frame->source_frame->size();
                     std::string msg(begin,end);
                     BOOSTER_ERROR("stacker") << "Got frame with error " << msg;
+                    notify("Frame Error " + msg,0,true);
                     return;
                 }
             default:
@@ -313,6 +316,24 @@ namespace ols {
             last_pulse_ = std::max(pulse->NS_ms,pulse->WE_ms) / 1000.0;
         }
 
+        void notify(std::string const &msg,double time,bool is_error=false)
+        {
+            if(!msg_out_)
+                return;
+            if(is_error)  {
+                auto err = std::make_shared<ErrorNotificationData>();
+                err->source = "video generation";
+                err->message = msg;
+                msg_out_->push(err);
+            }
+            else {
+                auto user = std::make_shared<UserNotificationData>();
+                user->message = msg;
+                user->time = time;
+                msg_out_->push(user);
+            }
+
+        }
         void handle_dither()
         {
             double timestamp = time(nullptr);
@@ -328,14 +349,18 @@ namespace ols {
                     dither_is_progress_ = true;
                     frames_dropped_ = 0;
                     make_pulse();
+                    notify("Dithering in progress...",2);
                 }
             }
             else {
                 if(timestamp - last_dither_ > dither_delay_ + last_pulse_) {
-                    if(frames_dropped_ == 0)
+                    if(frames_dropped_ == 0) {
                         frames_dropped_ = 1;
-                    else
+                    }
+                    else {
                         dither_is_progress_ = false;
+                        notify("Dithering completed",1);
+                    }
                 }
                 if(!dither_is_progress_) {
                     std::shared_ptr<StackerControl> ctl_ptr(new StackerControl());
@@ -358,7 +383,7 @@ namespace ols {
             }
         }
     private:
-        queue_pointer_type data_queue_, stack_out_, live_out_, debug_out_, plate_solving_out_, guiding_out_;
+        queue_pointer_type data_queue_, stack_out_, live_out_, debug_out_, plate_solving_out_, guiding_out_, msg_out_;
         bool stacking_active_ = false;
         bool stacking_in_process_ = false;
         bool debug_active_ = false;
@@ -381,9 +406,10 @@ namespace ols {
                                 queue_pointer_type live_output,
                                 queue_pointer_type debug_save,
                                 queue_pointer_type plate_solving_out,
-                                queue_pointer_type guide_out)
+                                queue_pointer_type guide_out,
+                                queue_pointer_type message_out)
     {
-        std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,stacking_output,live_output,debug_save,plate_solving_out,guide_out));
+        std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,stacking_output,live_output,debug_save,plate_solving_out,guide_out,message_out));
         std::thread t([=](){vg->run();});
         return t;
     }

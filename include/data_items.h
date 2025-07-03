@@ -40,6 +40,12 @@ namespace ols {
         virtual ~StatsData() {}
     };
 
+    struct UserNotificationData : public QueueData {
+        double time = 2;
+        std::string message;
+        virtual ~UserNotificationData() {}
+    };
+
     struct ErrorNotificationData : public QueueData {
         std::string source;
         std::string message;

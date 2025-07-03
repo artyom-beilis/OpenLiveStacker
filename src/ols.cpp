@@ -301,7 +301,8 @@ void OpenLiveStacker::run()
                                                         video_display_queue_,
                                                         debug_save_queue_,
                                                         plate_solving_queue_,
-                                                        guide_queue_);
+                                                        guide_queue_,
+                                                        stacker_stats_queue_);
 
     debug_save_thread_ = start_debug_saver(debug_save_queue_,stacker_stats_queue_,debug_dir_);
     preprocessor_thread_ = start_preprocessor(preprocessor_queue_,stacker_queue_,stacker_stats_queue_);

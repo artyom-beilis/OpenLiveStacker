@@ -824,6 +824,9 @@ function updatePushEvents(e) {
         document.getElementById('error_notification').style.display='inline';
         g_error_messages[stats.source] = stats.message;
     }
+    else if(stats.type == 'user') {
+        showNotification(stats.message,stats.time);
+    }
     else if(stats.type == 'mount') {
         document.getElementById('mount_ra').innerHTML = stats.ra;
         document.getElementById('mount_dec').innerHTML = stats.dec;

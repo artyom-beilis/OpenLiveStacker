@@ -253,6 +253,7 @@ namespace ols {
             std::shared_ptr<StatsData> data = std::dynamic_pointer_cast<StatsData>(p);
             std::shared_ptr<ErrorNotificationData> error = std::dynamic_pointer_cast<ErrorNotificationData>(p);
             std::shared_ptr<MountPositionNotification> mount = std::dynamic_pointer_cast<MountPositionNotification>(p);
+            std::shared_ptr<UserNotificationData> user = std::dynamic_pointer_cast<UserNotificationData>(p);
             std::ostringstream ss;
             cppcms::json::value info;
             if(data) {
@@ -267,6 +268,11 @@ namespace ols {
                 info["type"] = "error";
                 info["message"] = error->message;
                 info["source"] = error->source;
+            }
+            else if(user) {
+                info["type"] = "user";
+                info["message"] = user->message;
+                info["time"] = user->time;
             }
             else if(mount) {
                 info["type"] = "mount";
