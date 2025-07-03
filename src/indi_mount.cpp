@@ -413,7 +413,7 @@ namespace {
             guard_type g(lock_);
             return eod_to_j2000(EqCoord{RA_,DEC_});
         }
-        virtual bool pulse_guiding_supported(float &ns_guide_rate, float &we_guide_rate,MountErrorCode &)
+        virtual bool pulse_guiding_supported(float &ns_guide_rate, float &we_guide_rate,MountErrorCode &) override
         {
             guard_type g(lock_);
             ns_guide_rate = -1.0f;
@@ -433,7 +433,7 @@ namespace {
             }
             return true;
         }
-        virtual void pulse_guide(float NS_ms,float WE_ms,MountErrorCode &e) 
+        virtual void pulse_guide(float NS_ms,float WE_ms,MountErrorCode &e) override 
         {
             if(NS_ms > 0) {
                 setPropNumeric("TELESCOPE_TIMED_GUIDE_NS",{
