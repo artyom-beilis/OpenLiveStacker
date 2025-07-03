@@ -1195,7 +1195,6 @@ namespace ols
             pToupcamCamera->handle_error("No packet timeout");
             break;
         default:
-            pToupcamCamera->handle_error("Callback?");
             break;
         }
     }
