@@ -5,7 +5,9 @@ digraph {
             "Data Save"
             "Live Video Stream"
             "Plate Solver"
-            "PreProcessor"
+            "PreProcessor",
+            "Stats and Errors",
+            "Dither"
     }
     "PreProcessor" -> {
         "Stacker"
@@ -25,4 +27,5 @@ digraph {
     "Stacker" [label="Stacker\nregistration, stacking"]
     "PostProcessor" [label="PostProcessor\nstretching, mjpeg"]
     "Plate Solver" [label="ASTAP\nimage storage"]
+    "Dither" [label="Mount Guide"]
 }
