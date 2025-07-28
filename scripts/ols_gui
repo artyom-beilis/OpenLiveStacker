@@ -51,6 +51,9 @@ def _default_config(install_dir = None,src_dir = None):
             "ip":"0.0.0.0",
             "port":8080
         },
+        "alpaca" : {
+            "connection" : "http://127.0.0.1:32323"
+        },
         "indi": {
             "connection" : "127.0.0.1:7624"
         },
@@ -162,7 +165,7 @@ Categories=Astronomy;Education;Science
 
 class UI:
 
-    camera_driver_names = [ 'sim', 'asi', 'toup', 'svb', 'uvc', 'gphoto2','indi', 'indigo', "wdir" ] 
+    camera_driver_names = [ 'sim', 'asi', 'toup', 'svb', 'uvc', 'gphoto2','indi', 'indigo', 'alpaca', "wdir" ] 
     
     def __init__(self):
         self.process = None
@@ -181,7 +184,7 @@ class UI:
         driver_label = ttk.Label(self.root, text = "Camera Driver:")
         driver_label.grid(column = 0, row = 0,sticky=W) 
         self.driver_select = ttk.Combobox(self.root,justify=LEFT,width=30)
-        self.driver_select['values'] = ( 'Simulated', 'ASI ZWO', 'ToupTek', 'SVBony', 'UVC', 'GPhoto2', 'Indi', 'Indigo', "Watch Directory" )
+        self.driver_select['values'] = ( 'Simulated', 'ASI ZWO', 'ToupTek', 'SVBony', 'UVC', 'GPhoto2', 'Indi', 'Indigo', 'Alpaca', "Watch Directory" )
         self.driver_select.grid(column = 1, row = 0,sticky = W)
         self.driver_select.current(self._driver_index())
         self.driver = self.camera_driver_names[self._driver_index()]
@@ -194,7 +197,8 @@ class UI:
         self.oem_label,self.oem_checbox = self._add_bool_entry('OEM:','toup.oem',row=None)
         self.indi_widgets = self._add_string_entry('Indi Addr','indi.connection',str,None)
         self.indigo_widgets = self._add_string_entry('Indigo Addr','indigo.connection',str,None)
-        self.widgets_to_hide += [self.oem_label,self.oem_checbox] + self.indi_widgets + self.indigo_widgets
+        self.alpaca_widgets = self._add_string_entry('Alpaca Addr','alpaca.connection',str,None)
+        self.widgets_to_hide += [self.oem_label,self.oem_checbox] + self.indi_widgets + self.indigo_widgets + self.alpaca_widgets
 
         self.wdir_widgets =  \
            self._add_combo_entry("Format:","wdir.format",["raw16","rgb48","rgb24","mono16","mono8"],row=None) + \
@@ -482,6 +486,13 @@ class UI:
             else:
                 self.indigo_widgets[0].grid_forget()
                 self.indigo_widgets[1].grid_forget()
+        elif self.driver == 'alpaca':
+            if is_show:
+                self.alpaca_widgets[0].grid(column=0,row=1,sticky=W)
+                self.alpaca_widgets[1].grid(column=1,row=1,sticky=W)
+            else:
+                self.alpaca_widgets[0].grid_forget()
+                self.alpaca_widgets[1].grid_forget()
         elif self.driver == "wdir":
             if is_show:
                 for i,w in enumerate(self.wdir_widgets):

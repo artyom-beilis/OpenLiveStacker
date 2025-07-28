@@ -199,6 +199,7 @@ namespace ols {
         virtual void set_lat_lon(double lat,double lon,MountErrorCode &e) = 0;
         virtual std::pair<double,double> get_lat_lon(MountErrorCode &e) = 0;
         virtual EqCoord get_current(MountErrorCode &e) = 0; 
+        /// return current and count slew rate - starting from 0
         virtual std::pair<int,int> get_slew_rate(MountErrorCode &e) = 0;
         virtual void go_to(EqCoord coord,MountErrorCode &e) = 0;
         virtual void sync(EqCoord coord,MountErrorCode &e) = 0;
@@ -227,7 +228,44 @@ namespace ols {
         }
 
     protected:
+        virtual void abort() = 0;
         
+        bool check_altitude_in_limits(double alt,MountErrorCode &e)
+        {
+            if(alt < low_alt_ || alt > high_alt_) {
+                std::ostringstream ss;
+                ss << "Altitude of the target " << alt << " is not withing limits [" <<low_alt_ << ","<<high_alt_ << "]";
+                e = ss.str();
+                return false;
+            }
+            return true;
+        }
+
+        virtual void check_alt_limits(double alt) 
+        {
+            MountErrorCode e;
+            if(!check_altitude_in_limits(alt,e)) {
+                bool call_abort = true;
+                if(alt > high_alt_) {
+                    if(prev_alt_ > -100 && prev_alt_ >= alt) {
+                        call_abort = false;
+                    }
+                }
+                else if(alt < low_alt_) {
+                    if(prev_alt_ > -100 && prev_alt_ <= alt) {
+                        call_abort = false;
+                    }
+                }
+                if(call_abort) {
+                    abort();
+                    if(callback_) {
+                        callback_(EqCoord{0,0},AltAzCoord{0,0},"Aborting motion: " + e.message());
+                    }
+                }
+            }
+            prev_alt_ = alt;
+        }
+ 
         virtual void check_alt_limits(int low,int high,MountErrorCode &e);
         void save_alt(MountErrorCode &e);
         void load_alt();
@@ -235,6 +273,7 @@ namespace ols {
 
         int high_alt_ = 90;
         int low_alt_ = -90;
+        double prev_alt_ = -100;
         std::recursive_mutex lock_;
         bool connected_ = false;
         double RA_ = 0,DEC_ = 0;

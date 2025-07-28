@@ -225,6 +225,8 @@ add_library(ols SHARED
     src/server_sent_events.cpp
     src/downloader.cpp
     src/allocator.cpp
+    src/alpaca_client.cpp
+    src/alpaca_mount.cpp
     ${OLS_EXTRA}
     )
 
@@ -239,6 +241,14 @@ if(WITH_CURL)
     target_link_libraries(ols ${LIBCURL} ${LIBZ})
 endif()
 
+if(TRUE) # Always build alpaca
+    add_library(ols_driver_alpaca SHARED src/alpaca_camera.cpp)
+    target_link_libraries(ols_driver_alpaca ols ${OPENCV_CORE})    
+    message("- Building Alpaca Camera Driver")
+    install(TARGETS ols_driver_alpaca
+            LIBRARY DESTINATION lib
+    )
+endif()
 
 if(LIBUVC)
     add_library(ols_driver_uvc SHARED src/uvc_camera.cpp)

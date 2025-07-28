@@ -1,5 +1,6 @@
 #include "mount.h"
 
+#include "alpaca_mount.h"
 #ifdef WITH_INDI 
     #include "indi_mount.h"
 #endif
@@ -55,6 +56,7 @@ namespace ols {
     {
         auto g = guard();
         if(drivers_.empty()) {
+            drivers_.push_back(DriverInfo("alpaca","http://127.0.0.1:32323",true));
 #ifdef WITH_INDI
             indi_list_drivers(drivers_,libdir_);
 #endif            
@@ -68,8 +70,15 @@ namespace ols {
         if(driver_) {
             throw MountError("The driver is already loaded");
         }
+        if(name == "alpaca") {
+            MountErrorCode e;
+            std::unique_ptr<MountDriver> m = alpaca_start_driver(opt,e);
+            e.check();
+            driver_ = std::move(m);
+            return;
+        }
 #ifdef WITH_INDI 
-        if(name.find("indi:") == 0) {
+        else if(name.find("indi:") == 0) {
             MountErrorCode e;
             std::unique_ptr<MountDriver> m = indi_start_driver(name,opt,libdir_,e);
             e.check();
