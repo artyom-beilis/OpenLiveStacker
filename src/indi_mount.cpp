@@ -160,7 +160,7 @@ namespace {
             return AltAzCoord{altaz.altitude,altaz.azimuth};
         }
 
-        void abort()
+        virtual void abort() override
         {
             MountErrorCode e;
             setPropSwitch("TELESCOPE_ABORT_MOTION","ABORT",e,true);

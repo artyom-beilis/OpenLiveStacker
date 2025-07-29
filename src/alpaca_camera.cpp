@@ -510,18 +510,24 @@ namespace ols {
     class AlpacaCameraDriver : public CameraDriver {
     public:
         static std::string connection_string;
-        AlpacaCameraDriver() : 
-            client_(AlpacaCameraDriver::connection_string,"camera")
+        AlpacaCameraDriver() 
         {
-            if(error_stream)
-                client_.set_logf(error_stream);
+        }
+        AlpacaClient &client()
+        {
+            if(!client_) {
+                client_.reset(new AlpacaClient(AlpacaCameraDriver::connection_string,"camera"));
+                if(error_stream)
+                    client_->set_logf(error_stream);
+            }
+            return *client_;
         }
         virtual std::vector<std::string> list_cameras(CamErrorCode &e) 
         {
             try {
                 names_.clear();
                 ids_.clear();
-                auto devices = client_.list_devices();
+                auto devices = client().list_devices();
                 for(auto d :devices) {
                     names_.push_back(d.first);
                     ids_.push_back(d.second);
@@ -539,7 +545,7 @@ namespace ols {
                 if(size_t(id) >= names_.size()) {
                     throw std::runtime_error("No such camera " + std::to_string(id));
                 }
-                std::unique_ptr<Camera> cam(new AlpacaCamera(AlpacaCameraDriver::connection_string,ids_[id],names_[id]));
+                std::unique_ptr<Camera> cam(new AlpacaCamera(client().base_url(),ids_[id],names_[id]));
                 return cam;
             }
             catch(std::exception const &ex) {
@@ -551,7 +557,7 @@ namespace ols {
     private:
         std::vector<int> ids_;
         std::vector<std::string> names_;
-        AlpacaClient client_;
+        std::unique_ptr<AlpacaClient> client_;
     };
     std::string AlpacaCameraDriver::connection_string;
 }

@@ -14,18 +14,18 @@ namespace ols {
         {
             if(log_file)
                 client_.set_logf(log_file);
-	    auto devices = client_.list_devices();
-	    if(devices.empty()) {
-		throw std::runtime_error("No mount found");
-	    }
-	    client_.set_device(devices[0].second);
-	    client_.connect();
-	    if(!client_.is_connected())
-		throw std::runtime_error("Failed to connect to device");
-	    thread_ = std::thread([=]() {
-		poll();
-	    });
-	    connected_ = true;
+            auto devices = client_.list_devices();
+            if(devices.empty()) {
+                throw std::runtime_error("No mount found");
+            }
+            client_.set_device(devices[0].second);
+            client_.connect();
+            if(!client_.is_connected())
+                throw std::runtime_error("Failed to connect to device");
+            thread_ = std::thread([=]() {
+                    poll();
+            });
+            connected_ = true;
         }
         ~AlpacaMount()
         {
@@ -42,7 +42,7 @@ namespace ols {
                 fprintf(log_,"Exception %s\n",ex.what());
             }
         }
-        void abort()
+        virtual void abort() override
         {
             if(client_.get_value<bool>("/slewing"))
                 client_.put("/abortslew",{});
@@ -437,14 +437,15 @@ namespace ols {
         AlpacaMountDriver(std::string const &conn) :
             conn_(conn)
         {
-	     {
-	          AlpacaClient client(conn,"telescope");
-	          if(client.list_devices().empty()) {
-			     throw std::runtime_error("No Telescope Device Found");
-	          }
-             }
-	     create_log_file();
-	     cached_mount_.reset(new AlpacaMount(conn,log_));
+            {
+                AlpacaClient client(conn,"telescope");
+                if(client.list_devices().empty()) {
+                    throw std::runtime_error("No Telescope Device Found");
+                }
+                conn_ = client.base_url();
+            }
+            create_log_file();
+            cached_mount_.reset(new AlpacaMount(conn_,log_));
         }
         void create_log_file()
         {
@@ -479,9 +480,9 @@ namespace ols {
         {
             std::unique_ptr<Mount> m;
             try {
-		if(cached_mount_)
-		    m = std::move(cached_mount_);
-		else
+                if(cached_mount_)
+                    m = std::move(cached_mount_);
+                else
                     m.reset(new AlpacaMount(conn_,log_));
             }
             catch(std::exception const &ex) {

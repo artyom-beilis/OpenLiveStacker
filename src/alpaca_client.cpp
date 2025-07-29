@@ -27,10 +27,10 @@ namespace ols {
     {
         std::string addr;
         if(url == "auto")
-            addr = discover(type);
+            base_url_ = discover(type);
         else
-            addr = url;
-        client_.reset(new httplib::Client(addr));
+            base_url_ = url;
+        client_.reset(new httplib::Client(base_url_));
 		client_->set_connection_timeout(2,0);
 		client_->set_read_timeout(2,0);
         client_id_ = double(rand()) / RAND_MAX * 65534 + 1;

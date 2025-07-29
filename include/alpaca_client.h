@@ -45,12 +45,17 @@ namespace ols {
         cppcms::json::value get(std::string const &what);
         cppcms::json::value get(std::string const &what,std::multimap<std::string,std::string> const &params);
         void put(std::string const &where,std::multimap<std::string,std::string> const &params);
+        std::string base_url() 
+        {
+            return base_url_;
+        }
     private:
         static std::string discover(std::string const &type);
         std::multimap<std::string, std::string> std_params();
         static std::string to_lower(std::string s);
 
         std::string prefix_;
+        std::string base_url_;
         int client_id_;
         int transaction_id_ = 0;
         std::string device_type_;
