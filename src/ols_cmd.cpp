@@ -159,6 +159,9 @@ int main(int argc,char **argv)
         else if(driver == "indi") {
             driver_opt = cfg.get("indi.connection","");
         }
+        else if(driver == "alpaca") {
+            driver_opt = cfg.get("alpaca.connection","");
+        }
         server_cmd = cfg.get("start_cmd",server_cmd);
 
         std::string data_dir = cfg.get("data_dir","./data");

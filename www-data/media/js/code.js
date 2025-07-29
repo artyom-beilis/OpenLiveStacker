@@ -2753,11 +2753,16 @@ function loadMountStatus()
                 showError("Lattitude/Longitude is not defined, moust geolocation is not updated");
                 return;
             }
-            if(Math.abs(lat - data.lat) > 0.0001 || Math.abs(lon-data.lon) > data.lon) {
+	    var err = Math.max(Math.abs(lat - data.lat),Math.abs(lon-data.lon));
+            if(err > 0.02) {
                 restCall('post','/api/mount/geolocation',{"lat":lat,"lon":lon},(r)=>{
                     g_mount_geolocation_updated = true;
                     update_mnt();
-                });
+                }, 
+		(e) => {
+                    g_mount_geolocation_updated = true;
+		    showError(`Failed to update mount site location (difference ${err.toFixed(3)} degrees) : ${e}`); 
+		});
             }
         }
     });

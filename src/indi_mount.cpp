@@ -473,16 +473,6 @@ namespace {
             }
             return std::make_pair(2,4); // just some default
         }
-        bool check_altitude_in_limits(double alt,MountErrorCode &e)
-        {
-            if(alt < low_alt_ || alt > high_alt_) {
-                std::ostringstream ss;
-                ss << "Altitude of the target " << alt << " is not withing limits [" <<low_alt_ << ","<<high_alt_ << "]";
-                e = ss.str();
-                return false;
-            }
-            return true;
-        }
         void go_to_jnow_no_check(EqCoord coord,MountErrorCode &e) 
         {
             setPropSwitch("ON_COORD_SET","TRACK",e,true);
@@ -878,29 +868,7 @@ namespace {
                 flip_detected_count_ = 0;
             }
 
-            double alt = altaz.Alt;
-            MountErrorCode e;
-            if(!check_altitude_in_limits(alt,e)) {
-                bool call_abort = true;
-                if(alt > high_alt_) {
-                    if(prev_alt_ > -100 && prev_alt_ >= alt) {
-                        call_abort = false;
-                    }
-                }
-                else if(alt < low_alt_) {
-                    if(prev_alt_ > -100 && prev_alt_ <= alt) {
-                        call_abort = false;
-                    }
-                }
-                LOGP("Altitude is not withing limits %s, previous %f aborting = %d\n",e.message().c_str(),prev_alt_,int(call_abort));
-                if(call_abort) {
-                    abort();
-                    if(callback_) {
-                        callback_(EqCoord{0,0},AltAzCoord{0,0},"Aborting motion: " + e.message());
-                    }
-                }
-            }
-            prev_alt_ = alt;
+            check_alt_limits(altaz.Alt);
         }
         void set_geolocation(INDI::PropertyNumber p)
         {
@@ -1044,7 +1012,6 @@ namespace {
         bool load_alignment_on_connect_ = true;
         bool disable_serial_;
         double coord_update_time_ = 0.0;
-        double prev_alt_ = -100;
         double minutes_to_flip_prev_ = -24*60;
         int flip_detected_count_ = 0;
         INDI::BaseDevice device_;
