@@ -233,13 +233,12 @@ namespace ols {
                     continue;
                 auto addr = (struct sockaddr_in *)p->ifa_addr;
                 auto netmask = (struct sockaddr_in *)p->ifa_netmask;
-                unsigned ip = ntohl(addr->sin_addr.s_addr);
-                unsigned mask = ntohl(netmask->sin_addr.s_addr);
+                unsigned ip = addr->sin_addr.s_addr;
+                unsigned mask = netmask->sin_addr.s_addr;
                 unsigned broadcast = (ip & mask) | (~mask);
                 
                 struct in_addr bcast_addr;
-                bcast_addr.s_addr = htonl(broadcast);
-
+                bcast_addr.s_addr = broadcast;
                 char buf[INET_ADDRSTRLEN + 1] = {};
                 inet_ntop(AF_INET, &bcast_addr, buf, INET_ADDRSTRLEN);
                 fprintf(stderr,"Using %s\n",buf);
@@ -284,6 +283,7 @@ namespace ols {
                             int port = v.get("AlpacaPort",-1);
                             if(port != -1) {
                                 std::string addr = "http://" + remote_ip + ":" + std::to_string(port);
+                                fprintf(stderr,"Found Alpaca at %s\n",addr.c_str());
                                 result.insert(addr);
                             }
                         }
@@ -301,8 +301,10 @@ namespace ols {
             try {
                 AlpacaClient cl(ip,type);
                 auto res = cl.list_devices();
-                if(!res.empty())
+                if(!res.empty()) {
+                    fprintf(stderr,"Found %s at %s done\n",type.c_str(),ip.c_str());
                     return ip;
+                }
             }
             catch(std::exception const &) {
             }
