@@ -10,6 +10,8 @@ namespace ols {
     AlpacaClient::AlpacaClient(std::string const &url,std::string const &type)
     {
         client_.reset(new httplib::Client(url));
+	client_->set_connection_timeout(2,0);
+	client_->set_read_timeout(2,0);
         client_id_ = double(rand()) / RAND_MAX * 65534 + 1;
         device_type_ = to_lower(type);
     }
@@ -49,6 +51,8 @@ namespace ols {
     void AlpacaClient::get_binary_image(cv::Mat &output)
     {
         auto result = client_->Get(prefix_ + "/imagearray",{{"Accept","application/imagebytes"}});
+        if(!result)
+            throw std::runtime_error("Failed connect to " + prefix_ + "/imagearray");
         if(result->status != 200)
             throw std::runtime_error("Failed get image array statis = " + std::to_string(result->status));
         if(result->get_header_value("Content-Type") != "application/imagebytes")
@@ -123,6 +127,8 @@ namespace ols {
         par.insert(extra_params.begin(),extra_params.end());
         std::string url = prefix_ + where;
         auto res = client_->Put(url,par);
+        if(!res)
+            throw std::runtime_error("Failed connect to " + url);
         if(res->status !=200) {
             throw std::runtime_error("Failed to put for " + url + " status " + std::to_string(res->status));
         }
@@ -167,6 +173,8 @@ namespace ols {
     cppcms::json::value AlpacaClient::get_json(std::string const &url,std::multimap<std::string,std::string> const &params)
     {
         auto res = client_->Get(url,params,httplib::Headers());
+        if(!res)
+            throw std::runtime_error("Failed connect to " + url);
         if(res->status != 200)
             throw std::runtime_error("Failed status on " + url + " got " + std::to_string(res->status));
         if(log_) {

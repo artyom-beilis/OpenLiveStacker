@@ -14,18 +14,18 @@ namespace ols {
         {
             if(log_file)
                 client_.set_logf(log_file);
-            auto devices = client_.list_devices();
-            if(devices.empty()) {
-                throw std::runtime_error("No mount found");
-            }
-            client_.set_device(devices[0].second);
-            client_.connect();
-            if(!client_.is_connected())
-                throw std::runtime_error("Failed to connect to " + conn_str);
-            connected_ = true;
-            thread_ = std::thread([=]() {
-                poll();
-            });
+	    auto devices = client_.list_devices();
+	    if(devices.empty()) {
+		throw std::runtime_error("No mount found");
+	    }
+	    client_.set_device(devices[0].second);
+	    client_.connect();
+	    if(!client_.is_connected())
+		throw std::runtime_error("Failed to connect to device");
+	    thread_ = std::thread([=]() {
+		poll();
+	    });
+	    connected_ = true;
         }
         ~AlpacaMount()
         {
@@ -33,7 +33,8 @@ namespace ols {
                 guard_type g(lock_);
                 stop_ = true;
             }
-            thread_.join();
+            if(connected_)
+		    thread_.join();
         }
         void logex(std::exception const &ex)
         {
@@ -61,16 +62,24 @@ namespace ols {
                     if(stop_)
                         return;
                     if(check) {
-                        EqCoord eq;
-                        eq.RA  = client_.get_value<double>("/rightascension");
-                        eq.DEC = client_.get_value<double>("/declination");
-                        AltAzCoord altaz;
-                        altaz.Alt = client_.get_value<double>("/altitude");
-                        altaz.Az  = client_.get_value<double>("/azimuth");
-                        if(callback_) {
-                            callback_(eq,altaz,"");
-                        }
-                        check_alt_limits(altaz.Alt);
+			try {
+				EqCoord eq;
+				eq.RA  = client_.get_value<double>("/rightascension");
+				eq.DEC = client_.get_value<double>("/declination");
+				AltAzCoord altaz;
+				altaz.Alt = client_.get_value<double>("/altitude");
+				altaz.Az  = client_.get_value<double>("/azimuth");
+				if(callback_) {
+				    callback_(eq,altaz,"");
+				}
+				check_alt_limits(altaz.Alt);
+			}
+			catch(std::exception const &e) {
+			    if(callback_) {
+			        callback_(EqCoord(),AltAzCoord(),
+						std::string("Failed to fetch mount info: ") + e.what());
+			    }
+			}
                     }
                 }
                 usleep(500000);
@@ -396,7 +405,14 @@ namespace ols {
         AlpacaMountDriver(std::string const &conn) :
             conn_(conn)
         {
-            create_log_file();
+	     {
+	          AlpacaClient client(conn,"telescope");
+	          if(client.list_devices().empty()) {
+			     throw std::runtime_error("No Telescope Device Found");
+	          }
+             }
+	     create_log_file();
+	     cached_mount_.reset(new AlpacaMount(conn,log_));
         }
         void create_log_file()
         {
@@ -431,7 +447,10 @@ namespace ols {
         {
             std::unique_ptr<Mount> m;
             try {
-                m.reset(new AlpacaMount(conn_,log_));
+		if(cached_mount_)
+		    m = std::move(cached_mount_);
+		else
+                    m.reset(new AlpacaMount(conn_,log_));
             }
             catch(std::exception const &ex) {
                 e = ex;
@@ -450,14 +469,21 @@ namespace ols {
             shutdown();
         }
     private:
+	std::unique_ptr<Mount> cached_mount_;
         FILE *log_ = nullptr;
         std::string conn_;
     };
     
-    std::unique_ptr<MountDriver> alpaca_start_driver(std::string const &opt,MountErrorCode &)
+    std::unique_ptr<MountDriver> alpaca_start_driver(std::string const &opt,MountErrorCode &e)
     {
-        std::unique_ptr<MountDriver> d(new AlpacaMountDriver(opt));
-        return d;
+	try {
+            std::unique_ptr<MountDriver> d(new AlpacaMountDriver(opt));
+            return d;
+	}
+	catch(std::exception const &ex) {
+	    e = ex;
+	    return std::unique_ptr<MountDriver>();
+	}
     }
 
 }

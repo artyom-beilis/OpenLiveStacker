@@ -101,7 +101,7 @@ namespace ols {
                     throw std::runtime_error("Unsupported sensor type " + std::to_string(sensortype));
                 }
 
-                for(int bin=1;bin<max_bin;bin++) {
+                for(int bin=1;bin<=max_bin;bin++) {
                     int divisor = sensortype == 2 ? 2 : 1;
                     if(bin == 1)
                         divisor = 1;
