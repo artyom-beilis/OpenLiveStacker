@@ -32,7 +32,13 @@ namespace ols {
             reading_rest,
         }; 
 
-        struct __attribute__((__packed__)) Header {
+#ifdef _WIN32
+#pragma pack(push,1)
+#define PACKED
+#else
+#define PACKED  __attribute__((__packed__))
+#endif
+        struct PACKED Header {
             uint32_t signature;
             uint16_t version;
             uint16_t flags;
@@ -44,7 +50,9 @@ namespace ols {
             uint16_t fname_length;
             uint16_t extra_length;
         };
-
+#ifdef _WIN32
+#pragma pack(pop)
+#endif
         char const *get_error() noexcept
         {
             return error_;

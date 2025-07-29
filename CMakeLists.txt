@@ -6,7 +6,8 @@ if(NOT WIN32)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2 -g")
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
 else()
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDLL_EXPORT -Wall -O2 -D_USE_MATH_DEFINES")
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDLL_EXPORT /wd4267 /wd4244 /wd4101 /wd4141 -O2 -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS ")
 endif()
 option(OPENCV_ROOT "Path to OpenCV Library" "")
 option(NO_SSE4 "Disable SSE 4.1/4.3 on x86/x86_64 builds" OFF)
@@ -102,7 +103,7 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
 else()
     message("CPU: ${CMAKE_SYSTEM_PROCESSOR}")
     add_definitions(-DOLS_ARCH="${CMAKE_SYSTEM_PROCESSOR}")
-    if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86") 
+    if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x64" OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86") 
         add_definitions(-DUSE_CV_SIMD)
         set(WITH_SSE ON)
     endif()        
@@ -237,7 +238,13 @@ add_library(ols SHARED
     ${OLS_EXTRA}
     )
 
-target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBZ} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS} ${OLS_LIB_EXTRA})
+target_link_libraries(ols ${LIBTIFF} ${LIBCPPCMS} ${LIBZ} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS} ${OLS_LIB_EXTRA})
+if(NOT WIN32)
+    target_link_libraries(ols dl)
+else()
+    target_link_libraries(ols iphlpapi)
+endif()
+
 
 
 if(ANDROID_BUILD)
@@ -386,10 +393,13 @@ if(NOT ANDROID_BUILD)
     install(PROGRAMS scripts/ols_gui DESTINATION bin)
 endif()
 
-
+find_program(PYTHON NAMES python3 python)
+if(NOT PYTHON)
+    message(FATAL_ERROR "Can't build without Python interpreter")
+endif()
 
 add_custom_command(TARGET ols POST_BUILD
-    COMMAND python3 
+    COMMAND ${PYTHON} 
                 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/make_db.py 
                 ${CMAKE_CURRENT_SOURCE_DIR}/www-data/media/js/jsdb.js 
                 ${CMAKE_CURRENT_SOURCE_DIR}/www-data/media/js/vsop87_lib.js

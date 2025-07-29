@@ -9,9 +9,9 @@
 #include <booster/aio/basic_socket.h>
 
 #ifdef _WIN32
-# include <winscok2.h>
+# include <winsock2.h>
 # include <ws2tcpip.h>
-# include <iphlapi.h>
+# include <iphlpapi.h>
 #else
 # include <unistd.h>
 # include <arpa/inet.h>
@@ -220,6 +220,47 @@ namespace ols {
     }
     
     namespace {
+#ifdef _WIN32
+        std::vector<std::string> list_bcast_addresses()
+        {
+            IP_ADAPTER_ADDRESSES *addresses = nullptr, *addr = nullptr;
+            ULONG outBufLen = 15000;
+            addresses = (IP_ADAPTER_ADDRESSES *)malloc(outBufLen);
+            if (GetAdaptersAddresses(AF_INET, 
+                        GAA_FLAG_SKIP_ANYCAST |
+                        GAA_FLAG_SKIP_MULTICAST |
+                        GAA_FLAG_SKIP_DNS_SERVER,
+                        nullptr,
+                        addresses,
+                        &outBufLen) != NO_ERROR) 
+            {
+                free(addresses);
+                throw std::runtime_error("Failed to get adapter addresses");
+            }
+            std::vector<std::string> ips;
+
+            for (addr = addresses; addr != nullptr ; addr = addr->Next) {
+                if (addr->OperStatus != IfOperStatusUp) 
+                    continue;
+                IP_ADAPTER_UNICAST_ADDRESS *unicast = addr->FirstUnicastAddress;
+                if (unicast && unicast->Address.lpSockaddr->sa_family == AF_INET) {
+                    struct sockaddr_in *sa = (struct sockaddr_in*)unicast->Address.lpSockaddr;
+                    DWORD mask;
+                    ConvertLengthToIpv4Mask(unicast->OnLinkPrefixLength, &mask);
+                    uint32_t ip = (sa->sin_addr.s_addr);
+                    uint32_t broadcast = (ip & mask) | (~mask);
+                    struct in_addr bcast_addr;
+                    bcast_addr.s_addr = (broadcast);
+                    char buf[INET_ADDRSTRLEN + 1] = {};
+                    inet_ntop(AF_INET, &bcast_addr, buf, INET_ADDRSTRLEN);
+                    fprintf(stderr,"Using %s\n",buf);
+                    ips.push_back(buf);
+                }
+            }
+            free(addresses);
+            return ips;
+        }
+#else        
         std::vector<std::string> list_bcast_addresses()
         {
             struct ifaddrs *ifaddr = nullptr;
@@ -248,18 +289,19 @@ namespace ols {
             ifaddr = nullptr;
             return ips;
         }
+#endif        
         std::set<std::string> discover_ips(std::vector<std::string> const &baddr)
         {
             std::set<std::string> result;
             booster::aio::basic_socket s;
             s.open(booster::aio::pf_inet,booster::aio::sock_datagram);
             int enable = 1;
-            if(setsockopt(s.native(),SOL_SOCKET,SO_BROADCAST,&enable,sizeof(enable)) < 0)
+            if(setsockopt(s.native(),SOL_SOCKET,SO_BROADCAST,(char const *)&enable,sizeof(enable)) < 0)
                 throw std::system_error(errno, std::generic_category()); 
             struct timeval tv;
             tv.tv_sec = 0;
             tv.tv_usec = 500000;
-            if(setsockopt(s.native(),SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+            if(setsockopt(s.native(),SOL_SOCKET,SO_RCVTIMEO,(char const *)&tv,sizeof(tv)) < 0) {
                 throw std::system_error(errno, std::generic_category()); 
             }
             std::string message = "alpacadiscovery1";

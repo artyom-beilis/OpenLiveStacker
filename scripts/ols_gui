@@ -10,6 +10,12 @@ import subprocess
 
 _config_path = None
 
+def _home():
+    if sys.platform.startswith('win'):
+        return os.environ["HOME"]
+    else:
+        return os.environ["UserProfile"]
+
 def _default_config(install_dir = None,src_dir = None):
     assert (install_dir is None) != (src_dir is None)
     if install_dir is not None:
@@ -17,7 +23,7 @@ def _default_config(install_dir = None,src_dir = None):
         libdir = install_dir + "/lib"
         simdir = install_dir + "/share/ols/sim"
         www_dir = install_dir + "/share/ols/www-data"
-        data_dir = os.environ["HOME"] + "/OpenLiveStacker"
+        data_dir = _home() + "/OpenLiveStacker"
         astap_cli = install_dir + "/bin/astap_cli"
         if not os.path.exists(astap_cli):
             astap_cli = "astap_cli"
@@ -88,7 +94,7 @@ def get_default_config():
     root_dir =  os.path.dirname(scripts_dir)
     global _config_path
     if scripts_dir_name == "bin":
-        _config_path = os.environ['HOME'] + '/.ols_config.json'
+        _config_path = _home() + '/.ols_config.json'
         return _default_config(install_dir = root_dir)
     elif scripts_dir_name == "scripts":
         if root_dir == '':
@@ -131,6 +137,8 @@ def _save_config(cfg):
 
 
 def _make_desktop(icon_path):
+    if sys.platform.startswith('win'):
+        return
     exe_path = os.path.realpath(__file__)
     icon_path = os.path.realpath(icon_path)
     desktop_file = f"""
@@ -143,7 +151,7 @@ Terminal=false
 Type=Application
 Categories=Astronomy;Education;Science
 """
-    desktop_dir = os.environ['HOME'] + '/.local/share/applications'
+    desktop_dir = _home() + '/.local/share/applications'
     desktop_path = desktop_dir + '/OpenLiveStacker.desktop'
     same=False
     try:
@@ -178,7 +186,10 @@ class UI:
         self.root.title("OpenLiveStacker Server Control UI")
         icon_path = self.config["www_dir"] + "/media/img/facicon.png"
         img = PhotoImage(file=icon_path)
-        self.root.tk.call('wm', 'iconphoto', self.root._w, img)
+        if sys.platform.startswith('win'):
+            self.root.wm_iconphoto(False, img)
+        else:
+            self.root.tk.call('wm', 'iconphoto', self.root._w, img)
         _make_desktop(icon_path)
 
         driver_label = ttk.Label(self.root, text = "Camera Driver:")

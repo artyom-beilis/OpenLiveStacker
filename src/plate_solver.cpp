@@ -14,12 +14,15 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 
+#ifndef _WIN32
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <signal.h>
+#endif
+
 #include <booster/posix_time.h>
 #include <booster/log.h>
 
@@ -254,6 +257,7 @@ namespace ols {
             throw std::runtime_error("The ASTAP isn't found, so such file " + exe_); 
         }
         #endif        
+        #ifndef _WIN32
         int child_pid = fork();
         if(child_pid == 0) {
             int in_fd = open("/dev/null",O_RDONLY);
@@ -307,6 +311,9 @@ namespace ols {
                 throw std::runtime_error("Execution of the astap process failed");
             return WEXITSTATUS(status);
         }
+        #else
+        throw std::runtime_error("Not implemented!");
+        #endif
     }
 
 

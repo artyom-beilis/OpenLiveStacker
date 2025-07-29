@@ -10,7 +10,6 @@
 #include <opencv2/imgproc.hpp>
 #include "hot_removal.h"
 
-#include <unistd.h>
 
 namespace ols {
     class Simulator {
