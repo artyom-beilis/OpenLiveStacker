@@ -52,7 +52,7 @@ def _default_config(install_dir = None,src_dir = None):
             "port":8080
         },
         "alpaca" : {
-            "connection" : "http://127.0.0.1:32323"
+            "connection" : "auto"
         },
         "indi": {
             "connection" : "127.0.0.1:7624"

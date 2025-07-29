@@ -5,13 +5,34 @@
 #include <iostream>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <booster/aio/endpoint.h>
+#include <booster/aio/basic_socket.h>
+
+#ifdef _WIN32
+# include <winscok2.h>
+# include <ws2tcpip.h>
+# include <iphlapi.h>
+#else
+# include <unistd.h>
+# include <arpa/inet.h>
+# include <sys/socket.h>
+# include <ifaddrs.h>
+# include <netinet/in.h>
+# include <net/if.h>
+#endif
+
 
 namespace ols {
     AlpacaClient::AlpacaClient(std::string const &url,std::string const &type)
     {
-        client_.reset(new httplib::Client(url));
-	client_->set_connection_timeout(2,0);
-	client_->set_read_timeout(2,0);
+        std::string addr;
+        if(url == "auto")
+            addr = discover(type);
+        else
+            addr = url;
+        client_.reset(new httplib::Client(addr));
+		client_->set_connection_timeout(2,0);
+		client_->set_read_timeout(2,0);
         client_id_ = double(rand()) / RAND_MAX * 65534 + 1;
         device_type_ = to_lower(type);
     }
@@ -196,6 +217,97 @@ namespace ols {
     {
         transaction_id_ ++;
         return {{std::string("ClientID"),std::to_string(client_id_)},{std::string("ClientTransactionID"),std::to_string(transaction_id_)}};
+    }
+    
+    namespace {
+        std::vector<std::string> list_bcast_addresses()
+        {
+            struct ifaddrs *ifaddr = nullptr;
+            if(getifaddrs(&ifaddr) != 0)  {
+                throw std::runtime_error("Failed to get list of interfaces - autodetection failed");
+            }
+            std::vector<std::string> ips;
+
+            for(ifaddrs *p = ifaddr; p ; p = p->ifa_next) {
+                if(p->ifa_addr == nullptr || p->ifa_addr->sa_family != AF_INET || !(p->ifa_flags & IFF_UP))
+                    continue;
+                auto addr = (struct sockaddr_in *)p->ifa_addr;
+                auto netmask = (struct sockaddr_in *)p->ifa_netmask;
+                unsigned ip = ntohl(addr->sin_addr.s_addr);
+                unsigned mask = ntohl(netmask->sin_addr.s_addr);
+                unsigned broadcast = (ip & mask) | (~mask);
+                
+                struct in_addr bcast_addr;
+                bcast_addr.s_addr = htonl(broadcast);
+
+                char buf[INET_ADDRSTRLEN + 1] = {};
+                inet_ntop(AF_INET, &bcast_addr, buf, INET_ADDRSTRLEN);
+                fprintf(stderr,"Using %s\n",buf);
+                ips.push_back(buf);
+            }		
+            freeifaddrs(ifaddr);
+            ifaddr = nullptr;
+            return ips;
+        }
+        std::set<std::string> discover_ips(std::vector<std::string> const &baddr)
+        {
+            std::set<std::string> result;
+            booster::aio::basic_socket s;
+            s.open(booster::aio::pf_inet,booster::aio::sock_datagram);
+            int enable = 1;
+            if(setsockopt(s.native(),SOL_SOCKET,SO_BROADCAST,&enable,sizeof(enable)) < 0)
+                throw std::system_error(errno, std::generic_category()); 
+            struct timeval tv;
+            tv.tv_sec = 0;
+            tv.tv_usec = 500000;
+            if(setsockopt(s.native(),SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+                throw std::system_error(errno, std::generic_category()); 
+            }
+            std::string message = "alpacadiscovery1";
+            for(std::string const &target_ip :baddr) {
+                booster::aio::endpoint ep(target_ip,32227);
+                auto addr = ep.raw();
+                for(int attempts = 0; attempts < 2; attempts ++) {
+                    if(sendto(s.native(),message.c_str(),message.size(),0,addr.first,addr.second) < 0) {
+                        throw std::system_error(errno, std::generic_category()); 
+                    }
+                    char buffer[256] = {};
+                    struct sockaddr_in sender;
+                    socklen_t len = sizeof(sender);
+                    if(recvfrom(s.native(),buffer,sizeof(buffer) - 1,0,(struct sockaddr *)&sender,&len) > 0) {
+                        booster::aio::endpoint remote_ep;
+                        remote_ep.raw((struct sockaddr *)&sender,len);
+                        std::string remote_ip = remote_ep.ip();
+                        std::istringstream ss(buffer);
+                        cppcms::json::value v;
+                        if(v.load(ss,true)) {
+                            int port = v.get("AlpacaPort",-1);
+                            if(port != -1) {
+                                std::string addr = "http://" + remote_ip + ":" + std::to_string(port);
+                                result.insert(addr);
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+    }
+    std::string AlpacaClient::discover(std::string const &type)
+    {
+        auto nets = list_bcast_addresses();
+        auto ips = discover_ips(nets);
+        for(auto const &ip: ips) {
+            try {
+                AlpacaClient cl(ip,type);
+                auto res = cl.list_devices();
+                if(!res.empty())
+                    return ip;
+            }
+            catch(std::exception const &) {
+            }
+        }
+        throw std::runtime_error("Failed to discover Alpaca Server");
     }
     
 } // ols

@@ -56,7 +56,7 @@ namespace ols {
     {
         auto g = guard();
         if(drivers_.empty()) {
-            drivers_.push_back(DriverInfo("alpaca","http://127.0.0.1:32323",true));
+            drivers_.push_back(DriverInfo("alpaca","auto",true));
 #ifdef WITH_INDI
             indi_list_drivers(drivers_,libdir_);
 #endif            
