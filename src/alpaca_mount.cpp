@@ -239,6 +239,35 @@ namespace ols {
                 return EqCoord();
             }
         }
+        std::vector<double> make_rates(std::vector<std::pair<double,double> > const &rates)
+        {
+            std::vector<double> res;
+            for(auto const &range : rates) {
+                double minr = range.first;
+                double maxr = range.second;
+                minr = std::max(minr,15.0 / 3600); // at least tracking rate
+                if(maxr < minr)
+                    continue;
+                double start = maxr;
+                while(start >= minr) {
+                    res.push_back(start);
+                    start /= 2;
+                }
+            }
+            std::sort(res.begin(),res.end());
+            return res;
+        }
+        void make_rates(std::vector<std::pair<double,double> > const &r0,std::vector<std::pair<double,double> > const &r1)
+        {
+            auto rates0 = make_rates(r0);
+            auto rates1 = make_rates(r1);
+            size_t Nmax = std::max(rates0.size(),rates1.size());
+            size_t Nmin = std::min(rates0.size(),rates1.size());
+            size_t delta = (Nmax - Nmin) / 2;
+            for(size_t i=delta;i<Nmin;i++) {
+                rates_.push_back({rates0[i],rates1[i]});
+            }
+        }
         virtual std::pair<int,int> get_slew_rate(MountErrorCode &e) override
         {
             guard_type g(lock_);
@@ -246,11 +275,14 @@ namespace ols {
                 if(rates_.empty()) {
                     cppcms::json::array ar0 = client_.get("/axisrates",{{"Axis","0"}})["Value"].array();
                     cppcms::json::array ar1 = client_.get("/axisrates",{{"Axis","1"}})["Value"].array();
-                    for(unsigned i=0;i<std::min(ar0.size(),ar1.size());i++) {
-                        double r0 = 0.5 * (ar0[i].get<double>("Minimum") + ar0[i].get<double>("Maximum"));
-                        double r1 = 0.5 * (ar1[i].get<double>("Minimum") + ar1[i].get<double>("Maximum"));
-                        rates_.push_back({r0,r1});
+                    std::vector<std::pair<double,double> > r0,r1;
+                    for(unsigned i=0;i<ar0.size();i++) {
+                        r0.push_back({ar0[i].get<double>("Minimum"), ar0[i].get<double>("Maximum") });
                     }
+                    for(unsigned i=0;i<ar1.size();i++) {
+                        r1.push_back({ar1[i].get<double>("Minimum"), ar1[i].get<double>("Maximum") });
+                    }
+                    make_rates(r0,r1);
                     if(rates_.empty())
                         return {1,1};
                     if(log_) {
