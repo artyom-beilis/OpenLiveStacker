@@ -11,16 +11,13 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <unistd.h>
-#else
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 #endif
 
 
 #ifdef _WIN32
 void setenv(char const *key, char const *v,int)
 {
-    SetEnvironmentVariableA(key,v);    
+    _putenv_s(key,v);
 }
 
 #endif
