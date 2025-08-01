@@ -1,3 +1,8 @@
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#endif
+
 #include "camera.h"
 #include "toupcam.h"
 #include "toup_oem.h"
@@ -8,11 +13,57 @@
 #include <atomic>
 #include <map>
 #include <string.h>
-#include <sys/time.h>
-#include <unistd.h>
 #include <thread>
 #include <algorithm>
 #include <cmath>
+#ifdef _WIN32
+#include <booster/locale/utf.h>
+#endif
+#include "os_util.h"
+
+#ifdef _WIN32
+namespace {
+        
+    template<typename CharOut,typename CharIn>
+    std::basic_string<CharOut>
+    convert_impl(std::basic_string<CharIn> const &s)
+    {
+        using namespace booster::locale;
+        std::basic_string<CharOut> result;
+        CharIn const *begin = s.c_str();
+        CharIn const *end = begin + s.size();
+        result.reserve(end-begin);
+        typedef std::back_insert_iterator<std::basic_string<CharOut> > inserter_type;
+        inserter_type inserter(result);
+        utf::code_point c;
+        while(begin!=end) {
+            c=utf::utf_traits<CharIn>::template decode<CharIn const *>(begin,end);
+            if(c==utf::illegal || c==utf::incomplete) {
+                break;
+            }
+            else {
+                utf::utf_traits<CharOut>::template encode<inserter_type>(c,inserter);
+            }
+        }
+        return result;
+    }
+    inline std::wstring convert(std::string const &s)
+    {
+        return convert_impl<wchar_t>(s);
+    }
+    inline std::string convert(std::wstring const &s)
+    {
+        return convert_impl<char>(s);
+    }
+}
+#else
+namespace {
+    inline std::string convert(std::string const &s)
+    {
+        return s;
+    }
+}
+#endif
 
 namespace ols
 {
@@ -98,6 +149,7 @@ namespace ols
     public:
         typedef std::unique_lock<std::recursive_mutex> cam_guard_type;
         /// for Android
+#ifndef _WIN32
         ToupcamCamera(std::string const &android_id,std::string const &camera_name, CamErrorCode &e)
         {
             memset(&info_,0,sizeof(info_));
@@ -118,6 +170,7 @@ namespace ols
 
             init(e);
         }
+#endif        
         ToupcamCamera(ToupcamDeviceV2 info, CamErrorCode &e) : info_(info)
         {
             stream_active_ = 0;
@@ -297,9 +350,14 @@ namespace ols
                 if(bits != 16) 
                     shift_to16(bits,reinterpret_cast<uint16_t *>(buf_.data()),buf_.size()/2);
             }
-
+            
+#ifdef _WIN32
+            ::ols_util::timeval tv;
+            ::ols_util::gettimeofday(&tv, nullptr);
+#else            
             struct timeval tv;
             gettimeofday(&tv, nullptr);
+#endif            
             frm.unix_timestamp = tv.tv_sec;
             frm.unix_timestamp += tv.tv_usec * 1e-6;
             frm.width = w;
@@ -499,7 +557,9 @@ namespace ols
             opts.push_back(opt_exp);
             // Conditionally supported
             if (!(info_.model->flag & TOUPCAM_FLAG_MONO)) {
+#ifndef MEADECAM
                 opts.push_back(opt_auto_wb);
+#endif                
                 opts.push_back(opt_wb);
             }
             if (info_.model->flag & TOUPCAM_FLAG_TEC) // Thermoelectric Cooler Present
@@ -790,6 +850,7 @@ namespace ols
                 hr = Toupcam_put_AutoExpoEnable(hcam_, value ? 1 : 0);
             }
             break;
+#ifndef MEADECAM            
             case opt_auto_wb:
             {
                 auto_wb_ = !!value;
@@ -797,6 +858,7 @@ namespace ols
                 hr = Toupcam_AwbOnce(hcam_, auto_wb_ ? AutoWB : NULL, auto_wb_ ? this : NULL);
             }
             break;
+#endif            
             case opt_wb:
             {
                 int temp = value;
@@ -929,7 +991,7 @@ namespace ols
     private:
         void set_name()
         {
-            name_ = std::string(info_.displayname) + "/" + info_.model->name;
+            name_ = convert(info_.displayname) + "/" + convert(info_.model->name);
         }
         /**
          * API does not provide info on types of binnig, so let's check it
@@ -1059,7 +1121,7 @@ namespace ols
         }
         double getTECVoltage(CamErrorCode &e)
         {
-            timeval tv = {};
+            struct timeval tv = {};
             gettimeofday(&tv, nullptr);
             // Please do not get this value too frequently, the recommended interval is 2 seconds or more
             if(tv.tv_sec - lastTECVoltageMeasure_ < 2l)
@@ -1087,6 +1149,7 @@ namespace ols
                 e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_BITDEPTH, max)", hr);
                 return;
             }
+#ifndef MEADECAM
             unsigned maxTime;
             unsigned short maxAGain;
             if (FAILED(hr = Toupcam_get_MaxAutoExpoTimeAGain(hcam_, &maxTime, &maxAGain)))
@@ -1109,6 +1172,7 @@ namespace ols
                 e = make_message("Failed to Toupcam_put_MaxAutoExpoTimeAGain", hr);
                 return;
             }
+#endif            
             // Low noise seems a default choice for astroimageing
             if (((info_.model->flag & TOUPCAM_FLAG_LOW_NOISE)) && FAILED(hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_LOW_NOISE, 1)))
             {
@@ -1205,7 +1269,7 @@ namespace ols
     {
         // printf("AutoWB Temp=%d, Tint=%d\n", nTemp, nTint);
     }
-
+#ifndef _WIN32
     class SingleToupcamCameraDriver : public CameraDriver
     {
     public:
@@ -1241,7 +1305,7 @@ namespace ols
         std::string id_;
         std::string name_;
     };
-
+#endif
     class ToupcamCameraDriver : public CameraDriver
     {
     public:
@@ -1254,7 +1318,9 @@ namespace ols
          * Loops over connected Toupcam cameras, prepares display name, and saves camera info
          * Returns: list of camera names
          */
-
+#if defined MEADECAM || defined _WIN32
+        int enumOEM(ToupcamDeviceV2 info[TOUPCAM_MAX]) { return 0; }
+#else        
         int enumOEM(ToupcamDeviceV2 info[TOUPCAM_MAX])
         {
             int N = 0;
@@ -1287,7 +1353,7 @@ namespace ols
             pclose(f);
             return N;
         }
-
+#endif
         virtual std::vector<std::string> list_cameras(CamErrorCode &e)
         {
             names_.clear();
@@ -1296,7 +1362,12 @@ namespace ols
             unsigned N = oem_ ? enumOEM(info) : Toupcam_EnumV2(info);
             for (unsigned i = 0; i < N; i++)
             {
+                #ifdef _WIN32
+                std::wstring wname = std::wstring(info[i].displayname) + L"/" + info[i].model->name + L"/" + std::to_wstring(i);
+                std::string name = convert(wname); 
+                #else
                 std::string name = std::string(info[i].displayname) + "/" + info[i].model->name + "/" + std::to_string(i);
+                #endif
                 names_.push_back(name);
                 cams_.push_back(info[i]);
             }
@@ -1333,17 +1404,30 @@ namespace ols
 }
 
 extern "C" {
+#ifdef MEADECAM    
+    int ols_set_meade_driver_config(char const *str)
+#else    
     int ols_set_toup_driver_config(char const *str)
+#endif    
     {
         ols::ToupDriverConfig::driver_config = str;
         return 0;
     }
+#ifdef MEADECAM    
+    void ols_set_meade_driver_log(char const *,int ) {}
+#else    
     void ols_set_toup_driver_log(char const *log_path,int debug)
     {
-        Toupcam_log_File(log_path);
+        auto path = convert(log_path);
+        Toupcam_log_File(path.c_str());
         Toupcam_log_Level(debug ? 4 : 1);
     }
+#endif    
+#ifdef MEADECAM    
+    ols::CameraDriver *ols_get_meade_driver(int /*unused*/,ols::CamErrorCode *e)
+#else    
     ols::CameraDriver *ols_get_toup_driver(int /*unused*/,ols::CamErrorCode *e)
+#endif    
     {
         // const ToupcamModelV2** a = Toupcam_all_Model();
         // if(a)
@@ -1361,6 +1445,10 @@ extern "C" {
             return new ols::ToupcamCameraDriver(true);
         }
         else {
+#ifdef _WIN32            
+            *e = "Unsupported";
+            return nullptr;
+#else           
             size_t split_point = ols::ToupDriverConfig::driver_config.find(':');
             std::string id = ols::ToupDriverConfig::driver_config.substr(0,split_point);
             int fd=-1,vendor_id=0,product_id=0;
@@ -1377,6 +1465,7 @@ extern "C" {
             snprintf(toup_id,sizeof(toup_id),"fd-%d-%04x-%04x",fd,vendor_id,product_id);
             std::string name = split_point == std::string::npos ? "Camera" : ols::ToupDriverConfig::driver_config.substr(split_point+1);
             return new ols::SingleToupcamCameraDriver(toup_id,name);
+#endif            
         }
     }
 }

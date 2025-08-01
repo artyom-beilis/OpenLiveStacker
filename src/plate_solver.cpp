@@ -241,9 +241,9 @@ namespace ols {
     int PlateSolver::run(std::vector<std::string> &opts,std::string ini_path,double timeout_sec)
     {
         std::ostringstream ss;
-        ss << exe_;
+        ss <<"\"" << exe_ << "\"";
         for(size_t i=1;i<opts.size();i++) {
-            ss << " " << opts[i];
+            ss << " \"" << opts[i] <<"\"";
         }
         STARTUPINFO si = STARTUPINFO();
         PROCESS_INFORMATION pi = PROCESS_INFORMATION();

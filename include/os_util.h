@@ -24,9 +24,11 @@ namespace ols_util {
     }
 } // ols_util
 
+#ifndef NO_USING_NAMESPACE_OLS_UTIL
 using ols_util::timeval;
 using ols_util::gettimeofday;
 using ols_util::usleep;
+#endif
 
 #else
 

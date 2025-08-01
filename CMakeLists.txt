@@ -15,7 +15,7 @@ option(USE_INDI_AS_LIBRARY "Use special variand of indi - embedded server/client
 
 find_library(ASI_CAMERA_LIB ASICamera2)
 find_path(ASI_CAMERA_HDR ASICamera2.h)
-find_library(LIBUSB_LIB usb-1.0) 
+find_library(LIBUSB_LIB usb-1.0 NAMES usb-1.0 libusb-1.0) 
 find_library(SVB_CAMERA_LIB SVBCameraSDK) 
 find_path(SVB_CAMERA_HDR SVBCameraSDK.h)
 
@@ -41,6 +41,9 @@ find_path(INDIGO_HEADER indigo/indigo_bus.h)
 
 find_library(TOUPCAM_CAMERA_LIB toupcam)
 find_path(TOUPCAM_CAMERA_HDR toupcam.h)
+if(WIN32)
+    find_library(MEADECAM_CAMERA_LIB meadecam)
+endif()    
 
 find_library(LIBTIFF tiff)
 find_library(LIBCPPCMS cppcms)
@@ -175,10 +178,13 @@ else()
     message("- No ASI SDK header/lib found")
 endif()
 
-if(SVB_CAMERA_HDR AND SVB_CAMERA_LIB AND LIBUSB_LIB )
+# Remove AND LIBUSB_LIB
+# link ${LIBUSB_LIB}
+
+if(SVB_CAMERA_HDR AND SVB_CAMERA_LIB)
     include_directories(${SVB_CAMERA_HDR})
     add_library(ols_driver_svb SHARED src/svb_camera.cpp)
-    target_link_libraries(ols_driver_svb ${SVB_CAMERA_LIB} ${LIBUSB_LIB})
+    target_link_libraries(ols_driver_svb ${SVB_CAMERA_LIB})
     install(TARGETS ols_driver_svb
             LIBRARY DESTINATION lib
     )
@@ -192,12 +198,29 @@ if(TOUPCAM_CAMERA_HDR AND TOUPCAM_CAMERA_LIB)
     include_directories(${TOUPCAM_CAMERA_HDR})
     add_library(ols_driver_toup SHARED src/toup_camera.cpp)
     target_link_libraries(ols_driver_toup ${TOUPCAM_CAMERA_LIB})
+    if(WIN32)
+        target_link_libraries(ols_driver_toup ${LIBUSB_LIB})
+    endif()
     install(TARGETS ols_driver_toup
             LIBRARY DESTINATION lib
     )
     message("- Building Toupcam Driver")
 else()
     message("- No Toupcam SDK header/lib found")
+endif()
+
+if(TOUPCAM_CAMERA_HDR AND MEADECAM_CAMERA_LIB)
+    include_directories(${TOUPCAM_CAMERA_HDR})
+    add_library(ols_driver_meade SHARED src/toup_camera.cpp)
+    target_compile_definitions(ols_driver_meade PRIVATE MEADECAM)
+    
+    target_link_libraries(ols_driver_meade ${MEADECAM_CAMERA_LIB})
+    install(TARGETS ols_driver_meade
+            LIBRARY DESTINATION lib
+    )
+    message("- Building Meade Driver")
+else()
+    message("- No Meade SDK header/lib found")
 endif()
 
 if(LIBCFITSIO AND LIBCFITSIO_HDR)
