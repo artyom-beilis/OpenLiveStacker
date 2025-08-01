@@ -1371,9 +1371,6 @@ namespace ols
                 names_.push_back(name);
                 cams_.push_back(info[i]);
             }
-            if (names_.size() == 0)
-                e = make_message("list_cameras", TOUPCAM_ERROR_OPEN_BY_INDEX);
-            // printf("\n\nToupcamCameraDriver::list_cameras: %lu\n", names_.size());
             return names_;
         }
         /**

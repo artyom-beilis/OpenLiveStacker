@@ -1,0 +1,19 @@
+Following 3rd party executables and dlls are included in this distribution
+
+Open-Source:
+
+- OpenCV: https://opencv.org/license/ - Apache2 license
+- Libtiff: http://www.libtiff.org/ - BSD Like license
+- libcurl: https://curl.se/docs/copyright.html 
+- libpng: http://www.libpng.org/pub/png/src/libpng-LICENSE.txt  png license
+- zlib: https://zlib.net/zlib_license.html
+- libjpeg-turbo: https://github.com/libjpeg-turbo/libjpeg-turbo/blob/main/LICENSE.md - BSD like license
+- CppCMS and Booster: https://github.com/artyom-beilis/cppcms/blob/master/COPYING.TXT - MIT and Boost
+- ASTAP: https://www.hnsky.org/astap.htm - CC-By-v4
+- Processed OpenNGC Database: https://github.com/mattiaverga/OpenNGC/blob/master/LICENSE - CC-BT-SA-4
+
+
+Proprietary
+
+- ASI ZWO, SVBony, ToupTek and Meade SDKs
+
