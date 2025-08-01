@@ -14,6 +14,8 @@ namespace ols {
     #else
     #define OLS_EXPORT __declspec(dllimport)
     #endif
+#else
+    #define OLS_EXPORT 
 #endif
     struct sync_queue_base {
         OLS_EXPORT static std::atomic<long> items;

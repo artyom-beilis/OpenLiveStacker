@@ -1,4 +1,6 @@
+#ifdef _WIN32
 #include <direct.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -12,6 +14,7 @@
 #include <string.h>
 #ifndef _WIN32
 #  include <unistd.h>
+#  include <dirent.h>
 #  ifdef __linux__
 #     include <poll.h>
 #     include <sys/inotify.h>

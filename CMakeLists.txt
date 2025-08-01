@@ -181,10 +181,13 @@ endif()
 # Remove AND LIBUSB_LIB
 # link ${LIBUSB_LIB}
 
-if(SVB_CAMERA_HDR AND SVB_CAMERA_LIB)
+if(SVB_CAMERA_HDR AND SVB_CAMERA_LIB AND (WIN32 OR LIBUSB_LIB))
     include_directories(${SVB_CAMERA_HDR})
     add_library(ols_driver_svb SHARED src/svb_camera.cpp)
     target_link_libraries(ols_driver_svb ${SVB_CAMERA_LIB})
+    if(NOT WIN32)
+        target_link_libraries(ols_driver_svb ${LIBUSB_LIB})
+    endif()
     install(TARGETS ols_driver_svb
             LIBRARY DESTINATION lib
     )

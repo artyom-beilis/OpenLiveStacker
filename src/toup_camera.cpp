@@ -1354,7 +1354,7 @@ namespace ols
             return N;
         }
 #endif
-        virtual std::vector<std::string> list_cameras(CamErrorCode &e)
+        virtual std::vector<std::string> list_cameras(CamErrorCode &)
         {
             names_.clear();
             cams_.clear();
