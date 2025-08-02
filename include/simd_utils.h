@@ -1,11 +1,17 @@
 #pragma once
 
+#ifdef _MSC_VER
+#define OLS_ALWAYS_INLINE __forceinline 
+#else
+#define OLS_ALWAYS_INLINE __attribute__((always_inline))
+#endif
+
 namespace ols  {
 #ifdef USE_CV_SIMD
 
 /// apply plicewise linear interpoalation, v in range [0,1], table of size [size+1]
 
-__attribute__((always_inline)) inline void curve_simd(cv::v_float32x4 &v,int size,float *table)
+OLS_ALWAYS_INLINE inline void curve_simd(cv::v_float32x4 &v,int size,float *table)
 { 
     cv::v_float32x4 vf = v * cv::v_setall_f32(size - 1.0f); 
     cv::v_int32x4 indx = cv::v_floor(vf); 
@@ -31,7 +37,7 @@ __attribute__((always_inline)) inline void curve_simd(cv::v_float32x4 &v,int siz
 #endif
 
 /// table of size M+1
-__attribute__((always_inline)) inline float curve_one(float v,int M,float *table)
+OLS_ALWAYS_INLINE inline float curve_one(float v,int M,float *table)
 {
     float vf = v*(M-1);
     int indx = std::max(0,std::min(M-1,int(vf)));

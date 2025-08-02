@@ -283,7 +283,7 @@ namespace ols {
         {
             cv::Mat im_deconv(image.rows,image.cols,image.channels() == 3 ? CV_32FC3 : CV_32FC1,cv::Scalar::all(0.5));
             cv::Mat conv,relative_blur,tmp;
-            float eps = 1e-12;
+            float eps = 1e-12f;
             for(int i=0;i<deconv_iters_;i++) {
                 // psf blur
                 gaussian_blur(im_deconv,conv,deconv_kern_,deconv_sigma_);

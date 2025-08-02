@@ -4,13 +4,23 @@
 #include <booster/regex.h>
 #include <iostream>
 #include <fstream>
-#include <unistd.h>
 #include "allocator.h"
-
+#include <stdlib.h>
+#ifndef _WIN32
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <unistd.h>
+#endif
+
+
+#ifdef _WIN32
+void setenv(char const *key, char const *v,int)
+{
+    _putenv_s(key,v);
+}
+
+#endif
 
 bool parse_key_value(std::string arg,cppcms::json::value &cfg)
 {
@@ -37,6 +47,7 @@ bool parse_key_value(std::string arg,cppcms::json::value &cfg)
 
 }
 
+#ifndef _WIN32
 class ServerGuard {
 public:
     ServerGuard(ServerGuard const &) = delete;
@@ -99,6 +110,7 @@ private:
     int child_pid_ = -1;
 };
 
+#endif
 
 int main(int argc,char **argv)
 {   
@@ -173,7 +185,13 @@ int main(int argc,char **argv)
             driver_opt_ptr = driver_opt.c_str();
         }
 
+        #ifndef _WIN32
         ServerGuard sg(server_cmd);
+        #else
+        if(!server_cmd.empty())  {
+            throw std::runtime_error("Windows does not allow starting processes");
+        }
+        #endif
        
         ols::AllocatorGuard alloc_guard(mem_limit_mb > 0);
         {

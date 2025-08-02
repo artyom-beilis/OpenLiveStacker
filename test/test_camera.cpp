@@ -1,7 +1,7 @@
 #include "camera.h"
 #include <iostream>
 #include <fstream>
-#include <unistd.h>
+#include "os_util.h"
 
 int main()
 {   
@@ -42,7 +42,9 @@ int main()
             }
         },e);
         e.check();
-        sleep(20);
+        for(int i=0;i<20;i++) {
+            usleep(999000);
+        }
         camera->stop_stream(e);
         e.check();
         camera.reset();

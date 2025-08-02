@@ -1,16 +1,14 @@
-#include <sys/time.h>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <mutex>
 #include <thread>
 #include <queue>
-#include <unistd.h>
 
 #include "camera.h"
 #include "mount_ctl.h"
 #include "mount.h"
-
+#include "os_util.h"
 #include <booster/aio/deadline_timer.h>
 
 

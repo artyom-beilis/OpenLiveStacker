@@ -1,15 +1,30 @@
+#ifdef _WIN32
+#include <direct.h>
+#endif
+#include <stdlib.h>
+#include <stdio.h>
+
 #include "util.h"
 #include "sync_queue.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include <time.h>
-#include <unistd.h>
 #include <system_error>
-#include <dirent.h>
-#include <sys/inotify.h>
-#include <poll.h>
 #include <string.h>
+#ifndef _WIN32
+#  include <unistd.h>
+#  include <dirent.h>
+#  ifdef __linux__
+#     include <poll.h>
+#     include <sys/inotify.h>
+#  endif
+#else
+#include <io.h>
+#define access(a,b) _access(a,b)
+#define mkdir(x,y) _mkdir(x)
+#define F_OK 0
+#endif
 
 
 namespace ols {

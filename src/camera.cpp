@@ -1,5 +1,5 @@
 #include "camera.h"
-#include <dlfcn.h>
+#include <booster/shared_object.h>
 #include <algorithm>
 #include <iomanip>
 
@@ -22,19 +22,16 @@ void CameraDriver::load_driver(std::string const &name,std::string base_path,cha
         return;
     if(!base_path.empty())
         base_path += "/";
-    std::string so_path = (base_path + "libols_driver_" + name + ".so");
-    void *h = dlopen((base_path + "libols_driver_" + name + ".so").c_str(),RTLD_LAZY | RTLD_GLOBAL);
-    if(!h)
-        throw CamError("Failed to load driver " + so_path + ": `" + dlerror() + "'");
-    void *func = dlsym(h,("ols_get_" + name + "_driver").c_str());
+    std::unique_ptr<booster::shared_object> so;
+    std::string so_path = base_path + booster::shared_object::name("ols_driver_" + name);
+    so.reset(new booster::shared_object(so_path,booster::shared_object::load_lazy | booster::shared_object::load_local));
+    void *func = so->resolve_symbol(("ols_get_" + name + "_driver").c_str());
     if(!func) {
-        dlclose(h);
         throw CamError("Failed to find driver entry for " + name);
     }
     if(opt) {
-        void *opt_func = dlsym(h,("ols_set_" + name + "_driver_config").c_str());
+        void *opt_func = so->resolve_symbol(("ols_set_" + name + "_driver_config").c_str());
         if(!opt_func) {
-            dlclose(h);
             throw CamError("Failed to find driver config entry for " + name);
         }
         cam_config_ptr_type config = reinterpret_cast<cam_config_ptr_type>(opt_func);
@@ -42,7 +39,7 @@ void CameraDriver::load_driver(std::string const &name,std::string base_path,cha
             throw CamError("Failed to config driver for " + name);
     }
     if(!cam_log.empty()) {
-        void *log_func = dlsym(h,("ols_set_" + name + "_driver_log").c_str());
+        void *log_func = so->resolve_symbol(("ols_set_" + name + "_driver_log").c_str());
         if(log_func) {
             cam_log_ptr_type log_f = reinterpret_cast<cam_log_ptr_type>(log_func);
             log_f(cam_log.c_str(),cam_debug);
@@ -51,6 +48,7 @@ void CameraDriver::load_driver(std::string const &name,std::string base_path,cha
 
     driver_calls.insert(driver_calls.begin(),reinterpret_cast<cam_generator_ptr_type>(func));
     driver_names.insert(driver_names.begin(),name);
+    so.release(); // we don't want to unload the library
 }
 
 std::vector<std::string> CameraDriver::drivers()

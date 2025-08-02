@@ -7,18 +7,42 @@ import os
 import sys
 import json
 import subprocess
+import ctypes
 
 _config_path = None
+
+
+def _win32_get_short_path_name(long_name):
+    from ctypes import wintypes
+    get_short_path_name = ctypes.windll.kernel32.GetShortPathNameW
+    get_short_path_name.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+    get_short_path_name.restype = wintypes.DWORD
+    output_buf_size = 1024
+    output_buf = ctypes.create_unicode_buffer(output_buf_size)
+    size = get_short_path_name(long_name, output_buf, output_buf_size)
+    if output_buf_size >= size:
+        return output_buf.value
+    raise Exception("Failed to convert " + long_name)
+
+def _win():
+    return sys.platform.startswith('win')
+
+def _home():
+    if not _win():
+        return os.environ["HOME"]
+    else:
+        home = os.environ["UserProfile"]
+        return _win32_get_short_path_name(home)
 
 def _default_config(install_dir = None,src_dir = None):
     assert (install_dir is None) != (src_dir is None)
     if install_dir is not None:
         ols_cmd = install_dir + "/bin/ols_cmd"
-        libdir = install_dir + "/lib"
+        libdir = os.path.join(install_dir,("bin" if _win() else "lib" ))
         simdir = install_dir + "/share/ols/sim"
         www_dir = install_dir + "/share/ols/www-data"
-        data_dir = os.environ["HOME"] + "/OpenLiveStacker"
-        astap_cli = install_dir + "/bin/astap_cli"
+        data_dir = os.path.join(_home(), "OpenLiveStacker")
+        astap_cli = install_dir + "/bin/astap_cli" + ('.exe' if _win() else '')
         if not os.path.exists(astap_cli):
             astap_cli = "astap_cli"
     else:
@@ -43,6 +67,7 @@ def _default_config(install_dir = None,src_dir = None):
         "toup" : {
             "oem": False
         },
+        "meade" : {},
         "astap" : {
             "exe": astap_cli,
             "db": data_dir + "/db"
@@ -88,15 +113,20 @@ def get_default_config():
     root_dir =  os.path.dirname(scripts_dir)
     global _config_path
     if scripts_dir_name == "bin":
-        _config_path = os.environ['HOME'] + '/.ols_config.json'
+        _config_path = _home() + '/.ols_config.json'
         return _default_config(install_dir = root_dir)
+    elif _win() and os.path.exists(os.path.join(scripts_dir, 'bin\\ols_cmd.exe')):
+        _config_path = _home() + '\\.ols_config.json'
+        inst_dir = os.path.join(scripts_dir,".\\")
+        print("Install dir = ",inst_dir, "Config Path = ", _config_path)
+        return _default_config(install_dir = inst_dir)
     elif scripts_dir_name == "scripts":
         if root_dir == '':
             root_dir = "."
         _config_path = root_dir + "/ols_config.json"
         return _default_config(src_dir = root_dir)
     else:
-        raise Exception("ols_gui should either be in /install/path/bin or in source/directory/scripts")
+        raise Exception("ols_gui should either be in /install/path/bin or in source/directory/scripts scripts_dir=" + scripts_dir )
 
 def _merge_config(default_cfg,loaded):
     for key in default_cfg:
@@ -131,6 +161,8 @@ def _save_config(cfg):
 
 
 def _make_desktop(icon_path):
+    if _win():
+        return
     exe_path = os.path.realpath(__file__)
     icon_path = os.path.realpath(icon_path)
     desktop_file = f"""
@@ -143,7 +175,7 @@ Terminal=false
 Type=Application
 Categories=Astronomy;Education;Science
 """
-    desktop_dir = os.environ['HOME'] + '/.local/share/applications'
+    desktop_dir = _home() + '/.local/share/applications'
     desktop_path = desktop_dir + '/OpenLiveStacker.desktop'
     same=False
     try:
@@ -162,10 +194,15 @@ Categories=Astronomy;Education;Science
 
 
 
+def _get_drivers():
+    if not _win():
+        return [ 'sim', 'asi', 'toup', 'svb', 'uvc', 'gphoto2','indi', 'indigo', 'alpaca', "wdir" ], ('Simulated', 'ASI ZWO', 'ToupTek', 'SVBony', 'UVC', 'GPhoto2', 'Indi', 'Indigo', 'Alpaca', "Watch Directory" )
+    else:
+        return [ 'sim', 'asi', 'toup', 'meade', 'svb', 'alpaca' ], ('Simulated', 'ASI ZWO', 'ToupTek', 'Meade', 'SVBony', 'Alpaca')
 
 class UI:
 
-    camera_driver_names = [ 'sim', 'asi', 'toup', 'svb', 'uvc', 'gphoto2','indi', 'indigo', 'alpaca', "wdir" ] 
+    camera_driver_names = _get_drivers()[0]
     
     def __init__(self):
         self.process = None
@@ -178,13 +215,16 @@ class UI:
         self.root.title("OpenLiveStacker Server Control UI")
         icon_path = self.config["www_dir"] + "/media/img/facicon.png"
         img = PhotoImage(file=icon_path)
-        self.root.tk.call('wm', 'iconphoto', self.root._w, img)
+        if _win():
+            self.root.wm_iconphoto(False, img)
+        else:
+            self.root.tk.call('wm', 'iconphoto', self.root._w, img)
         _make_desktop(icon_path)
 
         driver_label = ttk.Label(self.root, text = "Camera Driver:")
         driver_label.grid(column = 0, row = 0,sticky=W) 
         self.driver_select = ttk.Combobox(self.root,justify=LEFT,width=30)
-        self.driver_select['values'] = ( 'Simulated', 'ASI ZWO', 'ToupTek', 'SVBony', 'UVC', 'GPhoto2', 'Indi', 'Indigo', 'Alpaca', "Watch Directory" )
+        self.driver_select['values'] = _get_drivers()[1]
         self.driver_select.grid(column = 1, row = 0,sticky = W)
         self.driver_select.current(self._driver_index())
         self.driver = self.camera_driver_names[self._driver_index()]
@@ -194,11 +234,13 @@ class UI:
 
 
         ## OEM
-        self.oem_label,self.oem_checbox = self._add_bool_entry('OEM:','toup.oem',row=None)
+        if not _win():
+            self.oem_label,self.oem_checbox = self._add_bool_entry('OEM:','toup.oem',row=None)
+            self.widgets_to_hide += [self.oem_label,self.oem_checbox]
         self.indi_widgets = self._add_string_entry('Indi Addr','indi.connection',str,None)
         self.indigo_widgets = self._add_string_entry('Indigo Addr','indigo.connection',str,None)
         self.alpaca_widgets = self._add_string_entry('Alpaca Addr','alpaca.connection',str,None)
-        self.widgets_to_hide += [self.oem_label,self.oem_checbox] + self.indi_widgets + self.indigo_widgets + self.alpaca_widgets
+        self.widgets_to_hide += self.indi_widgets + self.indigo_widgets + self.alpaca_widgets
 
         self.wdir_widgets =  \
            self._add_combo_entry("Format:","wdir.format",["raw16","rgb48","rgb24","mono16","mono8"],row=None) + \
@@ -383,19 +425,21 @@ class UI:
         indi_mount_drivers = ["None"] + sorted(set(indi_mount_drivers))
         indigo_ccd_drivers = self._get_exes_by_path('indigo_ccd*')
         indigo_ccd_drivers = ["None"] + sorted(set(indigo_ccd_drivers))
+
+        if not _win():
         
-        title = ttk.Label(self.root, text = "Start Indi or Indigo Server")
-        title.grid(column=0,columnspan=2,row=row)
-        self.widgets_to_hide += [title]
+            title = ttk.Label(self.root, text = "Start Indi or Indigo Server")
+            title.grid(column=0,columnspan=2,row=row)
+            self.widgets_to_hide += [title]
 
-        self.widgets_to_hide += self._add_combo_entry("Indi CCD:","server_start.indi_ccd",indi_ccd_drivers,row+1)
-        self.widgets_to_hide += self._add_combo_entry("Indi Mount:","server_start.indi_mount",indi_mount_drivers,row+2)
-        self.widgets_to_hide += self._add_combo_entry("Indigo CCD:","server_start.indigo_ccd",indigo_ccd_drivers,row+3)
+            self.widgets_to_hide += self._add_combo_entry("Indi CCD:","server_start.indi_ccd",indi_ccd_drivers,row+1)
+            self.widgets_to_hide += self._add_combo_entry("Indi Mount:","server_start.indi_mount",indi_mount_drivers,row+2)
+            self.widgets_to_hide += self._add_combo_entry("Indigo CCD:","server_start.indigo_ccd",indigo_ccd_drivers,row+3)
 
-        indi_vars = [ self.variables["server_start.indi_ccd"], self.variables["server_start.indi_mount"] ]
-        indigo_vars = [ self.variables["server_start.indigo_ccd"] ]
-        start_cmd = StringVar(value = self._get_cfg("server_start.cmd"))
-        start_cmd.trace_add('write',lambda *args:self._set_cfg("server_start.cmd",start_cmd.get()))
+            indi_vars = [ self.variables["server_start.indi_ccd"], self.variables["server_start.indi_mount"] ]
+            indigo_vars = [ self.variables["server_start.indigo_ccd"] ]
+            start_cmd = StringVar(value = self._get_cfg("server_start.cmd"))
+            start_cmd.trace_add('write',lambda *args:self._set_cfg("server_start.cmd",start_cmd.get()))
 
         def _update_cmd():
             indi_sel = []
@@ -436,20 +480,20 @@ class UI:
                     v.set("None")
             _update_cmd()
 
+        if not _win():
+            for v in indi_vars:
+                v.trace_add('write',_on_indi_select)
 
-        for v in indi_vars:
-            v.trace_add('write',_on_indi_select)
-
-        for v in indigo_vars:
-            v.trace_add('write',_on_indigo_select)
-        
-        
-        _update_cmd() 
-        title = ttk.Label(self.root,text="CMD:")
-        cmd = ttk.Label(self.root, textvariable = start_cmd)
-        title.grid(column=0,row=row+4,sticky=W)
-        cmd.grid(column=1,row=row+4,sticky=W)
-        self.widgets_to_hide += [title,cmd]
+            for v in indigo_vars:
+                v.trace_add('write',_on_indigo_select)
+            
+            
+            _update_cmd() 
+            title = ttk.Label(self.root,text="CMD:")
+            cmd = ttk.Label(self.root, textvariable = start_cmd)
+            title.grid(column=0,row=row+4,sticky=W)
+            cmd.grid(column=1,row=row+4,sticky=W)
+            self.widgets_to_hide += [title,cmd]
 
     
     def _driver_index(self):
@@ -466,6 +510,8 @@ class UI:
 
     def _change_driver(self,is_show):
         if self.driver == 'toup':
+            if _win():
+                return
             if is_show:
                 self.oem_label.grid(column=0,row=1,sticky=W)
                 self.oem_checbox.grid(column=1,row=1,sticky = W)

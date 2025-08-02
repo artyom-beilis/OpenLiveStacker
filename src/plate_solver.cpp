@@ -14,21 +14,30 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 
+#ifndef _WIN32
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <signal.h>
+#else
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #include <booster/posix_time.h>
 #include <booster/log.h>
 
 namespace ols {
     PlateSolver::PlateSolver(std::string const &db_path,std::string const &astap) :
         db_(db_path),
-        exe_(astap),
-        temp_dir_("/tmp")
+        exe_(astap)
     {
+        if(getenv("OLS_DATA_DIR"))
+            temp_dir_ = getenv("OLS_DATA_DIR");
+        else
+            temp_dir_ = ".";
         if(exe_.empty())
             exe_ = "astap_cli";
     }
@@ -228,6 +237,62 @@ namespace ols {
     }
 
 
+#ifdef _WIN32
+    int PlateSolver::run(std::vector<std::string> &opts,std::string ini_path,double timeout_sec)
+    {
+        std::ostringstream ss;
+        ss <<"\"" << exe_ << "\"";
+        for(size_t i=1;i<opts.size();i++) {
+            ss << " \"" << opts[i] <<"\"";
+        }
+        STARTUPINFO si = STARTUPINFO();
+        PROCESS_INFORMATION pi = PROCESS_INFORMATION();
+        std::string cmd = ss.str();
+        fprintf(stderr,"Executing %s\n",cmd.c_str());
+        if(!CreateProcessA(nullptr,
+                           &cmd[0],nullptr,nullptr,FALSE,0,nullptr,nullptr,&si,&pi)) {
+            throw std::runtime_error("Failed to start astap_cli: " + cmd);
+        }
+        int N = int(timeout_sec * 10);
+        int status = 0;
+
+        int i = 0;
+        bool terminated = false;
+        int exit = 1;
+        while(true) {
+            booster::ptime::millisleep(100);
+            DWORD exit_code;
+            if (GetExitCodeProcess(pi.hProcess, &exit_code)) {
+                if (exit_code == STILL_ACTIVE) {
+                    if(i >= N) {
+                        TerminateProcess(pi.hProcess,1);
+                        terminated = true;
+                        break;
+                    }
+                    i++;
+                }
+                else {
+                    exit = exit_code;
+                    break;
+                }
+            }
+            else {
+                terminated = true;
+                break;
+            }
+        }
+        
+        CloseHandle( pi.hProcess );
+        CloseHandle( pi.hThread );
+
+        if(terminated)
+           throw std::runtime_error("Execution took too much time, current limit is " + std::to_string(timeout_sec) +"s");
+
+        return exit;
+    }
+
+#else
+
     int PlateSolver::run(std::vector<std::string> &opts,std::string ini_path,double timeout_sec)
     {
         std::vector<char *> args;
@@ -308,6 +373,7 @@ namespace ols {
             return WEXITSTATUS(status);
         }
     }
+#endif    
 
 
     void PlateSolver::init(std::string const &db_path,std::string const &path_to_astap_cli,std::string const &temp_dir)

@@ -8,8 +8,17 @@
 #include <atomic>
 
 namespace ols {
+#if defined _WIN32
+    #if defined ols_EXPORTS
+    #define OLS_EXPORT __declspec(dllexport)
+    #else
+    #define OLS_EXPORT __declspec(dllimport)
+    #endif
+#else
+    #define OLS_EXPORT 
+#endif
     struct sync_queue_base {
-        static std::atomic<long> items;
+        OLS_EXPORT static std::atomic<long> items;
     };
     template<typename T>
     class sync_queue : public sync_queue_base {

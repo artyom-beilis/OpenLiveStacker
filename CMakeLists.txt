@@ -2,15 +2,20 @@ cmake_minimum_required(VERSION 2.8)
 project(OpenLiveStacker)
 
 include_directories(include)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2 -g")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
+if(NOT WIN32)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2 -g")
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic")
+else()
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDLL_EXPORT /wd4267 /wd4244 /wd4101 /wd4141 -O2 -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS ")
+endif()
 option(OPENCV_ROOT "Path to OpenCV Library" "")
 option(NO_SSE4 "Disable SSE 4.1/4.3 on x86/x86_64 builds" OFF)
 option(USE_INDI_AS_LIBRARY "Use special variand of indi - embedded server/client/deriver" OFF)
 
 find_library(ASI_CAMERA_LIB ASICamera2)
 find_path(ASI_CAMERA_HDR ASICamera2.h)
-find_library(LIBUSB_LIB usb-1.0) 
+find_library(LIBUSB_LIB usb-1.0 NAMES usb-1.0 libusb-1.0) 
 find_library(SVB_CAMERA_LIB SVBCameraSDK) 
 find_path(SVB_CAMERA_HDR SVBCameraSDK.h)
 
@@ -26,7 +31,9 @@ if(USE_INDI_AS_LIBRARY)
 else()
     find_library(INDI_LIB indiclient)
     find_path(INDI_HEADER libindi/baseclient.h)
-    include_directories(${INDI_HEADER})
+    if(INDI_HEADER)
+        include_directories(${INDI_HEADER})
+    endif()
 endif()
 
 find_library(INDIGO_LIB indigo)
@@ -34,6 +41,9 @@ find_path(INDIGO_HEADER indigo/indigo_bus.h)
 
 find_library(TOUPCAM_CAMERA_LIB toupcam)
 find_path(TOUPCAM_CAMERA_HDR toupcam.h)
+if(WIN32)
+    find_library(MEADECAM_CAMERA_LIB meadecam)
+endif()    
 
 find_library(LIBTIFF tiff)
 find_library(LIBCPPCMS cppcms)
@@ -48,8 +58,8 @@ find_path(LIBZ_HDR zlib.h)
 find_path(LIBCPPCMS_HRD cppcms/application.h)
 find_path(LIBCAMERA2_HDR camera/NdkCameraDevice.h)
 find_path(LIBMEDIANDK_HDR media/NdkImageReader.h)
-find_library(LIBCURL curl)
-find_library(LIBZ z)
+find_library(LIBCURL curl NAMES curl curl_imp libcurl_imp)
+find_library(LIBZ z NAMES z zlib)
 find_library(LIBCAMERA2_LIB camera2ndk)
 find_library(LIBMEDIANDK_LIB mediandk)
 
@@ -96,7 +106,7 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
 else()
     message("CPU: ${CMAKE_SYSTEM_PROCESSOR}")
     add_definitions(-DOLS_ARCH="${CMAKE_SYSTEM_PROCESSOR}")
-    if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86") 
+    if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "AMD64" OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x64" OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86") 
         add_definitions(-DUSE_CV_SIMD)
         set(WITH_SSE ON)
     endif()        
@@ -109,9 +119,16 @@ find_library(LIBCFITSIO cfitsio)
 
 
 if(WITH_SSE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse2")
-    if(NOT NO_SSE4)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.1 -msse4.2")
+    if(NOT WIN32)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse2")
+        if(NOT NO_SSE4)
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.1 -msse4.2")
+        endif()
+    else()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:SSE2")
+        if(NOT NO_SSE4)
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:SSE4.2")
+        endif()
     endif()
 endif()        
 
@@ -161,10 +178,16 @@ else()
     message("- No ASI SDK header/lib found")
 endif()
 
-if(SVB_CAMERA_HDR AND SVB_CAMERA_LIB AND LIBUSB_LIB )
+# Remove AND LIBUSB_LIB
+# link ${LIBUSB_LIB}
+
+if(SVB_CAMERA_HDR AND SVB_CAMERA_LIB AND (WIN32 OR LIBUSB_LIB))
     include_directories(${SVB_CAMERA_HDR})
     add_library(ols_driver_svb SHARED src/svb_camera.cpp)
-    target_link_libraries(ols_driver_svb ${SVB_CAMERA_LIB} ${LIBUSB_LIB})
+    target_link_libraries(ols_driver_svb ${SVB_CAMERA_LIB})
+    if(NOT WIN32)
+        target_link_libraries(ols_driver_svb ${LIBUSB_LIB})
+    endif()
     install(TARGETS ols_driver_svb
             LIBRARY DESTINATION lib
     )
@@ -178,12 +201,29 @@ if(TOUPCAM_CAMERA_HDR AND TOUPCAM_CAMERA_LIB)
     include_directories(${TOUPCAM_CAMERA_HDR})
     add_library(ols_driver_toup SHARED src/toup_camera.cpp)
     target_link_libraries(ols_driver_toup ${TOUPCAM_CAMERA_LIB})
+    if(WIN32)
+        target_link_libraries(ols_driver_toup ${LIBUSB_LIB})
+    endif()
     install(TARGETS ols_driver_toup
             LIBRARY DESTINATION lib
     )
     message("- Building Toupcam Driver")
 else()
     message("- No Toupcam SDK header/lib found")
+endif()
+
+if(TOUPCAM_CAMERA_HDR AND MEADECAM_CAMERA_LIB)
+    include_directories(${TOUPCAM_CAMERA_HDR})
+    add_library(ols_driver_meade SHARED src/toup_camera.cpp)
+    target_compile_definitions(ols_driver_meade PRIVATE MEADECAM)
+    
+    target_link_libraries(ols_driver_meade ${MEADECAM_CAMERA_LIB})
+    install(TARGETS ols_driver_meade
+            LIBRARY DESTINATION lib
+    )
+    message("- Building Meade Driver")
+else()
+    message("- No Meade SDK header/lib found")
 endif()
 
 if(LIBCFITSIO AND LIBCFITSIO_HDR)
@@ -200,6 +240,7 @@ endif()
 if(INDI_LIB AND INDI_HEADER)
     message(" - Building OLS with INDI Mount Support")
     set(OLS_EXTRA ${OLS_EXTRA} src/indi_mount.cpp)
+    set(OLS_LIB_EXTRA ${OLS_LIB_EXTRA} ${INDI_LIB})
     add_definitions(-DWITH_INDI)
 else()
     message(" - Building OLS without INDI Mount Support")
@@ -230,7 +271,13 @@ add_library(ols SHARED
     ${OLS_EXTRA}
     )
 
-target_link_libraries(ols dl ${LIBTIFF} ${LIBCPPCMS} ${LIBZ} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS} ${OLS_LIB_EXTRA} ${INDI_LIB})
+target_link_libraries(ols ${LIBTIFF} ${LIBCPPCMS} ${LIBZ} ${LIBBOOSTER} ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS} ${OLS_LIB_EXTRA})
+if(NOT WIN32)
+    target_link_libraries(ols dl)
+else()
+    target_link_libraries(ols iphlpapi)
+endif()
+
 
 
 if(ANDROID_BUILD)
@@ -270,7 +317,7 @@ target_link_libraries(ols_driver_sim ols ${OPENCV_IMGCODECS})
 
 
 
-if(NOT ANDROID_BUILD AND NOT APPLE)  
+if(LINUX AND NOT ANDROID_BUILD)  
     add_library(ols_driver_wdir SHARED src/wdir_camera.cpp)
     target_link_libraries(ols_driver_wdir ols ${OPENCV_CORE} ${OPENCV_IMGPROC} ${OPENCV_IMGCODECS} ${LIBBOOSTER})
     if(LIBRAW_LIB AND LIBRAW_HDR)
@@ -379,10 +426,13 @@ if(NOT ANDROID_BUILD)
     install(PROGRAMS scripts/ols_gui DESTINATION bin)
 endif()
 
-
+find_program(PYTHON NAMES python3 python)
+if(NOT PYTHON)
+    message(FATAL_ERROR "Can't build without Python interpreter")
+endif()
 
 add_custom_command(TARGET ols POST_BUILD
-    COMMAND python3 
+    COMMAND ${PYTHON} 
                 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/make_db.py 
                 ${CMAKE_CURRENT_SOURCE_DIR}/www-data/media/js/jsdb.js 
                 ${CMAKE_CURRENT_SOURCE_DIR}/www-data/media/js/vsop87_lib.js

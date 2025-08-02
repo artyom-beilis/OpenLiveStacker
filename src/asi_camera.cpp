@@ -6,8 +6,7 @@
 #include <atomic>
 #include <map>
 #include <string.h>
-#include <sys/time.h>
-#include <unistd.h>
+#include "os_util.h"
 #include <thread>
 #include <algorithm>
 
