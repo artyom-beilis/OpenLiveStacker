@@ -11,18 +11,18 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
     |-------------|---------|-------|---------|
     |ASI ZWO      | V       | V     | V       |
     |Tuptek/Meade | V       | V     | V       |
-    |SVBony       | X       | V     | V       |
-    |UVC          | V       | V     | X       |
-    |DSLR/gphoto2 | V       | V     | X       |
-    |Indi         | V       | V     | X       |
-    |Indigo       | X       | V     | X       |
+    |SVBony       |         | V     | V       |
+    |UVC          | V       | V     |         |
+    |DSLR/gphoto2 | V       | V     |         |
+    |Indi         | V       | V     |         |
+    |Indigo       |         | V     |         |
     |Alpaca       | V       | V     | V       |
 - Mount API:
 
     |Mount        | Android | Linux | Windows |
     |-------------|---------|-------|---------|
-    |Indi Embedded| V       | X     | X       |
-    |Indi Remote  | V       | V     | X       |
+    |Indi Embedded| V       |       |         |
+    |Indi Remote  | V       | V     |         |
     |Alpaca Remote| V       | V     | V       |
 - Planned cameras to be supported direclty: QHY
 - Featues:
