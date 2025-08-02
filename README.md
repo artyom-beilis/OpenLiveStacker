@@ -54,6 +54,8 @@ For Windows x64 download zip file, unzip it and run ols_gui, you may need to ins
 
 ![RIG](https://github.com/artyom-beilis/OpenLiveStacker/blob/main/docs/connection-charts.png)
 
+![RIG](https://github.com/artyom-beilis/OpenLiveStacker/blob/main/docs/conn-alpaca.png)
+
 ## Building
 
 ### Build Requirements
