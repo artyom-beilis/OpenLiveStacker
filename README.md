@@ -1,11 +1,13 @@
 # OpenLiveStacker - live stacking application
 
-OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) that uses an external camera for imaging and performs live stacking. It runs on Android and in Linux environments (including Linux Subsystem for Windows).
+OpenLiveStacker is a cross platform open source application for Electronically Assisted Astronomy (EAA) - live stacking.
+
+It runs on Android, Linux and Windows...
 
 ## Status
 
-- Platforms: Android, Linux and Windows
-- Cameras:
+- Supported Platforms: Android, Linux and Windows
+- Supported Cameras:
 
     |Camera       | Android | Linux | Windows |
     |-------------|---------|-------|---------|
@@ -18,7 +20,7 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
     |Indigo       |         | V     |         |
     |Alpaca       | V       | V     | V       |
     |Watch Dir    |         | V     |         |
-- Mount API:
+- Supported Mount API:
 
     |Mount        | Android | Linux | Windows |
     |-------------|---------|-------|---------|
@@ -34,6 +36,7 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
     - Auto/Manual stretch
     - Mount control via Indi and Aplaca
     - Plate solving, synchronization with mount
+    - Polar alignment
     - Gradient removal, satellite removal, hot pixel correction
     - Calibration frames: darks, flats, dark-flats
 
