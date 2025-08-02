@@ -71,7 +71,7 @@ namespace ols {
     };
     void AlpacaClient::get_binary_image(cv::Mat &output)
     {
-        auto result = client_->Get(prefix_ + "/imagearray",{{"Accept","application/imagebytes"}});
+        auto result = client_->Get(prefix_ + "/imagearray",std_params(),{{"Accept","application/imagebytes"}});
         if(!result)
             throw std::runtime_error("Failed connect to " + prefix_ + "/imagearray");
         if(result->status != 200)
@@ -193,7 +193,10 @@ namespace ols {
 
     cppcms::json::value AlpacaClient::get_json(std::string const &url,std::multimap<std::string,std::string> const &params)
     {
-        auto res = client_->Get(url,params,httplib::Headers());
+        auto full_params = std_params();
+        for(auto p: params)
+            full_params.insert(p);
+        auto res = client_->Get(url,full_params,httplib::Headers());
         if(!res)
             throw std::runtime_error("Failed connect to " + url);
         if(res->status != 200)
