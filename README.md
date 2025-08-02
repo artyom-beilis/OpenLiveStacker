@@ -4,30 +4,34 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
 
 ## Status
 
-- Beta, runs on Linux and Android.
-- Platforms: Linux, PI and  Android, Windows services for Linux are working as well
+- Platforms: Android, Linux and Windows
 - Cameras:
-    - Supported Linux and Android:
-        - ASI ZWO
-        - ToupTek and Meade (based on ToupTek)
-        - UVC Based like webcam, sv105
-        - DSLR/DSLM support using gphoto2
-        - Indi CCD - remote camera
-        - Android Camera
-        - Sim - simulation for development
-    - Linux Only:
-        - SVBony
-        - Indigo CCD
-        - Watch directoy for files (universal integration with ekos, Linux only)
-    - Planned to be supported:
-        - QHY - Linux and Android
+
+    |Camera       | Android | Linux | Windows |
+    |-------------|---------|-------|---------|
+    |ASI ZWO      | V       | V     | V       |
+    |Tuptek/Meade | V       | V     | V       |
+    |SVBony       | X       | V     | V       |
+    |UVC          | V       | V     | X       |
+    |DSLR/gphoto2 | V       | V     | X       |
+    |Indi         | V       | V     | X       |
+    |Indigo       | X       | V     | X       |
+    |Alpaca       | V       | V     | V       |
+- Mount API:
+
+    |Mount        | Android | Linux | Windows |
+    |-------------|---------|-------|---------|
+    |Indi Embedded| V       | X     | X       |
+    |Indi Remote  | V       | V     | X       |
+    |Alpaca Remote| V       | V     | V       |
+- Planned cameras to be supported direclty: QHY
 - Featues:
     - Live Stacking:
         - Deep Space Objects
         - Planetary
         - Non-Tracking - point and observe
     - Auto/Manual stretch
-    - Mount control via indi (both Android and Linux)
+    - Mount control via Indi and Aplaca
     - Plate solving, synchronization with mount
     - Gradient removal, satellite removal, hot pixel correction
     - Calibration frames: darks, flats, dark-flats
@@ -41,6 +45,10 @@ Please refer to <https://github.com/artyom-beilis/OpenLiveStacker/wiki/Open-Live
 ## Using on Linux
 
 For Linux AMD64 arch you can just download tar that contains everything, untar and run bin/ols_gui
+
+## Using on Windows
+
+For Windows x64 download zip file, unzip it and run ols_gui, you may need to install [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
 
 ## How to combine OpenLiveStacker in your EAA rig
 
