@@ -17,6 +17,7 @@ OpenLiveStacker is an application for Electronically Assisted Astronomy (EAA) th
     |Indi         | V       | V     |         |
     |Indigo       |         | V     |         |
     |Alpaca       | V       | V     | V       |
+    |Watch Dir    |         | V     |         |
 - Mount API:
 
     |Mount        | Android | Linux | Windows |
