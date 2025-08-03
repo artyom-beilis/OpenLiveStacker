@@ -71,7 +71,14 @@ namespace ols {
     };
     void AlpacaClient::get_binary_image(cv::Mat &output)
     {
-        auto result = client_->Get(prefix_ + "/imagearray",std_params(),{{"Accept","application/imagebytes"}});
+        auto result = client_->Get(prefix_ + "/imagearray",std_params(),
+            {
+                {"Accept","application/imagebytes"},
+                {"Accept-Encoding", "identity"}
+                // ^^^ identity is not really needed 
+                // just a workaround for ASCOM Remote 6.7 bug #71
+            } 
+        );
         if(!result)
             throw std::runtime_error("Failed connect to " + prefix_ + "/imagearray");
         if(result->status != 200)
