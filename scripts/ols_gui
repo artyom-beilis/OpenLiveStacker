@@ -108,7 +108,7 @@ def _default_config(install_dir = None,src_dir = None):
 
 
 def get_default_config():
-    scripts_dir = os.path.dirname(sys.argv[0])
+    scripts_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
     scripts_dir_name = os.path.basename(scripts_dir)
     root_dir =  os.path.dirname(scripts_dir)
     global _config_path
