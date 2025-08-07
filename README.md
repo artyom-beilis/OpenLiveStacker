@@ -48,7 +48,7 @@ Please refer to <https://github.com/artyom-beilis/OpenLiveStacker/wiki/Open-Live
 
 ## Using on Linux
 
-For Linux AMD64 arch you can just download tar that contains everything, untar and run bin/ols_gui
+For Linux AMD64 arch you can just download tar that contains everything, untar and run `./bin/ols_gui`
 
 ## Using on Windows
 
