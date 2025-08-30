@@ -295,7 +295,7 @@ void MountControlApp::go_to()
     MountErrorCode e;
     double RA=Mount::parseRA(content_.get<std::string>("ra"),e);
     e.check();
-    double DEC=Mount::parseRA(content_.get<std::string>("dec"),e);
+    double DEC=Mount::parseDEC(content_.get<std::string>("dec"),e);
     e.check();
     client->go_to(EqCoord{RA,DEC},e);
     e.check();
