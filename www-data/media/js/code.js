@@ -1931,6 +1931,50 @@ function sunIsAllowed()
     return document.getElementById('mount_sun_allow').checked;
 }
 
+function RaDecToXYZ(ra,dec)
+{
+    const d2r = Math.PI / 180;
+    var ra_rad = parseRA(ra) * d2r;
+    var dec_rad = parseDEC(dec) * d2r;
+    var fact = Math.cos(dec_rad);
+    var z = Math.sin(dec_rad);
+    var x = Math.cos(ra_rad) * fact;
+    var y = Math.sin(ra_rad) * fact;
+    console.log(`${x*x + y*y + z*z}`)
+    return [x,y,z];
+}
+
+function findObjectByCoord()
+{
+    const startTime = performance.now();
+    var ra_str = document.getElementById('mount_ra').innerHTML;
+    var dec_str = document.getElementById('mount_dec').innerHTML;
+    console.log(`RA = ${ra_str} dec=${dec_str}`)
+    var target_xyz = RaDecToXYZ(ra_str,dec_str);
+    var best_sim = -10;
+    var best_name = null;
+    var best_coord = null;
+    const is_messier = /^M[0-9]+$/;
+    for(name in jsdb) {
+        var s_crd = jsdb[name]
+        var obj_xyz = RaDecToXYZ(s_crd[0],s_crd[1])
+        var sim = target_xyz[0] * obj_xyz[0] + target_xyz[1] * obj_xyz[1] + target_xyz[2] * obj_xyz[2];
+        if(best_name == null || sim > best_sim) {
+            best_sim = sim;
+            best_name = name;
+            best_coord = s_crd;
+        }
+        else if(sim == best_sim && name.match(is_messier)) {
+            best_name = name;
+        }
+    }
+    const endTime = performance.now();
+    best_name = best_name.toLowerCase()
+    document.getElementById('solver_object').value = best_name;
+    updateSolverRADE(best_name)
+    console.log(`Call to findObjectByCoord took ${endTime - startTime} milliseconds -> ${best_coord}`)
+}
+
 function updateRADEFor(name,target_id)
 {
     var coord=['','']
@@ -2558,6 +2602,7 @@ function mountConnect()
 
 function mountGoTo(ra,dec)
 {
+    console.log(`goto ${ra} ${dec}`)
     restCall('post','/api/mount/goto',{'ra':ra,'dec':dec},(e)=>{}) 
 }
 
