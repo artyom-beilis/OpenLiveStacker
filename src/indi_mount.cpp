@@ -486,10 +486,12 @@ namespace {
         virtual void go_to(EqCoord coord,MountErrorCode &e) override
         {
             guard_type g(lock_);
+            LOGP("Goto %.6f,%.6f j2000\n",coord.RA,coord.DEC);
             coord = j2000_to_eod(coord);
             double alt = get_altitude_for_jnow(coord).Alt;
             if(!check_altitude_in_limits(alt,e))
                 return;
+            LOGP("Goto %.6f,%.6f jnow\n",coord.RA,coord.DEC);
             go_to_jnow_no_check(coord,e);
         }
 
