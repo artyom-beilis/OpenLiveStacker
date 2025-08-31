@@ -3,6 +3,7 @@
 //#include <booster/posix_time.h>
 #include <stdexcept>
 #include <iostream>
+#include <sstream>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <booster/aio/endpoint.h>
@@ -109,8 +110,11 @@ namespace ols {
         size_t start = meta.DataStart;
         size_t size = width * height * (rgb ? 3 : 1) * bpp;
         size_t end = start + size;
-        if(start < sizeof(meta) || size >= end || end > result->body.size() || size == 0)
-            throw std::runtime_error("Image format mistmatch");
+        if(start < sizeof(meta) || size >= end || end > result->body.size() || size == 0) {
+            std::ostringstream ss;
+            ss << "Start=" << start << " sizeof(meta)="<< sizeof(meta) << " img size=" << size << "  end =" << end << " body_size="<<result->body.size();
+            throw std::runtime_error("Image format mistmatch:" + ss.str());
+        }
         void *ptr = &result->body[start];
         cv::Mat orig(height,width,
             (bpp == 1 ? 
