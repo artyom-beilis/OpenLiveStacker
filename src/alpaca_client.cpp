@@ -94,6 +94,8 @@ namespace ols {
             bpp = 1;
         else if(meta.TransmissionElementType == 8)
             bpp = 2;
+        else if(meta.TransmissionElementType == 2)
+            bpp = 4;
         else
             throw std::runtime_error("Elemented type = " + std::to_string(meta.TransmissionElementType) + " is not supported");
         int height = meta.Dimension1;
@@ -110,9 +112,16 @@ namespace ols {
         if(start < sizeof(meta) || size >= end || end > result->body.size() || size == 0)
             throw std::runtime_error("Image format mistmatch");
         void *ptr = &result->body[start];
-        cv::Mat orig(height,width,(bpp == 1 ? (rgb ? CV_8UC3 : CV_8UC1) : (rgb ? CV_16UC3 : CV_16UC1)),ptr);
+        cv::Mat orig(height,width,
+            (bpp == 1 ? 
+                (rgb ? CV_8UC3 : CV_8UC1) : 
+                (bpp == 2 ?
+                (rgb ? CV_16UC3 : CV_16UC1)
+                :(rgb ? CV_32SC3 : CV_32SC1))
+                ),
+            ptr);
         cv::Mat tr = orig.t();
-        if(bpp == 1) {
+        if(bpp != 2) {
             tr.convertTo(output,(rgb ? CV_16UC3 : CV_16UC1));
         }
         else {
