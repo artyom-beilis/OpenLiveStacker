@@ -1,9 +1,10 @@
 {
+
     "libdir" : "./build",
     "data_dir": "./data",
     "driver" : "sim",
     "sim" : {
-        "path" : "sim"
+        "path" : "."
     },
     "mem_limit_mb" : 0,
     "wdir" : {
