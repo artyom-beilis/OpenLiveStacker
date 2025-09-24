@@ -57,12 +57,11 @@ namespace ols {
             if(e)
                 return 0;
             if(is_abs){
-                return accum_position_;
-            }
-            else {
                 return position_impl(e);
             }
-
+            else {
+                return accum_position_;
+            }
         }
 
         void move_by(int delta,FocuserErrorCode &e)
@@ -134,6 +133,7 @@ namespace ols {
         
         std::vector<FocuserInfo> drivers_list();
         void load_driver(FocuserInfo const &info,FocuserErrorCode &e);
+        void unload_driver();
         
     protected:
         FocuserInterface();

@@ -46,6 +46,32 @@
     <button style="display:none" id="error_notification" class="comp_but error_background" onclick='showErrorNotification();'>&nbsp;</button>
 </p>
 <button style="display:none; float:right" id="stacking_ui_live" class="comp_but" onclick="toggleThumbLive();">L</button>
+
+<div id="focuser_controls" style="display:none; z-index:1;">
+<p>
+    <table>
+    <tr>
+        <td><button class="mount_sq_but focuser_move" onclick="focuserMove(-1,'s');">←</button></td>
+        <td><button class="mount_sq_but focuser_move" onclick="focuserMove( 1,'s');">→</button></td>
+        <td><button class="mount_sq_but focuser_move" onclick="focuserMove(0,'')" >Go</button>
+        <td><button class="mount_sq_but" onclick="showFocuserControls(false);" >X</button></td>
+    </tr>
+    <tr>
+        <td><button class="mount_sq_but focuser_move" onclick="focuserMove(-1,'m');">⇇</button></td>
+        <td><button class="mount_sq_but focuser_move" onclick="focuserMove( 1,'m');">⇉</button></td>
+        <td colspan="2"><input class="mount_input focuser_pos_cls" id="focuser_position" type="number" value="" /></td>
+    </tr>
+    <tr>
+        <td><button class="mount_sq_but focuser_move" onclick="focuserMove(-1,'l');">⬱</button></td>
+        <td><button class="mount_sq_but focuser_move" onclick="focuserMove( 1,'l');">⇶</button></td>
+        <td colspan="2"><button class="focuser_rect_but" onclick="focuserAbort()">Abort</button></td>
+    </tr>
+    </table>
+</p>
+</div>
+
+
+
 <div id="mount_controls" style="display:none; z-index:1;">
 <p>
     <table>
@@ -246,6 +272,7 @@
         <button onclick="selectConfig('calib');">Calib.</button>
         <button onclick="selectConfig('astap');">ASTAP</button>
         <button onclick="selectConfig('mount');">Mount</button>
+        <button onclick="selectConfig('focuser');">Focuser</button>
     <p>
     <div id="config_tab_camera" class="config_tab" >
         <p>Format: <select id="stream_format"></select> <span class="nowr">FPS lim.<input id="stream_max_framerate" class="val_input saved_input" type="number" step="1" value="10" /></span> <button onclick="startStream()" >Stream</button></p>
@@ -320,6 +347,37 @@
             <button id='download_start' onclick='downloadStart()'>Download</button><button id='download_stop' onclick='downloadStop()'>Cancel</button>
             <span id='download_status'></span>
         </p>
+    </div>
+    <div id="config_tab_focuser" class="config_tab" style="display:none">
+        <div id="focuser_driver_selection" style='display:none' >
+            <p>Select Driver</p>
+            <p><select id="focuser_driver_name" onchange="focuserDriverSelect()"></select></p>
+            <p id="focuser_driver_option_p"><input id="focuser_driver_option" value="" type="text" ></p>
+            <p><button onclick="focuserStart();">Load</button></p>
+        </div>
+        <div id="focuser_connected_display_block" style="display:none">
+            <table>
+                <tr>
+                    <td colspan="2"><button onclick="showFocuserControls(true);">Open Focuser Controls</button></td>
+                </tr>
+                <tr>
+                    <td>Focuser range</td>
+                    <td><span id="focuser_range">?</span></td>
+                </tr>
+                <tr>
+                    <td>Small Step</td>
+                    <td><input class="val_input saved_input" id="focuser_step_s" type="number" value="10" /></td>
+                </tr>
+                <tr>
+                    <td>Medium Step</td>
+                    <td><input class="val_input saved_input" id="focuser_step_m" type="number" value="100" /></td>
+                </tr>
+                <tr>
+                    <td>Large Step</td>
+                    <td><input class="val_input saved_input" id="focuser_step_l" type="number" value="1000" /></td>
+                </tr>
+            </table>
+        </div>
     </div>
     <div id="config_tab_mount" class="config_tab" style="display:none">
         <p><strong>Experimental</strong></p>

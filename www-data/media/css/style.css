@@ -38,6 +38,23 @@
     .comp_but, .incdec_but { width: 12mm ; height:12mm; font-size:6mm ; padding: 0 }
 
     .mount_input { width: 36mm; height:18mm; font-size:9mm; padding: 0;}
+    .focuser_rect_but { 
+        width: 36mm ;
+        height:18mm;
+        font-size:9mm ;
+        padding: 0;
+        -webkit-touch-callout: none; /* Safari */
+        -webkit-user-select: none; /* Chrome */
+           -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* Internet Explorer/Edge */
+                user-select: none;
+    }
+    input#focuser_position {
+        font-size: 9mm;
+    }
+    .focuser_pos_cls  {
+        text-align:center;
+    }
     .mount_sq_but { 
         width: 18mm ;
         height:18mm;

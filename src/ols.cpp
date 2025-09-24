@@ -7,6 +7,8 @@
 #include <fstream>
 #include "camera_ctl.h"
 #include "mount_ctl.h"
+#include "focuser_ctl.h"
+#include "focuser.h"
 #include "stacker_ctl_app.h"
 #include "processors.h"
 #include "common_utils.h"
@@ -189,6 +191,7 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     web_service_->applications_pool().mount(cppcms::create_pool<ConfigApp>(data_dir_),cppcms::mount_point("/config((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this,video_generator_queue_),cppcms::mount_point("/camera((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<MountControlApp>(stacker_stats_queue_,this),cppcms::mount_point("/mount((/.*)?)",1));
+    web_service_->applications_pool().mount(cppcms::create_pool<FocuserControlApp>(),cppcms::mount_point("/focuser((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<StackerControlApp>(this,data_dir_,video_generator_queue_),
                                             cppcms::mount_point("/stacker((/.*)?)",1),
                                             cppcms::app::asynchronous);
@@ -353,5 +356,6 @@ void OpenLiveStacker::stop()
     camera_.reset();
     driver_.reset();
     shutdown_mount();
+    FocuserInterface::instance().unload_driver();
 }
 }

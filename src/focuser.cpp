@@ -29,10 +29,18 @@ namespace ols {
             focuser_ = load_alpaca_focuser(info.opt,e);
             return;
         }
+        else {
+            e = "Invalid driver name: " + info.name;
+        }
     }
     std::vector<FocuserInfo> FocuserInterface::drivers_list()
     {
         guard_type g(lock_);
-        return {{ "remote:alpaca","auto" }};
+        return {{ "alpaca:remote","auto" }};
+    }
+    void FocuserInterface::unload_driver()
+    {
+        guard_type g(lock_);
+        focuser_.reset();
     }
 }

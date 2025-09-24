@@ -67,7 +67,11 @@ namespace ols {
         virtual bool is_absolute(FocuserErrorCode &e) override
         {
             try {
-                return client_.get_value<bool>("/absolute");
+                if(abs_ready_)
+                    return is_abs_;
+                is_abs_ = client_.get_value<bool>("/absolute");
+                abs_ready_ = true;
+                return is_abs_;
             }
             catch(std::exception const &ex) {
                 logex(ex);
@@ -88,7 +92,7 @@ namespace ols {
         virtual bool is_moving(FocuserErrorCode &e) override
         {
             try {
-                return client_.get_value<bool>("/is_moving");
+                return client_.get_value<bool>("/ismoving");
             }
             catch(std::exception const &ex) {
                 logex(ex);
@@ -100,7 +104,12 @@ namespace ols {
         virtual int max_range(FocuserErrorCode &e) override
         {
             try {
-                return client_.get_value<int>("/maxstep");
+                if(max_step_ready_) {
+                    return max_step_;
+                }
+                max_step_ =  client_.get_value<int>("/maxstep");
+                max_step_ready_ = true;
+                return max_step_;
             }
             catch(std::exception const &ex) {
                 logex(ex);
@@ -130,7 +139,7 @@ namespace ols {
         void move_impl(int n,FocuserErrorCode &e)
         {
             try {
-                return client_.put("move",{{"Position",std::to_string(n)}});
+                return client_.put("/move",{{"Position",std::to_string(n)}});
             }
             catch(std::exception const &ex) {
                 logex(ex);
@@ -147,6 +156,10 @@ namespace ols {
         }
         AlpacaClient client_;
         FILE *log_;
+        bool abs_ready_ = false;
+        bool is_abs_ = true;
+        bool max_step_ready_ = false;
+        int max_step_ = 0;
     };
 
 
