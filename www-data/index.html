@@ -272,7 +272,7 @@
         <button onclick="selectConfig('calib');">Calib.</button>
         <button onclick="selectConfig('astap');">ASTAP</button>
         <button onclick="selectConfig('mount');">Mount</button>
-        <button onclick="selectConfig('focuser');">Focuser</button>
+        <button onclick="selectConfig('focuser');" class="alpha_features" >Focuser</button>
     <p>
     <div id="config_tab_camera" class="config_tab" >
         <p>Format: <select id="stream_format"></select> <span class="nowr">FPS lim.<input id="stream_max_framerate" class="val_input saved_input" type="number" step="1" value="10" /></span> <button onclick="startStream()" >Stream</button></p>
@@ -299,6 +299,9 @@
         </p>
         <p>
             <span class="nowr" >Lon:<input class="val_input saved_input" id="stack_lon" type="number" step="0.001"></span>
+        </p>
+        <p>
+            <span id="extra_opt_toggle" class="nowr" ><label for="extra_opt_checked">Alpha Features</label><input class = "saved_input" id="extra_opt_checked" type="checkbox" onchange="enableAlphaFeatures(this.checked)" ></span>
         </p>
         <p><button id="manual_geolocation" onclick="getBrowserGeolocation();">Get Geolocation</button></p>
         <p>

@@ -9,6 +9,9 @@
         height: 0;
         width: 0;
     }
+    .alpha_features {
+        display:none;
+    }
     body, td { font-size: 5mm ; color:red ; font-family: sans; background-color:black }
     a:link {color: red;}
     a:visited { color: red; }

@@ -2911,6 +2911,12 @@ function focuserDriverSelect()
     document.getElementById('focuser_driver_option').value = g_focuser_driver_list[index].option
 }
 
+function enableAlphaFeatures(enable)
+{
+    for(var el of document.getElementsByClassName('alpha_features'))
+        el.style.display = enable ? 'inline' : 'none';
+}
+
 function focuserStart()
 {
     var name =document.getElementById('focuser_driver_name').value;
