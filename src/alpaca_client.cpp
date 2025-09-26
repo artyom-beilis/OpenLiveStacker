@@ -312,7 +312,7 @@ namespace ols {
             ifaddr = nullptr;
             return ips;
         }
-#endif        
+#endif      
         std::set<std::string> discover_ips(std::vector<std::string> const &baddr)
         {
             std::set<std::string> result;
@@ -324,9 +324,11 @@ namespace ols {
             struct timeval tv;
             tv.tv_sec = 0;
             tv.tv_usec = 500000;
+#ifndef _WIN32
             if(setsockopt(s.native(),SOL_SOCKET,SO_RCVTIMEO,(char const *)&tv,sizeof(tv)) < 0) {
                 throw std::system_error(errno, std::generic_category()); 
             }
+#endif            
             std::string message = "alpacadiscovery1";
             for(std::string const &target_ip :baddr) {
                 booster::aio::endpoint ep(target_ip,32227);
@@ -338,6 +340,14 @@ namespace ols {
                     char buffer[256] = {};
                     struct sockaddr_in sender;
                     socklen_t len = sizeof(sender);
+#ifdef _WIN32
+                    fd_set fds;
+                    FD_ZERO(&fds);
+                    FD_SET(s.native(), &fds);
+                    if(select(0,&fds,0,0,&tv) != 1) {
+                        continue;
+                    }
+#endif                    
                     if(recvfrom(s.native(),buffer,sizeof(buffer) - 1,0,(struct sockaddr *)&sender,&len) > 0) {
                         booster::aio::endpoint remote_ep;
                         remote_ep.raw((struct sockaddr *)&sender,len);
