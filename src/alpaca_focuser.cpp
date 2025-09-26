@@ -16,9 +16,18 @@ namespace ols {
                     throw std::runtime_error("No focuser found");
                 }
                 client_.set_device(devices[0].second);
-                client_.connect();
-                if(!client_.is_connected())
-                    throw std::runtime_error("Failed to connect to device");
+                bool connected = true;
+                try {
+                    connected = client_.is_connected();
+                }
+                catch(std::exception const &e) {
+                    logex(e);
+                }
+                if(!connected) {
+                    client_.connect();
+                    if(!client_.is_connected())
+                        throw std::runtime_error("Failed to connect to device");
+                }
             }
             catch(...) {
                 close_log();
