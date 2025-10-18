@@ -9,5 +9,6 @@ namespace ols {
                                 queue_pointer_type debug_save,
                                 queue_pointer_type plate_solving_output,
                                 queue_pointer_type guiding_output,
-                                queue_pointer_type message_output);
+                                queue_pointer_type message_output,
+                                queue_pointer_type vr_output);
 }

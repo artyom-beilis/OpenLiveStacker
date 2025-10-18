@@ -27,6 +27,8 @@ namespace ols {
                                       queue_pointer_type out,
                                       queue_pointer_type stats_and_error,
                                       queue_pointer_type plate_solving_output,
+                                      queue_pointer_type vr_out,
                                       std::string data_dir);
     std::thread start_debug_saver(queue_pointer_type in,queue_pointer_type error_queue,std::string debug_dir);
+    std::thread start_vr_processor(queue_pointer_type in,queue_pointer_type out);
 }

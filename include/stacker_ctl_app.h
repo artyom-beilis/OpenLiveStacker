@@ -31,8 +31,20 @@ namespace ols {
             dispatcher().map("POST","/control/?",&StackerControlApp::control,this);
             dispatcher().map("POST","/stretch/?",&StackerControlApp::stretch,this);
             dispatcher().map("POST","/sharpen/?",&StackerControlApp::sharpen,this);
+            dispatcher().map("POST","/vr/?",&StackerControlApp::vr,this);
             dispatcher().map("GET", "/status/?",&StackerControlApp::status,this);
             dispatcher().map("DELETE", "/calibration/([A-Za-z0-9_.\\-]*)",&StackerControlApp::del_calibration,this,1);
+        }
+        void vr()
+        {
+            std::shared_ptr<VRInfo> vr(new VRInfo());
+            vr->enable = content_.get<bool>("enable");
+            vr->circle = content_.get<bool>("circle");
+            vr->width = content_.get<int>("width");
+            vr->height = content_.get<int>("height");
+            vr->central_padding = content_.get<int>("central_padding");
+            vr->factor = content_.get<double>("factor");
+            queue_->push(vr); 
         }
         void del_calibration(std::string id)
         {

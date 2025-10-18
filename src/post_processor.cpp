@@ -17,11 +17,12 @@
 namespace ols {
     class PostProcessorProcessor {
     public:
-        PostProcessorProcessor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,std::string data_dir) :
+        PostProcessorProcessor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,queue_pointer_type vr,std::string data_dir) :
             in_(in),
             out_(out),
             stats_(stats),
             plate_solving_(plate_solving),
+            vr_out_(vr),
             data_dir_(data_dir),
             //pp_(new PostProcessor())
             pp_(new PlanetaryPostProcessor())
@@ -36,6 +37,10 @@ namespace ols {
                     if(out_)
                         out_->push(data_ptr);
                     break;
+                }
+                auto vr_ptr = std::dynamic_pointer_cast<VRInfo>(data_ptr);
+                if(vr_ptr && vr_out_) {
+                    vr_ = vr_ptr->enable;
                 }
                 auto video_ptr = std::dynamic_pointer_cast<StackedFrame>(data_ptr);
                 if(video_ptr) {
@@ -111,6 +116,11 @@ namespace ols {
             frame->format.width = img8.cols;
             frame->format.height = img8.rows;
             std::vector<unsigned char> buf;
+            if(vr_ && vr_out_) {
+                std::shared_ptr<CameraFrame> vr(new CameraFrame());
+                img8.copyTo(vr->frame);
+                vr_out_->push_or_replace(vr);
+            }
             cv::imencode(".jpeg",img8,buf);
             frame->jpeg_frame = std::shared_ptr<VideoFrame>(new VideoFrame(buf.data(),buf.size()));
             if(plate_solving_ && create_ps_frame) {
@@ -383,10 +393,11 @@ namespace ols {
             }
         }
     private:
-        queue_pointer_type in_,out_,stats_,plate_solving_;
+        queue_pointer_type in_,out_,stats_,plate_solving_,vr_out_;
         std::string data_dir_;
         int width_,height_;
         bool mono_;
+        bool vr_ = false;
         bool save_tiff_ = true;
         int version_;
         bool calibration_=false;
@@ -401,9 +412,9 @@ namespace ols {
         StackerControl stack_info_;
     };
 
-    std::thread start_post_processor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,std::string data_dir)
+    std::thread start_post_processor(queue_pointer_type in,queue_pointer_type out,queue_pointer_type stats,queue_pointer_type plate_solving,queue_pointer_type vr,std::string data_dir)
     {
-        std::shared_ptr<PostProcessorProcessor> p(new PostProcessorProcessor(in,out,stats,plate_solving,data_dir));
+        std::shared_ptr<PostProcessorProcessor> p(new PostProcessorProcessor(in,out,stats,plate_solving,vr,data_dir));
         return std::thread([=]() { p->run(); });
     }
  

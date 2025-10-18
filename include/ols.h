@@ -79,6 +79,8 @@ namespace ols {
         queue_pointer_type stacker_stats_queue_      = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type plate_solving_queue_      = std::shared_ptr<queue_type>(new queue_type());
         queue_pointer_type guide_queue_              = std::shared_ptr<queue_type>(new queue_type());
+        queue_pointer_type vr_queue_                 = std::shared_ptr<queue_type>(new queue_type());
+        queue_pointer_type vr_display_queue_         = std::shared_ptr<queue_type>(new queue_type());
         
         std::recursive_mutex camera_lock_;
         std::unique_ptr<Camera> camera_;
@@ -98,6 +100,7 @@ namespace ols {
 
         booster::intrusive_ptr<VideoGeneratorApp> video_generator_app_;
         booster::intrusive_ptr<VideoGeneratorApp> stacked_video_generator_app_;
+        booster::intrusive_ptr<VideoGeneratorApp> vr_generator_app_;
         booster::intrusive_ptr<StackerStatsNotification> stats_stream_app_;
         
         std::thread video_generator_thread_;
@@ -105,6 +108,7 @@ namespace ols {
         std::thread preprocessor_thread_;
         std::thread stacker_thread_;
         std::thread pp_thread_;
+        std::thread vr_thread_;
         
         std::shared_ptr<cppcms::service> web_service_;
 

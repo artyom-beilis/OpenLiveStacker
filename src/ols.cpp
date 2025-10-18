@@ -183,9 +183,11 @@ void OpenLiveStacker::init(std::string driver_name,int external_option)
     
     video_generator_app_ = new VideoGeneratorApp(*web_service_,"Real time video");
     stacked_video_generator_app_ = new VideoGeneratorApp(*web_service_,"Stacked video");
+    vr_generator_app_ = new VideoGeneratorApp(*web_service_,"VR video");
     stats_stream_app_ = new StackerStatsNotification(*web_service_);
     web_service_->applications_pool().mount(video_generator_app_,cppcms::mount_point("/video/live",0));
     web_service_->applications_pool().mount(stacked_video_generator_app_,cppcms::mount_point("/video/stacked",0));
+    web_service_->applications_pool().mount(vr_generator_app_,cppcms::mount_point("/video/vr",0));
     web_service_->applications_pool().mount(cppcms::create_pool<ConfigApp>(data_dir_),cppcms::mount_point("/config((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<CameraControlApp>(this,video_generator_queue_),cppcms::mount_point("/camera((/.*)?)",1));
     web_service_->applications_pool().mount(cppcms::create_pool<MountControlApp>(stacker_stats_queue_,this),cppcms::mount_point("/mount((/.*)?)",1));
@@ -292,6 +294,7 @@ void OpenLiveStacker::run()
 {
     video_display_queue_->call_on_push(video_generator_app_->get_callback());
     stack_display_queue_->call_on_push(stacked_video_generator_app_->get_callback());
+    vr_display_queue_->call_on_push(vr_generator_app_->get_callback());
     stacker_stats_queue_->call_on_push(stats_stream_app_->get_callback());
     plate_solving_queue_->call_on_push(set_plate_solving_image);
     guide_queue_->call_on_push([=](data_pointer_type p) { this->guide(p); });
@@ -302,7 +305,8 @@ void OpenLiveStacker::run()
                                                         debug_save_queue_,
                                                         plate_solving_queue_,
                                                         guide_queue_,
-                                                        stacker_stats_queue_);
+                                                        stacker_stats_queue_,
+                                                        vr_queue_);
 
     debug_save_thread_ = start_debug_saver(debug_save_queue_,stacker_stats_queue_,debug_dir_);
     preprocessor_thread_ = start_preprocessor(preprocessor_queue_,stacker_queue_,stacker_stats_queue_);
@@ -311,7 +315,10 @@ void OpenLiveStacker::run()
                                               stack_display_queue_,
                                               stacker_stats_queue_,
                                               plate_solving_queue_,
+                                              vr_queue_,
                                               data_dir_);
+
+    vr_thread_ = start_vr_processor(vr_queue_,vr_display_queue_);
     try {
         web_service_->run();
     }
@@ -349,6 +356,7 @@ void OpenLiveStacker::stop()
     preprocessor_thread_.join();
     stacker_thread_.join();
     pp_thread_.join();
+    vr_thread_.join();
 
     camera_.reset();
     driver_.reset();

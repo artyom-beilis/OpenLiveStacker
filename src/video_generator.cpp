@@ -16,14 +16,16 @@ namespace ols {
                        queue_pointer_type debug,
                        queue_pointer_type plate_solving_output,
                        queue_pointer_type guiding_output,
-                       queue_pointer_type message_output): 
+                       queue_pointer_type message_output,
+                       queue_pointer_type vr_output): 
             data_queue_(queue),
             stack_out_(stacking_output),
             live_out_(live_output),
             debug_out_(debug),
             plate_solving_out_(plate_solving_output),
             guiding_out_(guiding_output),
-            msg_out_(message_output)
+            msg_out_(message_output),
+            vr_out_(vr_output)
         {
         }
         void handle_jpeg_stack(std::shared_ptr<CameraFrame> frame,cv::Mat image,bool copy)
@@ -47,6 +49,12 @@ namespace ols {
             else {
                 double factor = 255.0 / frame->frame_dr;
                 image.convertTo(normalized,image.channels() == 3 ? CV_8UC3: CV_8UC1,factor);
+            }
+
+            if(vr_live()) {
+                std::shared_ptr<CameraFrame> vr(new CameraFrame());
+                normalized.copyTo(vr->frame);
+                vr_out_->push_or_replace(vr);
             }
 
             cv::imencode(".jpeg",normalized,buf);
@@ -105,7 +113,7 @@ namespace ols {
                             frame->frame = cv::imdecode(buffer,cv::IMREAD_UNCHANGED);
                             frame->frame_dr = 255;
                             frame->raw = frame->frame;
-                            if(live_auto_stretch_) {
+                            if(live_auto_stretch_ || vr_live()) {
                                 // can forward jpeg as is since it need to be stretched
                                 handle_jpeg_stack(frame,frame->frame,true);
                             }
@@ -245,6 +253,10 @@ namespace ols {
                 stack_out_->push(ctl_ptr);
                 debug_out_->push(ctl_ptr);
         }
+        bool vr_live()
+        {
+            return vr_ && !stacking_in_process_;
+        }
         void run()
         {
             while(true) {
@@ -254,6 +266,8 @@ namespace ols {
                     live_out_->push(data_ptr);
                     stack_out_->push(data_ptr);
                     debug_out_->push(data_ptr);
+                    if(vr_out_)
+                        vr_out_->push(data_ptr);
                     break;
                 }
                 auto frame_ptr = std::dynamic_pointer_cast<CameraFrame>(data_ptr);
@@ -273,6 +287,14 @@ namespace ols {
                 if(live_ptr){
                     handle_live_ctl(live_ptr);
                     continue;
+                }
+
+                auto vr_ptr = std::dynamic_pointer_cast<VRInfo>(data_ptr);
+
+                if(vr_ptr && vr_out_) {
+                    vr_ = vr_ptr->enable;
+                    vr_out_->push(vr_ptr);
+                    stack_out_->push(vr_ptr);
                 }
                
                 char const *name = "nullptr";
@@ -383,7 +405,8 @@ namespace ols {
             }
         }
     private:
-        queue_pointer_type data_queue_, stack_out_, live_out_, debug_out_, plate_solving_out_, guiding_out_, msg_out_;
+        queue_pointer_type data_queue_, stack_out_, live_out_, debug_out_, plate_solving_out_, guiding_out_, msg_out_, vr_out_;
+        bool vr_ = false;
         bool stacking_active_ = false;
         bool stacking_in_process_ = false;
         bool debug_active_ = false;
@@ -407,9 +430,10 @@ namespace ols {
                                 queue_pointer_type debug_save,
                                 queue_pointer_type plate_solving_out,
                                 queue_pointer_type guide_out,
-                                queue_pointer_type message_out)
+                                queue_pointer_type message_out,
+                                queue_pointer_type vr_out)
     {
-        std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,stacking_output,live_output,debug_save,plate_solving_out,guide_out,message_out));
+        std::shared_ptr<VideoGenerator> vg(new VideoGenerator(input,stacking_output,live_output,debug_save,plate_solving_out,guide_out,message_out,vr_out));
         std::thread t([=](){vg->run();});
         return t;
     }

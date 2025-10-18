@@ -99,6 +99,15 @@ namespace ols {
         double avg_brightness_sigma = -1.0;
     };
 
+    struct VRInfo : public QueueData {
+        bool enable = false;
+        bool circle = false;
+        int width = 0;
+        int height = 0;
+        int central_padding = 0;
+        double factor = 0.0;
+    };
+
     struct StackerControl : public QueueData {
         enum ControlType {
             ctl_init,     /// start stacking

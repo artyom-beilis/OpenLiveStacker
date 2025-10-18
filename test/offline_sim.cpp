@@ -39,7 +39,7 @@ namespace ols {
             }
             std::thread t1 = start_preprocessor(input_queue_,stacker_queue_,nullptr);
             std::thread t2 = start_stacker(stacker_queue_,pp_queue_);
-            std::thread t3 = start_post_processor(pp_queue_,out,nullptr,nullptr,output_dir_);
+            std::thread t3 = start_post_processor(pp_queue_,out,nullptr,nullptr,nullptr,output_dir_);
             std::shared_ptr<StackerControl> ctl(new StackerControl(cfg_));
             std::cerr << cfg_.width << " " << cfg_.height << std::endl;
             input_queue_->push(ctl);

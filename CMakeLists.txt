@@ -268,6 +268,7 @@ add_library(ols SHARED
     src/allocator.cpp
     src/alpaca_client.cpp
     src/alpaca_mount.cpp
+    src/vr_processor.cpp
     ${OLS_EXTRA}
     )
 
