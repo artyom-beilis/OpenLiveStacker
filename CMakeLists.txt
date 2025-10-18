@@ -269,6 +269,9 @@ add_library(ols SHARED
     src/alpaca_client.cpp
     src/alpaca_mount.cpp
     src/vr_processor.cpp
+    src/focuser_ctl.cpp
+    src/focuser.cpp
+    src/alpaca_focuser.cpp
     ${OLS_EXTRA}
     )
 

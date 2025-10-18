@@ -3,6 +3,7 @@ var g_slew_speed = 5;
 var global_width = 0;
 var global_height = 0;
 var global_bin = 0;
+var g_focuser_driver_list = null;
 var global_download_progress = null;
 var global_zoom = 1.0;
 var g_sharpen_sent = 0.0;
@@ -1417,6 +1418,13 @@ function startStream()
         recalcFOV();
     });
     showConfig(false);
+}
+function showFocuserControls(disp)
+{
+    if(disp) {
+        showConfig(false);
+    }
+    document.getElementById('focuser_controls').style.display = disp ? 'block' : 'none';
 }
 
 function showMount(disp)
@@ -2853,7 +2861,7 @@ function selectStackConfig(cfg)
 
 function selectConfig(cfg)
 {
-    var cfgs = ['astap','general','camera','profiles','calib','mount'];
+    var cfgs = ['astap','general','camera','profiles','calib','mount','focuser'];
     for(var i=0;i<cfgs.length;i++) {
         var obj = document.getElementById('config_tab_' + cfgs[i]);
         if(cfgs[i] == cfg) {
@@ -2875,6 +2883,94 @@ function selectConfig(cfg)
     if(cfg == 'mount') {
         update_mnt();
     }
+    if(cfg == 'focuser') {
+        queryFocuser();
+    }
+}
+
+function focuserDriversUpdate(data)
+{
+    g_focuser_driver_list = data.drivers;
+    var drivers_select = document.getElementById('focuser_driver_name');
+    for(var i=0;i<data.drivers.length;i++) {
+        var option = document.createElement("option");
+        var name = data.drivers[i].name;
+        var opt = data.drivers[i].opt;
+        option.text  = name;
+        option.value = name;
+        option.selected = i == 0;
+        if(option.selected)
+            document.getElementById('focuser_driver_option').value = opt
+        drivers_select.add(option);
+    }
+}
+
+function focuserDriverSelect()
+{
+    var index = document.getElementById('focuser_driver_name').selectedIndex;
+    document.getElementById('focuser_driver_option').value = g_focuser_driver_list[index].option
+}
+
+function enableAlphaFeatures(enable)
+{
+    for(var el of document.getElementsByClassName('alpha_features'))
+        el.style.display = enable ? 'inline' : 'none';
+}
+
+function focuserStart()
+{
+    var name =document.getElementById('focuser_driver_name').value;
+    var opt = document.getElementById('focuser_driver_option').value;
+    restCall('post','/api/focuser/load',{"driver":name,"opt":opt},(e)=>{
+        setTimeout(queryFocuser,300);
+    });
+}
+
+function focuserMove(dir,type)
+{
+    for(var item of document.getElementsByClassName('focuser_move')) {
+        item.disabled = true;
+    }
+    if(dir == 0) {
+        var val = parseInt(document.getElementById('focuser_position').value)
+        restCall('post','/api/focuser/move_to',{"value":val},(e)=>{});
+    }
+    else {
+        var val = parseInt(document.getElementById('focuser_step_' + type).value) * dir;
+        restCall('post','/api/focuser/move_by',{"value":val},(e)=>{});
+    }
+    setTimeout(queryFocuser,250);
+}
+
+function focuserAbort()
+{
+    restCall('post','/api/focuser/abort',{},(e)=>{});
+    setTimeout(queryFocuser,250);
+}
+
+function queryFocuser()
+{
+    restCall('get','/api/focuser/status',null,(data) => {
+        if(!data.connected) {
+            if(g_focuser_driver_list == null) {
+                restCall('get','/api/focuser/drivers',null,focuserDriversUpdate)
+            }
+            document.getElementById('focuser_driver_selection').style.display='block';
+            document.getElementById('focuser_connected_display_block').style.display='none';
+        }
+        else {
+            document.getElementById('focuser_driver_selection').style.display='none';
+            document.getElementById('focuser_connected_display_block').style.display='block';
+        }
+        document.getElementById('focuser_range').innerHTML = data.max_range;
+        document.getElementById('focuser_position').value = data.position;
+        for(var item of document.getElementsByClassName('focuser_move')) {
+            item.disabled = data.is_moving;
+        }
+        if(data.is_moving) {
+            setTimeout(queryFocuser,250);
+        }
+    });
 }
 
 function getProfiles()
