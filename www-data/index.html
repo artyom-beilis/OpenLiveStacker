@@ -272,6 +272,7 @@
         <button onclick="selectConfig('calib');">Calib.</button>
         <button onclick="selectConfig('astap');">ASTAP</button>
         <button onclick="selectConfig('mount');">Mount</button>
+        <button onclick="selectConfig('bino');">Bino</button>
         <button onclick="selectConfig('focuser');" class="alpha_features" >Focuser</button>
     <p>
     <div id="config_tab_camera" class="config_tab" >
@@ -351,6 +352,37 @@
             <span id='download_status'></span>
         </p>
     </div>
+    <div id="config_tab_bino" class="config_tab" style="display:none">
+        <div>
+            <table>
+                <tr>
+                    <td>Enable</td>
+                    <td><input class="val_input saved_input" id="enable_bino" type="checkbox" /></td>
+                </tr>
+                <tr>
+                    <td>Screen Width (mm)</td>
+                    <td><input class="val_input saved_input" id="screen_width_mm" type="number" value="140" /></td>
+                </tr>
+                <tr>
+                    <td>Pupillary Distance (mm)</td>
+                    <td><input class="val_input saved_input" id="pupillary_distance_mm" type="number" value="60" /></td>
+                </tr>
+                <tr>
+                    <td>Display Format</td>
+                    <td>
+                        <select id="solver_units" class="saved_input">
+                            <option value="circle" selected>Circle</option>
+                            <option value="1_1" >Square</option>
+                            <option value="4_3" >4:3</option>
+                            <option value="16_9" >16:9</option>
+                        </select>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+
     <div id="config_tab_focuser" class="config_tab" style="display:none">
         <div id="focuser_driver_selection" style='display:none' >
             <p>Select Driver</p>

@@ -2861,7 +2861,7 @@ function selectStackConfig(cfg)
 
 function selectConfig(cfg)
 {
-    var cfgs = ['astap','general','camera','profiles','calib','mount','focuser'];
+    var cfgs = ['astap','general','camera','profiles','calib','mount','bino','focuser'];
     for(var i=0;i<cfgs.length;i++) {
         var obj = document.getElementById('config_tab_' + cfgs[i]);
         if(cfgs[i] == cfg) {
