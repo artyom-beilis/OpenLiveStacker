@@ -64,9 +64,7 @@ def _default_config(install_dir = None,src_dir = None):
             "path" : simdir
         },
         "mem_limit_mb" : 0,
-        "toup" : {
-            "oem": False
-        },
+        "toup" : {},
         "meade" : {},
         "astap" : {
             "exe": astap_cli,
@@ -196,7 +194,7 @@ Categories=Astronomy;Education;Science
 
 def _get_drivers():
     if not _win():
-        return [ 'sim', 'asi', 'toup', 'svb', 'uvc', 'gphoto2','indi', 'indigo', 'alpaca', "wdir" ], ('Simulated', 'ASI ZWO', 'ToupTek', 'SVBony', 'UVC', 'GPhoto2', 'Indi', 'Indigo', 'Alpaca', "Watch Directory" )
+        return [ 'sim', 'asi', 'toup', 'meade', 'svb', 'uvc', 'gphoto2','indi', 'indigo', 'alpaca', "wdir" ], ('Simulated', 'ASI ZWO', 'ToupTek', 'Meade', 'SVBony', 'UVC', 'GPhoto2', 'Indi', 'Indigo', 'Alpaca', "Watch Directory" )
     else:
         return [ 'sim', 'asi', 'toup', 'meade', 'svb', 'alpaca' ], ('Simulated', 'ASI ZWO', 'ToupTek', 'Meade', 'SVBony', 'Alpaca')
 
@@ -233,10 +231,6 @@ class UI:
 
 
 
-        ## OEM
-        if not _win():
-            self.oem_label,self.oem_checbox = self._add_bool_entry('OEM:','toup.oem',row=None)
-            self.widgets_to_hide += [self.oem_label,self.oem_checbox]
         self.indi_widgets = self._add_string_entry('Indi Addr','indi.connection',str,None)
         self.indigo_widgets = self._add_string_entry('Indigo Addr','indigo.connection',str,None)
         self.alpaca_widgets = self._add_string_entry('Alpaca Addr','alpaca.connection',str,None)
@@ -509,16 +503,7 @@ class UI:
         return [os.path.basename(n) for n in executables]
 
     def _change_driver(self,is_show):
-        if self.driver == 'toup':
-            if _win():
-                return
-            if is_show:
-                self.oem_label.grid(column=0,row=1,sticky=W)
-                self.oem_checbox.grid(column=1,row=1,sticky = W)
-            else:
-                self.oem_label.grid_forget()
-                self.oem_checbox.grid_forget()
-        elif self.driver == 'indi':
+        if self.driver == 'indi':
             if is_show:
                 self.indi_widgets[0].grid(column=0,row=1,sticky=W)
                 self.indi_widgets[1].grid(column=1,row=1,sticky=W)
