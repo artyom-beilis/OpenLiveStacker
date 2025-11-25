@@ -4,8 +4,11 @@
 #endif
 
 #include "camera.h"
+#ifdef MEADECAM
+#include "meadecam.h"
+#else
 #include "toupcam.h"
-#include "toup_oem.h"
+#endif
 #include "shift_bit.h"
 #include <mutex>
 #include <sstream>
@@ -557,9 +560,7 @@ namespace ols
             opts.push_back(opt_exp);
             // Conditionally supported
             if (!(info_.model->flag & TOUPCAM_FLAG_MONO)) {
-#ifndef MEADECAM
                 opts.push_back(opt_auto_wb);
-#endif                
                 opts.push_back(opt_wb);
             }
             if (info_.model->flag & TOUPCAM_FLAG_TEC) // Thermoelectric Cooler Present
@@ -850,7 +851,6 @@ namespace ols
                 hr = Toupcam_put_AutoExpoEnable(hcam_, value ? 1 : 0);
             }
             break;
-#ifndef MEADECAM            
             case opt_auto_wb:
             {
                 auto_wb_ = !!value;
@@ -858,7 +858,6 @@ namespace ols
                 hr = Toupcam_AwbOnce(hcam_, auto_wb_ ? AutoWB : NULL, auto_wb_ ? this : NULL);
             }
             break;
-#endif            
             case opt_wb:
             {
                 int temp = value;
@@ -1149,7 +1148,6 @@ namespace ols
                 e = make_message("Failed to Toupcam_put_Option(TOUPCAM_OPTION_BITDEPTH, max)", hr);
                 return;
             }
-#ifndef MEADECAM
             unsigned maxTime;
             unsigned short maxAGain;
             if (FAILED(hr = Toupcam_get_MaxAutoExpoTimeAGain(hcam_, &maxTime, &maxAGain)))
@@ -1172,7 +1170,6 @@ namespace ols
                 e = make_message("Failed to Toupcam_put_MaxAutoExpoTimeAGain", hr);
                 return;
             }
-#endif            
             // Low noise seems a default choice for astroimageing
             if (((info_.model->flag & TOUPCAM_FLAG_LOW_NOISE)) && FAILED(hr = Toupcam_put_Option(hcam_, TOUPCAM_OPTION_LOW_NOISE, 1)))
             {
@@ -1310,7 +1307,7 @@ namespace ols
     {
     public:
 
-        ToupcamCameraDriver(bool oem=false):oem_(oem)
+        ToupcamCameraDriver()
         {
         }
 
@@ -1318,6 +1315,7 @@ namespace ols
          * Loops over connected Toupcam cameras, prepares display name, and saves camera info
          * Returns: list of camera names
          */
+#if 0 // OEM    
 #if defined MEADECAM || defined _WIN32
         int enumOEM(ToupcamDeviceV2 info[TOUPCAM_MAX]) { return 0; }
 #else        
@@ -1354,19 +1352,20 @@ namespace ols
             return N;
         }
 #endif
+#endif  
         virtual std::vector<std::string> list_cameras(CamErrorCode &)
         {
             names_.clear();
             cams_.clear();
             ToupcamDeviceV2 info[TOUPCAM_MAX] = {};
-            unsigned N = oem_ ? enumOEM(info) : Toupcam_EnumV2(info);
+            unsigned N = Toupcam_EnumV2(info);
             for (unsigned i = 0; i < N; i++)
             {
                 #ifdef _WIN32
-                std::wstring wname = std::wstring(info[i].displayname) + L"/" + info[i].model->name + L"/" + std::to_wstring(i);
+                std::wstring wname = std::wstring(info[i].displayname) + L"/" + std::to_wstring(i);
                 std::string name = convert(wname); 
                 #else
-                std::string name = std::string(info[i].displayname) + "/" + info[i].model->name + "/" + std::to_string(i);
+                std::string name = std::string(info[i].displayname) + "/" +  std::to_string(i);
                 #endif
                 names_.push_back(name);
                 cams_.push_back(info[i]);
@@ -1393,7 +1392,6 @@ namespace ols
     private:
         std::vector<ToupcamDeviceV2> cams_;
         std::vector<std::string> names_;
-        bool oem_;
     };
     namespace ToupDriverConfig {
         std::string driver_config;
@@ -1411,15 +1409,15 @@ extern "C" {
         return 0;
     }
 #ifdef MEADECAM    
-    void ols_set_meade_driver_log(char const *,int ) {}
+    void ols_set_meade_driver_log(char const *log_path,int debug)
 #else    
     void ols_set_toup_driver_log(char const *log_path,int debug)
+#endif    
     {
         auto path = convert(log_path);
         Toupcam_log_File(path.c_str());
         Toupcam_log_Level(debug ? 4 : 1);
     }
-#endif    
 #ifdef MEADECAM    
     ols::CameraDriver *ols_get_meade_driver(int /*unused*/,ols::CamErrorCode *e)
 #else    
@@ -1438,9 +1436,11 @@ extern "C" {
         if(ols::ToupDriverConfig::driver_config.empty()) {
             return new ols::ToupcamCameraDriver();
         }
+#if 0 // OEM
         else if(ols::ToupDriverConfig::driver_config == "oem") {
             return new ols::ToupcamCameraDriver(true);
         }
+#endif        
         else {
 #ifdef _WIN32            
             *e = "Unsupported";
@@ -1454,8 +1454,10 @@ extern "C" {
                 return nullptr;
             }
 
+            #if 0 // OEM
             // handle OEM cameras replace OEM to Topu product/vendor id
             ols::oem_to_touptek(vendor_id,product_id);
+            #endif
 
             char toup_id[256];
             // touptek android format

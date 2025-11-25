@@ -160,11 +160,6 @@ int main(int argc,char **argv)
             ss<<cfg["wdir"];
             driver_opt = ss.str();
         }
-        else if(driver == "toup") {
-            bool oem = cfg.get("toup.oem",false);
-            if(oem)
-                driver_opt = "oem";
-        }
         else if(driver == "indigo") {
             driver_opt = cfg.get("indigo.connection","");
         }

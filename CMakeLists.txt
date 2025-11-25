@@ -41,9 +41,8 @@ find_path(INDIGO_HEADER indigo/indigo_bus.h)
 
 find_library(TOUPCAM_CAMERA_LIB toupcam)
 find_path(TOUPCAM_CAMERA_HDR toupcam.h)
-if(WIN32)
-    find_library(MEADECAM_CAMERA_LIB meadecam)
-endif()    
+find_path(MEADECAM_CAMERA_HDR meadecam.h)
+find_library(MEADECAM_CAMERA_LIB meadecam)
 
 find_library(LIBTIFF tiff)
 find_library(LIBCPPCMS cppcms)
@@ -212,8 +211,8 @@ else()
     message("- No Toupcam SDK header/lib found")
 endif()
 
-if(TOUPCAM_CAMERA_HDR AND MEADECAM_CAMERA_LIB)
-    include_directories(${TOUPCAM_CAMERA_HDR})
+if(MEADECAM_CAMERA_HDR AND MEADECAM_CAMERA_LIB)
+    include_directories(${MEADECAM_CAMERA_HDR})
     add_library(ols_driver_meade SHARED src/toup_camera.cpp)
     target_compile_definitions(ols_driver_meade PRIVATE MEADECAM)
     
