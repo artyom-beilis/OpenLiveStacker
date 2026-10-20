@@ -83,7 +83,7 @@ For Windows x64 download zip file, unzip it and run ols_gui, you may need to ins
 
 Here the packages you can install on apt based distributions
 
-    apt-get install libgphoto2-dev git python3 cmake libuvc-dev libtiff-dev libpcre3-dev libcurl4-openssl-dev zlib1g-dev libraw-dev libopencv-dev libopencv-imgcodecs-dev libopencv-imgproc-dev build-essential libpcre3-dev zlib1g-dev libcfitsio-dev
+    apt-get install libgphoto2-dev git python3 cmake libuvc-dev libtiff-dev libcurl4-openssl-dev zlib1g-dev libraw-dev libopencv-dev libopencv-imgcodecs-dev libopencv-imgproc-dev build-essential libpcre3-dev zlib1g-dev libcfitsio-dev
 
 For Indi support camera and mount:
 
