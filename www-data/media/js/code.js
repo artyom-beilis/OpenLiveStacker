@@ -2812,7 +2812,7 @@ function loadMountStatus()
             var lat = parseFloat(getVal("lat"));
             var lon = parseFloat(getVal("lon"));
             if(isNaN(lat) || isNaN(lon)) {
-                showError("Lattitude/Longitude is not defined, moust geolocation is not updated");
+                showError("Lattitude/Longitude is not defined, mount geolocation is not updated");
                 return;
             }
 	    var err = Math.max(Math.abs(lat - data.lat),Math.abs(lon-data.lon));
